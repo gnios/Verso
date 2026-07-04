@@ -1,0 +1,23 @@
+# .NET
+bin/
+obj/
+*.user
+.vs/
+*.suo
+
+# Modelos Whisper (binários grandes, baixados sob demanda)
+models/
+
+# Python
+__pycache__/
+*.pyc
+.venv-whisperx/
+
+# Artefatos de teste/mídia grandes
+sample-test-23min.mp4
+sample-test-23min_transcricao.txt
+transcricao-output.txt
+
+# OS
+Thumbs.db
+.DS_Store
