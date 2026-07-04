@@ -1005,5 +1005,59 @@
             <Setter Property="LineHeight" Value="22" />
             <Setter Property="Foreground" Value="{DynamicResource TranscribaFgSecondary}" />
         </Style>
+
+        <Style Selector="StackPanel.settings-section">
+            <Setter Property="Margin" Value="0,0,0,32" />
+            <Setter Property="Spacing" Value="0" />
+        </Style>
+        <Style Selector="TextBlock.settings-section-title">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaFg}" />
+        </Style>
+        <Style Selector="Border.settings-section-title-border">
+            <Setter Property="Margin" Value="0,0,0,14" />
+            <Setter Property="Padding" Value="0,0,0,8" />
+            <Setter Property="BorderBrush" Value="{DynamicResource TranscribaBorder}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+        </Style>
+        <Style Selector="Border.settings-row">
+            <Setter Property="Padding" Value="0,12" />
+            <Setter Property="BorderBrush" Value="{DynamicResource TranscribaBorder}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+        </Style>
+        <Style Selector="TextBlock.settings-row-label">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaFg}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBlock.settings-row-sub">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaMuted}" />
+        </Style>
+        <Style Selector="TextBox.settings-input">
+            <Setter Property="MinWidth" Value="220" />
+            <Setter Property="Padding" Value="7,7,10,7" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Background" Value="{DynamicResource TranscribaBg}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource TranscribaBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="{DynamicResource TranscribaRadius}" />
+        </Style>
+        <Style Selector="TextBox.settings-input:focus">
+            <Setter Property="BorderBrush" Value="{DynamicResource TranscribaAccent}" />
+        </Style>
+        <Style Selector="ComboBox.settings-select">
+            <Setter Property="MinWidth" Value="220" />
+            <Setter Property="Padding" Value="7,7,10,7" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Background" Value="{DynamicResource TranscribaBg}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource TranscribaBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="{DynamicResource TranscribaRadius}" />
+        </Style>
+        <Style Selector="ToggleSwitch.settings-toggle">
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
     </Application.Styles>
 </Application>
