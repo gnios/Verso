@@ -47,6 +47,13 @@
                                 Command="{Binding OpenCommand}"
                                 HorizontalContentAlignment="Stretch"
                                 VerticalContentAlignment="Stretch">
+                            <Button.ContextFlyout>
+                                <MenuFlyout>
+                                    <MenuItem Header="Excluir"
+                                              Command="{Binding DeleteCommand}"
+                                              IsVisible="{Binding CanDelete}" />
+                                </MenuFlyout>
+                            </Button.ContextFlyout>
                             <StackPanel Spacing="0">
                                 <TextBlock Classes="dash-card-title">
                                     <Run Text="{Binding Icon}" />

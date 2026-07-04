@@ -15,6 +15,9 @@ public partial class DashboardViewModel : ViewModelBase
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IServiceProvider _serviceProvider;
+    private readonly SidebarViewModel _sidebar;
+    private readonly IConfirmationService _confirmation;
+    private readonly MediaStorageService _mediaStorage;
     private readonly TranscriptionQueueService? _queueService;
 
     public ObservableCollection<TranscriptionCardViewModel> Cards { get; } = [];
@@ -35,10 +38,18 @@ public partial class DashboardViewModel : ViewModelBase
     public bool IsProgressFilterActive => ActiveStatusFilter == LibraryStatusFilter.Progress;
     public bool IsDoneFilterActive => ActiveStatusFilter == LibraryStatusFilter.Done;
 
-    public DashboardViewModel(IServiceScopeFactory scopeFactory, IServiceProvider serviceProvider)
+    public DashboardViewModel(
+        IServiceScopeFactory scopeFactory,
+        IServiceProvider serviceProvider,
+        SidebarViewModel sidebar,
+        IConfirmationService confirmation,
+        MediaStorageService mediaStorage)
     {
         _scopeFactory = scopeFactory;
         _serviceProvider = serviceProvider;
+        _sidebar = sidebar;
+        _confirmation = confirmation;
+        _mediaStorage = mediaStorage;
 
         if (serviceProvider.GetService<TranscriptionQueueService>() is { } queueService)
         {
@@ -76,6 +87,28 @@ public partial class DashboardViewModel : ViewModelBase
         _serviceProvider.GetRequiredService<NavigationService>().NavigateTo(
             ScreenKey.Editor,
             new NavigationParameter(TranscriptionId: transcriptionId));
+
+    internal async Task DeleteTranscriptionAsync(Guid transcriptionId)
+    {
+        var card = FindCard(transcriptionId);
+        var title = card?.Title ?? "esta transcrição";
+
+        if (!await _confirmation.ConfirmAsync(
+                "Excluir transcrição",
+                $"A transcrição \"{title}\" e todos os seus dados serão excluídos permanentemente. Deseja continuar?"))
+        {
+            return;
+        }
+
+        _queueService?.Cancel(transcriptionId);
+
+        using var scope = _scopeFactory.CreateScope();
+        var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
+        await libraryService.DeleteTranscriptionAsync(transcriptionId);
+        _mediaStorage.DeleteMedia(transcriptionId);
+        await _sidebar.LoadAsync();
+        await LoadAsync();
+    }
 
     internal async Task RetryTranscriptionAsync(Guid transcriptionId)
     {
@@ -142,7 +175,8 @@ public partial class DashboardViewModel : ViewModelBase
             Cards.Add(new TranscriptionCardViewModel(
                 summary,
                 OpenTranscription,
-                id => _ = RetryTranscriptionAsync(id)));
+                id => _ = RetryTranscriptionAsync(id),
+                id => _ = DeleteTranscriptionAsync(id)));
         }
 
         IsEmpty = Cards.Count == 0;
