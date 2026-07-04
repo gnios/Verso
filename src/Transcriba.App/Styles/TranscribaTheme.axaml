@@ -46,6 +46,40 @@
     <SolidColorBrush x:Key="TranscribaSurfaceHover" Color="{DynamicResource TranscribaSurfaceHoverColor}" />
     <SolidColorBrush x:Key="TranscribaSurfaceActive" Color="{DynamicResource TranscribaSurfaceActiveColor}" />
 
+    <Color x:Key="TagBlueColor">#2EAADC</Color>
+    <Color x:Key="TagBlueLightColor">#1A2EAADC</Color>
+    <Color x:Key="TagGreenColor">#4DAB6F</Color>
+    <Color x:Key="TagGreenLightColor">#1A4DAB6F</Color>
+    <Color x:Key="TagYellowColor">#CB912F</Color>
+    <Color x:Key="TagYellowLightColor">#1FCB912F</Color>
+    <Color x:Key="TagRedColor">#EB5757</Color>
+    <Color x:Key="TagRedLightColor">#1AEB5757</Color>
+    <Color x:Key="TagPurpleColor">#9065B0</Color>
+    <Color x:Key="TagPurpleLightColor">#1A9065B0</Color>
+    <Color x:Key="TagOrangeColor">#D9730D</Color>
+    <Color x:Key="TagOrangeLightColor">#1AD9730D</Color>
+    <Color x:Key="TagPinkColor">#C14C8A</Color>
+    <Color x:Key="TagPinkLightColor">#1AC14C8A</Color>
+    <Color x:Key="TagTealColor">#0D9488</Color>
+    <Color x:Key="TagTealLightColor">#1A0D9488</Color>
+
+    <SolidColorBrush x:Key="TagBlue" Color="{StaticResource TagBlueColor}" />
+    <SolidColorBrush x:Key="TagBlueLight" Color="{StaticResource TagBlueLightColor}" />
+    <SolidColorBrush x:Key="TagGreen" Color="{StaticResource TagGreenColor}" />
+    <SolidColorBrush x:Key="TagGreenLight" Color="{StaticResource TagGreenLightColor}" />
+    <SolidColorBrush x:Key="TagYellow" Color="{StaticResource TagYellowColor}" />
+    <SolidColorBrush x:Key="TagYellowLight" Color="{StaticResource TagYellowLightColor}" />
+    <SolidColorBrush x:Key="TagRed" Color="{StaticResource TagRedColor}" />
+    <SolidColorBrush x:Key="TagRedLight" Color="{StaticResource TagRedLightColor}" />
+    <SolidColorBrush x:Key="TagPurple" Color="{StaticResource TagPurpleColor}" />
+    <SolidColorBrush x:Key="TagPurpleLight" Color="{StaticResource TagPurpleLightColor}" />
+    <SolidColorBrush x:Key="TagOrange" Color="{StaticResource TagOrangeColor}" />
+    <SolidColorBrush x:Key="TagOrangeLight" Color="{StaticResource TagOrangeLightColor}" />
+    <SolidColorBrush x:Key="TagPink" Color="{StaticResource TagPinkColor}" />
+    <SolidColorBrush x:Key="TagPinkLight" Color="{StaticResource TagPinkLightColor}" />
+    <SolidColorBrush x:Key="TagTeal" Color="{StaticResource TagTealColor}" />
+    <SolidColorBrush x:Key="TagTealLight" Color="{StaticResource TagTealLightColor}" />
+
     <Thickness x:Key="SidebarWidth">260</Thickness>
     <CornerRadius x:Key="TranscribaRadius">4</CornerRadius>
     <CornerRadius x:Key="TranscribaRadiusMd">6</CornerRadius>

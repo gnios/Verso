@@ -137,5 +137,170 @@
             <Setter Property="FontSize" Value="11" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
+
+        <Style Selector="TextBlock.screen-title">
+            <Setter Property="FontSize" Value="28" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaFg}" />
+            <Setter Property="LetterSpacing" Value="-0.1" />
+        </Style>
+        <Style Selector="TextBlock.screen-subtitle">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaFgSecondary}" />
+        </Style>
+        <Style Selector="StackPanel.screen-header">
+            <Setter Property="Margin" Value="0,0,0,28" />
+        </Style>
+
+        <Style Selector="StackPanel.dash-toolbar">
+            <Setter Property="Margin" Value="0,0,0,20" />
+        </Style>
+        <Style Selector="Button.dash-filter">
+            <Setter Property="Padding" Value="12,5" />
+            <Setter Property="Background" Value="{DynamicResource TranscribaSurface}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource TranscribaBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="{DynamicResource TranscribaRadius}" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaFgSecondary}" />
+            <Setter Property="FontSize" Value="13" />
+        </Style>
+        <Style Selector="Button.dash-filter:pointerover">
+            <Setter Property="BorderBrush" Value="{DynamicResource TranscribaBorderDark}" />
+        </Style>
+        <Style Selector="Button.dash-filter.active">
+            <Setter Property="Background" Value="{DynamicResource TranscribaAccentLight}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource TranscribaAccent}" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaAccent}" />
+        </Style>
+
+        <Style Selector="TextBox.dash-search">
+            <Setter Property="MinWidth" Value="180" />
+            <Setter Property="Padding" Value="12,7" />
+            <Setter Property="Background" Value="{DynamicResource TranscribaBg}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource TranscribaBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="{DynamicResource TranscribaRadius}" />
+            <Setter Property="FontSize" Value="13" />
+        </Style>
+        <Style Selector="TextBox.dash-search:focus">
+            <Setter Property="BorderBrush" Value="{DynamicResource TranscribaAccent}" />
+        </Style>
+
+        <Style Selector="TextBlock.dash-empty">
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="Padding" Value="0,48" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaMuted}" />
+            <Setter Property="FontSize" Value="14" />
+        </Style>
+
+        <Style Selector="Button.dash-card">
+            <Setter Property="Width" Value="300" />
+            <Setter Property="Margin" Value="0,0,14,14" />
+            <Setter Property="Padding" Value="18,16" />
+            <Setter Property="Background" Value="{DynamicResource TranscribaBg}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource TranscribaBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="{DynamicResource TranscribaRadiusLg}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.dash-card:pointerover">
+            <Setter Property="BorderBrush" Value="{DynamicResource TranscribaBorderDark}" />
+        </Style>
+
+        <Style Selector="TextBlock.dash-card-title">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaFg}" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+        </Style>
+        <Style Selector="TextBlock.dash-card-preview">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaFgSecondary}" />
+            <Setter Property="LineHeight" Value="18" />
+            <Setter Property="Margin" Value="0,0,0,10" />
+        </Style>
+        <Style Selector="StackPanel.dash-card-meta TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaMuted}" />
+        </Style>
+
+        <Style Selector="Border.tag">
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="CornerRadius" Value="99" />
+        </Style>
+        <Style Selector="Border.tag TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="Border.tag-blue">
+            <Setter Property="Background" Value="{StaticResource TagBlueLight}" />
+        </Style>
+        <Style Selector="Border.tag-blue TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TagBlue}" />
+        </Style>
+        <Style Selector="Border.tag-green">
+            <Setter Property="Background" Value="{StaticResource TagGreenLight}" />
+        </Style>
+        <Style Selector="Border.tag-green TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TagGreen}" />
+        </Style>
+        <Style Selector="Border.tag-yellow">
+            <Setter Property="Background" Value="{StaticResource TagYellowLight}" />
+        </Style>
+        <Style Selector="Border.tag-yellow TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TagYellow}" />
+        </Style>
+        <Style Selector="Border.tag-red">
+            <Setter Property="Background" Value="{StaticResource TagRedLight}" />
+        </Style>
+        <Style Selector="Border.tag-red TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TagRed}" />
+        </Style>
+        <Style Selector="Border.tag-purple">
+            <Setter Property="Background" Value="{StaticResource TagPurpleLight}" />
+        </Style>
+        <Style Selector="Border.tag-purple TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TagPurple}" />
+        </Style>
+        <Style Selector="Border.tag-orange">
+            <Setter Property="Background" Value="{StaticResource TagOrangeLight}" />
+        </Style>
+        <Style Selector="Border.tag-orange TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TagOrange}" />
+        </Style>
+        <Style Selector="Border.tag-pink">
+            <Setter Property="Background" Value="{StaticResource TagPinkLight}" />
+        </Style>
+        <Style Selector="Border.tag-pink TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TagPink}" />
+        </Style>
+        <Style Selector="Border.tag-teal">
+            <Setter Property="Background" Value="{StaticResource TagTealLight}" />
+        </Style>
+        <Style Selector="Border.tag-teal TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TagTeal}" />
+        </Style>
+
+        <Style Selector="Border.status-badge">
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="CornerRadius" Value="99" />
+        </Style>
+        <Style Selector="Border.status-badge TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="Border.status-progress">
+            <Setter Property="Background" Value="{StaticResource TagYellowLight}" />
+        </Style>
+        <Style Selector="Border.status-progress TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TagYellow}" />
+        </Style>
+        <Style Selector="Border.status-done">
+            <Setter Property="Background" Value="{StaticResource TagGreenLight}" />
+        </Style>
+        <Style Selector="Border.status-done TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TagGreen}" />
+        </Style>
     </Application.Styles>
 </Application>

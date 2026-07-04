@@ -739,14 +739,15 @@ T16, T30 → T50
 **Tools**: MCP: NONE / Skill: NONE
 
 **Done when**:
-- [ ] Layout visualmente equivalente ao protótipo (grid responsivo, cores de tag, badges de status)
-- [ ] Clique no card navega para o Editor
-- [ ] Gate `build` passa
+- [x] Layout visualmente equivalente ao protótipo (grid responsivo, cores de tag, badges de status)
+- [x] Clique no card navega para o Editor
+- [x] Gate `build` passa
 
 **Tests**: none
 **Gate**: build
 
 **Commit**: `feat(dashboard): implementa DashboardView`
+**Status**: ✅ Concluída
 
 ---
 
