@@ -10,6 +10,7 @@ public static class AppServiceCollectionExtensions
     {
         services.AddSingleton<NavigationService>();
         services.AddSingleton<IThemeApplicator, AvaloniaThemeApplicator>();
+        services.AddSingleton<IFileSaveService, AvaloniaFileSaveService>();
         services.AddSingleton<ThemeService>();
         services.AddSingleton<SidebarViewModel>();
         services.AddSingleton<NewPageModalViewModel>();

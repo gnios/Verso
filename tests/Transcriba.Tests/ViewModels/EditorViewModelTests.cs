@@ -10,6 +10,7 @@ using Transcriba.Core;
 using Transcriba.Core.Data;
 using Transcriba.Core.Data.Entities;
 using Transcriba.Core.Engine;
+using System.Text;
 using Transcriba.Tests.Services;
 
 namespace Transcriba.Tests.ViewModels;
@@ -77,6 +78,59 @@ public class EditorViewModelTests
         var editor = Assert.IsType<EditorViewModel>(navigation.CurrentViewModel);
         await Task.Delay(50);
         return editor;
+    }
+
+    private static async Task<(IServiceProvider Provider, string Directory, Guid TranscriptionId)>
+        CreateEditorProviderWithFileSaveAsync(
+            TranscriptionStatus status,
+            FakeFileSaveService fileSave,
+            Action<Transcription>? configure = null)
+    {
+        var (baseProvider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();
+        var dbPath = Path.Combine(directory, "transcriba.db");
+
+        var services = new ServiceCollection();
+        services.AddTranscribaDatabase(dbPath);
+        services.AddTranscribaEngine();
+        services.AddTranscribaServices();
+        services.AddTranscribaAppServices();
+        services.AddSingleton<IFileSaveService>(fileSave);
+        var provider = services.BuildServiceProvider();
+        await DbBootstrapper.MigrateAsync(provider);
+
+        var transcriptionId = Guid.NewGuid();
+        await using (var ctx = await TestDbHelper.GetFactory(provider).CreateDbContextAsync())
+        {
+            var transcription = new Transcription
+            {
+                Id = transcriptionId,
+                Title = "Entrevista teste",
+                Icon = "🎤",
+                Status = status,
+                ErrorMessage = status == TranscriptionStatus.Error ? "falha simulada" : null,
+                CreatedAt = DateTime.UtcNow,
+                DurationSeconds = 120,
+            };
+
+            if (status == TranscriptionStatus.Done)
+            {
+                transcription.Segments.Add(new Segment
+                {
+                    Id = Guid.NewGuid(),
+                    TranscriptionId = transcriptionId,
+                    StartSeconds = 0,
+                    EndSeconds = 2.5,
+                    Text = "Primeiro segmento",
+                    SortOrder = 0,
+                });
+            }
+
+            configure?.Invoke(transcription);
+            ctx.Transcriptions.Add(transcription);
+            await ctx.SaveChangesAsync();
+        }
+
+        return (provider, directory, transcriptionId);
     }
 
     [Fact]
@@ -295,6 +349,122 @@ public class EditorViewModelTests
 
             Assert.Single(segments);
             Assert.Equal("primeiro segundo", segments[0].Text);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task Export_WithoutSegments_DisablesExportCommand()
+    {
+        var (provider, directory, transcriptionId) = await CreateEditorProviderAsync(TranscriptionStatus.InProgress);
+        try
+        {
+            var editor = await CreateEditorAsync(provider, transcriptionId);
+
+            Assert.False(editor.CanExport);
+            Assert.False(editor.ExportCommand.CanExecute(null));
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task ExportWithFormat_Txt_WritesFileViaExportService()
+    {
+        var fileSave = new FakeFileSaveService();
+        var (provider, directory, transcriptionId) =
+            await CreateEditorProviderWithFileSaveAsync(TranscriptionStatus.Done, fileSave);
+        var outputPath = Path.Combine(directory, "export.txt");
+        fileSave.NextPath = outputPath;
+
+        try
+        {
+            var editor = await CreateEditorAsync(provider, transcriptionId);
+
+            Assert.True(editor.CanExport);
+            await editor.ExportWithFormatAsync(ExportFormat.Txt);
+
+            Assert.Equal(ExportFormat.Txt, fileSave.LastFormat);
+            Assert.Equal("Entrevista teste", fileSave.LastSuggestedName);
+            Assert.True(File.Exists(outputPath));
+
+            var lines = await File.ReadAllLinesAsync(outputPath, Encoding.UTF8);
+            Assert.Contains(lines, l => l.Contains("Primeiro segmento"));
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task ExportWithFormat_Srt_CallsExportServiceWithSrtExtension()
+    {
+        var fileSave = new FakeFileSaveService();
+        var (provider, directory, transcriptionId) =
+            await CreateEditorProviderWithFileSaveAsync(TranscriptionStatus.Done, fileSave);
+        var outputPath = Path.Combine(directory, "export.srt");
+        fileSave.NextPath = outputPath;
+
+        try
+        {
+            var editor = await CreateEditorAsync(provider, transcriptionId);
+            await editor.ExportWithFormatAsync(ExportFormat.Srt);
+
+            Assert.Equal(ExportFormat.Srt, fileSave.LastFormat);
+            Assert.True(File.Exists(outputPath));
+            var content = await File.ReadAllTextAsync(outputPath, Encoding.UTF8);
+            Assert.Contains("Primeiro segmento", content);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task ExportWithFormat_Vtt_CallsExportServiceWithVttExtension()
+    {
+        var fileSave = new FakeFileSaveService();
+        var (provider, directory, transcriptionId) =
+            await CreateEditorProviderWithFileSaveAsync(TranscriptionStatus.Done, fileSave);
+        var outputPath = Path.Combine(directory, "export.vtt");
+        fileSave.NextPath = outputPath;
+
+        try
+        {
+            var editor = await CreateEditorAsync(provider, transcriptionId);
+            await editor.ExportWithFormatAsync(ExportFormat.Vtt);
+
+            Assert.Equal(ExportFormat.Vtt, fileSave.LastFormat);
+            Assert.True(File.Exists(outputPath));
+            var content = await File.ReadAllTextAsync(outputPath, Encoding.UTF8);
+            Assert.StartsWith("WEBVTT", content);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task ExportWithFormat_CancelledSavePath_DoesNotCreateFile()
+    {
+        var fileSave = new FakeFileSaveService { NextPath = null };
+        var (provider, directory, transcriptionId) =
+            await CreateEditorProviderWithFileSaveAsync(TranscriptionStatus.Done, fileSave);
+
+        try
+        {
+            var editor = await CreateEditorAsync(provider, transcriptionId);
+            await editor.ExportWithFormatAsync(ExportFormat.Txt);
+
+            Assert.False(Directory.GetFiles(directory, "export.*").Any());
         }
         finally
         {

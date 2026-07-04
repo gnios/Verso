@@ -107,7 +107,8 @@
                     <Border Grid.Column="4" Classes="editor-toolbar-sep" Width="1" Height="16" />
                     <Button Grid.Column="5"
                             Content="Exportar"
-                            Command="{Binding ExportCommand}" />
+                            Command="{Binding ExportCommand}"
+                            IsEnabled="{Binding CanExport}" />
 
                     <Border Grid.Column="0"
                             Grid.ColumnSpan="6"
@@ -170,5 +171,7 @@
         </ScrollViewer>
 
         <views:PlayerBarView Grid.Row="1" DataContext="{Binding PlayerBar}" />
+
+        <views:ExportDialog Grid.RowSpan="2" DataContext="{Binding}" />
     </Grid>
 </UserControl>
