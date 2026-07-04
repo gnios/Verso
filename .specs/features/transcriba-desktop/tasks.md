@@ -246,6 +246,7 @@ T16, T30 → T50
 **Gate**: build
 
 **Commit**: `feat(data): adiciona entidades de domínio`
+**Status**: ✅ Concluída
 
 ---
 
@@ -266,6 +267,7 @@ T16, T30 → T50
 **Gate**: build
 
 **Commit**: `feat(data): adiciona TranscribaDbContext e migration inicial`
+**Status**: ✅ Concluída
 
 ---
 
