@@ -27,6 +27,7 @@ class Program
                 services.AddTranscribaDatabase();
                 services.AddTranscribaEngine();
                 services.AddTranscribaServices();
+                services.AddTranscribaAppServices();
             })
             .Build();
         _host.Start();

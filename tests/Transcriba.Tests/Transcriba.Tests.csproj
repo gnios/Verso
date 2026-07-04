@@ -20,6 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Transcriba.App\Transcriba.App.csproj" />
     <ProjectReference Include="..\..\src\Transcriba.Core\Transcriba.Core.csproj" />
   </ItemGroup>
 
