@@ -1,6 +1,8 @@
 ﻿using Avalonia;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System;
+using Transcriba.Core.Data;
 
 namespace Transcriba.App;
 
@@ -17,8 +19,11 @@ class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        _host = Host.CreateDefaultBuilder(args).Build();
+        _host = Host.CreateDefaultBuilder(args)
+            .ConfigureServices(services => services.AddTranscribaDatabase())
+            .Build();
         _host.Start();
+        DbBootstrapper.MigrateAsync(_host.Services).GetAwaiter().GetResult();
 
         try
         {

@@ -289,6 +289,7 @@ T16, T30 → T50
 **Gate**: full
 
 **Commit**: `feat(data): inicializa banco SQLite em AppData via IDbContextFactory`
+**Status**: ✅ Concluída
 
 ---
 
