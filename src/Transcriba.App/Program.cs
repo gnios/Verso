@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System;
+using Transcriba.Core;
 using Transcriba.Core.Data;
 using Transcriba.Core.Engine;
 
@@ -25,6 +26,7 @@ class Program
             {
                 services.AddTranscribaDatabase();
                 services.AddTranscribaEngine();
+                services.AddTranscribaServices();
             })
             .Build();
         _host.Start();
