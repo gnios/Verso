@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Transcriba.Core.Export;
+using Transcriba.Core.Media;
 using Transcriba.Core.Services;
 
 namespace Transcriba.Core;
@@ -15,6 +16,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<SegmentEditingService>();
         services.AddScoped<SettingsService>();
         services.AddScoped<ExportService>();
+        services.AddSingleton<IMediaPlaybackService, LibVlcPlaybackService>();
         return services;
     }
 }
