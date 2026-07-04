@@ -9,6 +9,8 @@ public static class AppServiceCollectionExtensions
     public static IServiceCollection AddTranscribaAppServices(this IServiceCollection services)
     {
         services.AddSingleton<NavigationService>();
+        services.AddSingleton<IThemeApplicator, AvaloniaThemeApplicator>();
+        services.AddSingleton<ThemeService>();
 
         services.AddTransient<DashboardViewModel>();
         services.AddTransient<ResearchViewModel>();
