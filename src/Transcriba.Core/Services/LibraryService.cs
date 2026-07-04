@@ -248,6 +248,23 @@ public class LibraryService(IDbContextFactory<TranscribaDbContext> dbContextFact
         }
     }
 
+    public async Task DeleteTranscriptionAsync(Guid id)
+    {
+        await using var context = await dbContextFactory.CreateDbContextAsync();
+        var transcription = await context.Transcriptions
+            .Include(t => t.Tags)
+            .FirstOrDefaultAsync(t => t.Id == id);
+
+        if (transcription is null)
+        {
+            return;
+        }
+
+        transcription.Tags.Clear();
+        context.Transcriptions.Remove(transcription);
+        await context.SaveChangesAsync();
+    }
+
     public async Task<Transcription> CreateStandaloneAsync(
         string title,
         string? icon,

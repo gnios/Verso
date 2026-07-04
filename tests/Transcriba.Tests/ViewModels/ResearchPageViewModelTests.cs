@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Transcriba.App;
 using Transcriba.App.Services;
@@ -14,7 +15,7 @@ namespace Transcriba.Tests.ViewModels;
 public class ResearchPageViewModelTests
 {
     private static async Task<(IServiceProvider Provider, string Directory, int ResearchId, Guid DoneId, Guid ProgressId)>
-        CreateResearchProviderAsync()
+        CreateResearchProviderAsync(FakeConfirmationService? confirmation = null)
     {
         var (baseProvider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();
         var dbPath = Path.Combine(directory, "transcriba.db");
@@ -24,6 +25,12 @@ public class ResearchPageViewModelTests
         services.AddTranscribaEngine();
         services.AddTranscribaServices();
         services.AddTranscribaAppServices();
+        services.AddSingleton(new MediaStorageService(Path.Combine(directory, "media")));
+        if (confirmation is not null)
+        {
+            services.AddSingleton<IConfirmationService>(confirmation);
+        }
+
         var provider = services.BuildServiceProvider();
         await DbBootstrapper.MigrateAsync(provider);
 
@@ -215,6 +222,58 @@ public class ResearchPageViewModelTests
             page.NavigateDashboardCommand.Execute(null);
 
             Assert.Equal(ScreenKey.Dashboard, navigation.CurrentScreen);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task DeleteTranscription_Confirmed_RemovesFromListAndDatabase()
+    {
+        var confirmation = new FakeConfirmationService { NextResult = true };
+        var (provider, directory, researchId, doneId, _) =
+            await CreateResearchProviderAsync(confirmation);
+        var mediaStorage = provider.GetRequiredService<MediaStorageService>();
+        var mediaPath = Path.Combine(directory, "source.wav");
+        await File.WriteAllTextAsync(mediaPath, "audio");
+        await mediaStorage.CopyToAppDataAsync(mediaPath, doneId);
+
+        try
+        {
+            var page = await CreateResearchPageAsync(provider, researchId);
+            await page.DeleteTranscriptionAsync(doneId);
+
+            Assert.Equal("Excluir transcrição", confirmation.LastTitle);
+            Assert.Single(page.Transcriptions);
+            Assert.DoesNotContain(page.Transcriptions, card => card.Id == doneId);
+
+            await using var ctx = await TestDbHelper.GetFactory(provider).CreateDbContextAsync();
+            Assert.False(await ctx.Transcriptions.AnyAsync(t => t.Id == doneId));
+            Assert.False(Directory.Exists(Path.Combine(directory, "media", doneId.ToString("N"))));
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task DeleteTranscription_Cancelled_KeepsTranscription()
+    {
+        var confirmation = new FakeConfirmationService { NextResult = false };
+        var (provider, directory, researchId, doneId, _) =
+            await CreateResearchProviderAsync(confirmation);
+
+        try
+        {
+            var page = await CreateResearchPageAsync(provider, researchId);
+            await page.DeleteTranscriptionAsync(doneId);
+
+            Assert.Equal(2, page.Transcriptions.Count);
+            await using var ctx = await TestDbHelper.GetFactory(provider).CreateDbContextAsync();
+            Assert.True(await ctx.Transcriptions.AnyAsync(t => t.Id == doneId));
         }
         finally
         {

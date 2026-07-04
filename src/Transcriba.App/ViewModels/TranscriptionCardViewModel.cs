@@ -32,6 +32,8 @@ public partial class TranscriptionCardViewModel : ViewModelBase
 
     private readonly Action<Guid>? _retryHandler;
 
+    private readonly Action<Guid>? _deleteHandler;
+
 
 
     public Guid Id { get; }
@@ -84,18 +86,23 @@ public partial class TranscriptionCardViewModel : ViewModelBase
 
     public bool CanRetry => IsError && _retryHandler is not null;
 
+    public bool CanDelete => _deleteHandler is not null;
+
 
 
     public TranscriptionCardViewModel(
         TranscriptionSummary summary,
         Action<Guid> openHandler,
-        Action<Guid>? retryHandler = null)
+        Action<Guid>? retryHandler = null,
+        Action<Guid>? deleteHandler = null)
 
     {
 
         _openHandler = openHandler;
 
         _retryHandler = retryHandler;
+
+        _deleteHandler = deleteHandler;
 
         Id = summary.Id;
 
@@ -172,6 +179,12 @@ public partial class TranscriptionCardViewModel : ViewModelBase
         }
 
     }
+
+
+
+    [RelayCommand(CanExecute = nameof(CanDelete))]
+
+    private void Delete() => _deleteHandler?.Invoke(Id);
 
 
 

@@ -60,6 +60,13 @@
                             <Button Classes="research-item"
                                     Command="{Binding OpenCommand}"
                                     HorizontalContentAlignment="Stretch">
+                                <Button.ContextFlyout>
+                                    <MenuFlyout>
+                                        <MenuItem Header="Excluir"
+                                                  Command="{Binding DeleteCommand}"
+                                                  IsVisible="{Binding CanDelete}" />
+                                    </MenuFlyout>
+                                </Button.ContextFlyout>
                                 <Grid ColumnDefinitions="Auto,*,Auto">
                                     <Border Grid.Column="0"
                                             Classes="research-item-icon"
