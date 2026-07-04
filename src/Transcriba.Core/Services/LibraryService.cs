@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Transcriba.Core.Catalogs;
 using Transcriba.Core.Data;
 using Transcriba.Core.Data.Entities;
 
@@ -47,12 +48,52 @@ public class LibraryService(IDbContextFactory<TranscribaDbContext> dbContextFact
     {
         await using var context = await dbContextFactory.CreateDbContextAsync();
         return await context.Tags
+            .OrderBy(t => t.Name)
             .Select(t => new TagSummary(
                 t.Id,
                 t.Name,
                 context.Transcriptions.Count(tr => tr.Tags.Any(tag => tag.Id == t.Id))))
-            .OrderBy(t => t.Name)
             .ToListAsync();
+    }
+
+    public async Task<Transcription> CreateStandaloneAsync(
+        string title,
+        string? icon,
+        IEnumerable<string> tagNames)
+    {
+        await using var context = await dbContextFactory.CreateDbContextAsync();
+
+        var transcription = new Transcription
+        {
+            Id = Guid.NewGuid(),
+            Title = title,
+            Icon = icon,
+            Status = TranscriptionStatus.InProgress,
+            CreatedAt = DateTime.UtcNow,
+        };
+
+        foreach (var tagName in tagNames
+                     .Select(t => t.Trim())
+                     .Where(t => !string.IsNullOrEmpty(t))
+                     .Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var tag = await context.Tags.FirstOrDefaultAsync(t => t.Name == tagName);
+            if (tag is null)
+            {
+                tag = new Tag
+                {
+                    Name = tagName,
+                    ColorName = TagColorCatalog.GetColor(tagName),
+                };
+                context.Tags.Add(tag);
+            }
+
+            transcription.Tags.Add(tag);
+        }
+
+        context.Transcriptions.Add(transcription);
+        await context.SaveChangesAsync();
+        return transcription;
     }
 
     private static IQueryable<Transcription> ApplyFilter(IQueryable<Transcription> query, LibraryFilter filter)
