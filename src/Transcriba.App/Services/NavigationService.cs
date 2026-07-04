@@ -36,6 +36,14 @@ public partial class NavigationService : ObservableObject
         {
             researchPage.Initialize(parameter as NavigationParameter);
         }
+        else if (viewModel is UploadViewModel upload)
+        {
+            upload.Initialize(parameter as NavigationParameter);
+        }
+        else if (viewModel is EditorViewModel editor)
+        {
+            editor.Initialize(parameter as NavigationParameter);
+        }
 
         CurrentViewModel = viewModel;
     }

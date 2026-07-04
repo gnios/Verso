@@ -3,6 +3,7 @@ using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Transcriba.Core.Catalogs;
 using Transcriba.Core.Data;
 using Transcriba.Core.Data.Entities;
 
@@ -121,9 +122,34 @@ public sealed class TranscriptionQueueService : BackgroundService
     {
         await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
+        var transcription = await context.Transcriptions
+            .SingleOrDefaultAsync(t => t.Id == request.TranscriptionId, cancellationToken);
+
+        if (transcription is null)
+        {
+            throw new InvalidOperationException($"Transcrição {request.TranscriptionId} não encontrada.");
+        }
+
         await context.Segments
             .Where(s => s.TranscriptionId == request.TranscriptionId)
             .ExecuteDeleteAsync(cancellationToken);
+
+        await context.Speakers
+            .Where(s => s.TranscriptionId == request.TranscriptionId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        Speaker? defaultSpeaker = null;
+        if (transcription.SpeakerMode == SpeakerMode.Automatic)
+        {
+            defaultSpeaker = new Speaker
+            {
+                Id = Guid.NewGuid(),
+                TranscriptionId = request.TranscriptionId,
+                Name = "Locutor 1",
+                ColorHex = SpeakerColorCatalog.ColorAtIndex(0),
+            };
+            context.Speakers.Add(defaultSpeaker);
+        }
 
         var sortOrder = 0;
         foreach (var segment in result.Segments)
@@ -136,6 +162,7 @@ public sealed class TranscriptionQueueService : BackgroundService
                 EndSeconds = segment.EndSeconds,
                 Text = segment.Text,
                 SortOrder = sortOrder++,
+                SpeakerId = defaultSpeaker?.Id,
             });
         }
 
