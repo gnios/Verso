@@ -2,6 +2,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Transcriba.App;
 using Transcriba.App.Services;
 using Transcriba.App.ViewModels;
+using Transcriba.Core;
+using Transcriba.Core.Data;
+using Transcriba.Core.Engine;
 
 namespace Transcriba.Tests.Services;
 
@@ -9,9 +12,14 @@ public class NavigationServiceTests
 {
     private static NavigationService CreateNavigationService()
     {
+        var dbPath = Path.Combine(Path.GetTempPath(), $"transcriba-nav-{Guid.NewGuid():N}", "transcriba.db");
         var services = new ServiceCollection();
+        services.AddTranscribaDatabase(dbPath);
+        services.AddTranscribaEngine();
+        services.AddTranscribaServices();
         services.AddTranscribaAppServices();
         var provider = services.BuildServiceProvider();
+        DbBootstrapper.MigrateAsync(provider).GetAwaiter().GetResult();
         return provider.GetRequiredService<NavigationService>();
     }
 

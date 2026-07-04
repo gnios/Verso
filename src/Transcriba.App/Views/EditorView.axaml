@@ -1,9 +1,43 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="Transcriba.App.Views.EditorView">
-    <TextBlock Text="Editor"
-               FontSize="28"
-               FontWeight="Bold"
-               Foreground="{DynamicResource TranscribaFg}"
-               Margin="40,40,56,32" />
+             xmlns:vm="using:Transcriba.App.ViewModels"
+             x:Class="Transcriba.App.Views.EditorView"
+             x:DataType="vm:EditorViewModel">
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                  VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="40,40,56,32" Spacing="12">
+            <TextBlock Text="{Binding Title}"
+                       Classes="screen-title" />
+
+            <Border Classes="status-badge status-progress"
+                    HorizontalAlignment="Left"
+                    IsVisible="{Binding IsInProgress}">
+                <TextBlock Text="{Binding StatusMessage}" />
+            </Border>
+
+            <TextBlock Text="{Binding StatusMessage}"
+                       Classes="dash-card-error"
+                       IsVisible="{Binding IsError}" />
+
+            <ItemsControl ItemsSource="{Binding Segments}"
+                          IsVisible="{Binding HasSegments}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:EditorSegmentViewModel">
+                        <Border BorderBrush="{DynamicResource TranscribaBorder}"
+                                BorderThickness="0,0,0,1"
+                                Padding="0,8">
+                            <StackPanel Spacing="4">
+                                <TextBlock FontSize="12"
+                                           Foreground="{DynamicResource TranscribaMuted}"
+                                           Text="{Binding StartSeconds, StringFormat='{}{0:0.0}s'}" />
+                                <TextBlock Text="{Binding Text}"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TranscribaFg}" />
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>

@@ -15,6 +15,7 @@ public partial class DashboardViewModel : ViewModelBase
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IServiceProvider _serviceProvider;
+    private readonly TranscriptionQueueService? _queueService;
 
     public ObservableCollection<TranscriptionCardViewModel> Cards { get; } = [];
 
@@ -41,7 +42,8 @@ public partial class DashboardViewModel : ViewModelBase
 
         if (serviceProvider.GetService<TranscriptionQueueService>() is { } queueService)
         {
-            queueService.StatusChanged += OnQueueStatusChanged;
+            _queueService = queueService;
+            _queueService.StatusChanged += OnQueueStatusChanged;
         }
     }
 
@@ -75,6 +77,37 @@ public partial class DashboardViewModel : ViewModelBase
             ScreenKey.Editor,
             new NavigationParameter(TranscriptionId: transcriptionId));
 
+    internal async Task RetryTranscriptionAsync(Guid transcriptionId)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
+        var settingsService = scope.ServiceProvider.GetRequiredService<SettingsService>();
+
+        var transcription = await libraryService.GetTranscriptionAsync(transcriptionId);
+        if (transcription is null || string.IsNullOrWhiteSpace(transcription.MediaFilePath) || _queueService is null)
+        {
+            return;
+        }
+
+        var settings = await settingsService.GetAsync();
+        await libraryService.ResetToInProgressAsync(transcriptionId);
+
+        var card = FindCard(transcriptionId);
+        if (card is not null)
+        {
+            card.Status = TranscriptionStatus.InProgress;
+            card.ErrorMessage = null;
+            card.NotifyRetryAvailability();
+        }
+
+        _queueService.Enqueue(new TranscriptionJobRequest(
+            transcriptionId,
+            transcription.MediaFilePath,
+            transcription.Language,
+            transcription.Quality,
+            settings.Device));
+    }
+
     private void ApplyNavigationParameter(NavigationParameter? parameter)
     {
         if (parameter is null)
@@ -106,7 +139,10 @@ public partial class DashboardViewModel : ViewModelBase
         Cards.Clear();
         foreach (var summary in summaries)
         {
-            Cards.Add(new TranscriptionCardViewModel(summary, OpenTranscription));
+            Cards.Add(new TranscriptionCardViewModel(
+                summary,
+                OpenTranscription,
+                id => _ = RetryTranscriptionAsync(id)));
         }
 
         IsEmpty = Cards.Count == 0;
@@ -118,7 +154,7 @@ public partial class DashboardViewModel : ViewModelBase
         if (card is null)
         {
             if (e.Status is TranscriptionStatusChanged.Queued or TranscriptionStatusChanged.InProgress
-                or TranscriptionStatusChanged.Done)
+                or TranscriptionStatusChanged.Done or TranscriptionStatusChanged.Error)
             {
                 _ = LoadAsync();
             }
@@ -127,6 +163,17 @@ public partial class DashboardViewModel : ViewModelBase
         }
 
         card.Status = MapQueueStatus(e.Status);
+        if (e.Status == TranscriptionStatusChanged.Error)
+        {
+            card.ErrorMessage = e.ErrorMessage;
+        }
+        else if (e.Status == TranscriptionStatusChanged.Done)
+        {
+            card.ErrorMessage = null;
+            _ = LoadAsync();
+        }
+
+        card.NotifyRetryAvailability();
     }
 
     private TranscriptionCardViewModel? FindCard(Guid transcriptionId)

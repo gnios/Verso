@@ -1,3 +1,5 @@
+using System.Linq;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Transcriba.App;
 using Transcriba.App.Services;
@@ -5,6 +7,7 @@ using Transcriba.App.ViewModels;
 using Transcriba.Core;
 using Transcriba.Core.Data;
 using Transcriba.Core.Data.Entities;
+using Transcriba.Core.Engine;
 using Transcriba.Core.Services;
 using Transcriba.Tests.Services;
 
@@ -12,23 +15,26 @@ namespace Transcriba.Tests.ViewModels;
 
 public class DashboardViewModelTests
 {
-    private static async Task<(IServiceProvider Provider, string Directory, int TagId)> CreateDashboardProviderAsync()
+    private static async Task<(IServiceProvider Provider, string Directory, int TagId, Guid ErrorId)> CreateDashboardProviderAsync()
     {
         var (baseProvider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();
         var dbPath = Path.Combine(directory, "transcriba.db");
 
         var services = new ServiceCollection();
         services.AddTranscribaDatabase(dbPath);
+        services.AddTranscribaEngine();
         services.AddTranscribaServices();
         services.AddTranscribaAppServices();
         var provider = services.BuildServiceProvider();
         await DbBootstrapper.MigrateAsync(provider);
-        var tagId = await SeedDashboardDataAsync(provider);
+        var (tagId, errorId) = await SeedDashboardDataAsync(provider, directory);
 
-        return (provider, directory, tagId);
+        return (provider, directory, tagId, errorId);
     }
 
-    private static async Task<int> SeedDashboardDataAsync(IServiceProvider provider)
+    private static async Task<(int TagId, Guid ErrorId)> SeedDashboardDataAsync(
+        IServiceProvider provider,
+        string directory)
     {
         var factory = TestDbHelper.GetFactory(provider);
         await using var ctx = await factory.CreateDbContextAsync();
@@ -39,6 +45,7 @@ public class DashboardViewModelTests
         var doneId = Guid.NewGuid();
         var progressId = Guid.NewGuid();
         var otherProgressId = Guid.NewGuid();
+        var errorId = Guid.NewGuid();
 
         ctx.Transcriptions.AddRange(
             new Transcription
@@ -102,10 +109,22 @@ public class DashboardViewModelTests
                         SortOrder = 0
                     }
                 ]
+            },
+            new Transcription
+            {
+                Id = errorId,
+                Title = "Falha na transcrição",
+                Status = TranscriptionStatus.Error,
+                ErrorMessage = "falha simulada",
+                MediaFilePath = Path.Combine(directory, "media.wav"),
+                Language = "pt",
+                Quality = ModelQuality.Standard,
+                CreatedAt = new DateTime(2025, 4, 10, 12, 0, 0, DateTimeKind.Utc),
             });
 
         await ctx.SaveChangesAsync();
-        return tag.Id;
+        await File.WriteAllTextAsync(Path.Combine(directory, "media.wav"), "wav");
+        return (tag.Id, errorId);
     }
 
     private static async Task<DashboardViewModel> CreateDashboardAsync(IServiceProvider provider)
@@ -120,12 +139,12 @@ public class DashboardViewModelTests
     [Fact]
     public async Task LoadAsync_AllFilter_ReturnsAllTranscriptions()
     {
-        var (provider, directory, _) = await CreateDashboardProviderAsync();
+        var (provider, directory, _, _) = await CreateDashboardProviderAsync();
         try
         {
             var dashboard = await CreateDashboardAsync(provider);
 
-            Assert.Equal(3, dashboard.Cards.Count);
+            Assert.Equal(4, dashboard.Cards.Count);
             Assert.False(dashboard.IsEmpty);
             Assert.True(dashboard.IsAllFilterActive);
         }
@@ -138,7 +157,7 @@ public class DashboardViewModelTests
     [Fact]
     public async Task SetProgressFilter_ReturnsOnlyInProgressCards()
     {
-        var (provider, directory, _) = await CreateDashboardProviderAsync();
+        var (provider, directory, _, _) = await CreateDashboardProviderAsync();
         try
         {
             var dashboard = await CreateDashboardAsync(provider);
@@ -159,7 +178,7 @@ public class DashboardViewModelTests
     [Fact]
     public async Task SetDoneFilter_ReturnsOnlyDoneCards()
     {
-        var (provider, directory, _) = await CreateDashboardProviderAsync();
+        var (provider, directory, _, _) = await CreateDashboardProviderAsync();
         try
         {
             var dashboard = await CreateDashboardAsync(provider);
@@ -181,7 +200,7 @@ public class DashboardViewModelTests
     [Fact]
     public async Task NavigationParameter_StatusFilter_IsAppliedOnLoad()
     {
-        var (provider, directory, _) = await CreateDashboardProviderAsync();
+        var (provider, directory, _, _) = await CreateDashboardProviderAsync();
         try
         {
             var navigation = provider.GetRequiredService<NavigationService>();
@@ -204,7 +223,7 @@ public class DashboardViewModelTests
     [Fact]
     public async Task NavigationParameter_TagFilter_ReturnsMatchingCards()
     {
-        var (provider, directory, tagId) = await CreateDashboardProviderAsync();
+        var (provider, directory, tagId, _) = await CreateDashboardProviderAsync();
         try
         {
             var navigation = provider.GetRequiredService<NavigationService>();
@@ -228,7 +247,7 @@ public class DashboardViewModelTests
     [Fact]
     public async Task SearchText_WithProgressFilter_ReturnsMatchingCards()
     {
-        var (provider, directory, _) = await CreateDashboardProviderAsync();
+        var (provider, directory, _, _) = await CreateDashboardProviderAsync();
         try
         {
             var dashboard = await CreateDashboardAsync(provider);
@@ -249,7 +268,7 @@ public class DashboardViewModelTests
     [Fact]
     public async Task SearchText_WithNoMatches_ShowsEmptyState()
     {
-        var (provider, directory, _) = await CreateDashboardProviderAsync();
+        var (provider, directory, _, _) = await CreateDashboardProviderAsync();
         try
         {
             var dashboard = await CreateDashboardAsync(provider);
@@ -269,7 +288,7 @@ public class DashboardViewModelTests
     [Fact]
     public async Task OpenTranscription_NavigatesToEditorWithTranscriptionId()
     {
-        var (provider, directory, _) = await CreateDashboardProviderAsync();
+        var (provider, directory, _, _) = await CreateDashboardProviderAsync();
         try
         {
             var navigation = provider.GetRequiredService<NavigationService>();
@@ -286,5 +305,86 @@ public class DashboardViewModelTests
         {
             TestDbHelper.Cleanup(directory);
         }
+    }
+
+    [Fact]
+    public async Task StatusChanged_UpdatesExistingCardToDone()
+    {
+        var (provider, directory, _, _) = await CreateDashboardProviderAsync();
+        try
+        {
+            var dashboard = await CreateDashboardAsync(provider);
+            var queue = provider.GetRequiredService<TranscriptionQueueService>();
+            var progressCard = dashboard.Cards.First(card => card.IsInProgress);
+
+            RaiseStatusChanged(queue, progressCard.Id, TranscriptionStatusChanged.Done);
+
+            Assert.True(progressCard.IsDone);
+            Assert.Null(progressCard.ErrorMessage);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task StatusChanged_Error_SetsErrorMessageAndRetry()
+    {
+        var (provider, directory, _, _) = await CreateDashboardProviderAsync();
+        try
+        {
+            var dashboard = await CreateDashboardAsync(provider);
+            var queue = provider.GetRequiredService<TranscriptionQueueService>();
+            var progressCard = dashboard.Cards.First(card => card.IsInProgress);
+
+            RaiseStatusChanged(queue, progressCard.Id, TranscriptionStatusChanged.Error, "ffmpeg indisponível");
+
+            Assert.True(progressCard.IsError);
+            Assert.Equal("ffmpeg indisponível", progressCard.ErrorMessage);
+            Assert.True(progressCard.CanRetry);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task RetryCommand_ResetsStatusToInProgress()
+    {
+        var (provider, directory, _, errorId) = await CreateDashboardProviderAsync();
+        try
+        {
+            var dashboard = await CreateDashboardAsync(provider);
+            var errorCard = Assert.Single(dashboard.Cards, card => card.Id == errorId);
+
+            errorCard.RetryCommand.Execute(null);
+            await Task.Delay(100);
+
+            Assert.True(errorCard.IsInProgress);
+            Assert.Null(errorCard.ErrorMessage);
+
+            await using var readContext = await TestDbHelper.GetFactory(provider).CreateDbContextAsync();
+            var transcription = await readContext.Transcriptions.SingleAsync(t => t.Id == errorId);
+            Assert.Equal(TranscriptionStatus.InProgress, transcription.Status);
+            Assert.Null(transcription.ErrorMessage);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    private static void RaiseStatusChanged(
+        TranscriptionQueueService queue,
+        Guid transcriptionId,
+        TranscriptionStatusChanged status,
+        string? errorMessage = null)
+    {
+        var raiseMethod = typeof(TranscriptionQueueService).GetMethod(
+            "RaiseStatusChanged",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        raiseMethod!.Invoke(queue, [transcriptionId, status, errorMessage]);
     }
 }
