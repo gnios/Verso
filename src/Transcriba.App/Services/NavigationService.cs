@@ -32,6 +32,10 @@ public partial class NavigationService : ObservableObject
         {
             dashboard.Initialize(parameter as NavigationParameter);
         }
+        else if (viewModel is ResearchPageViewModel researchPage)
+        {
+            researchPage.Initialize(parameter as NavigationParameter);
+        }
 
         CurrentViewModel = viewModel;
     }
@@ -39,7 +43,7 @@ public partial class NavigationService : ObservableObject
     private object ResolveViewModel(ScreenKey key) => key switch
     {
         ScreenKey.Dashboard => _services.GetRequiredService<DashboardViewModel>(),
-        ScreenKey.Research => _services.GetRequiredService<ResearchViewModel>(),
+        ScreenKey.Research => _services.GetRequiredService<ResearchPageViewModel>(),
         ScreenKey.Upload => _services.GetRequiredService<UploadViewModel>(),
         ScreenKey.Recording => _services.GetRequiredService<RecordingViewModel>(),
         ScreenKey.Editor => _services.GetRequiredService<EditorViewModel>(),

@@ -15,7 +15,7 @@ public static class AppServiceCollectionExtensions
         services.AddSingleton<MainWindowViewModel>();
 
         services.AddTransient<DashboardViewModel>();
-        services.AddTransient<ResearchViewModel>();
+        services.AddTransient<ResearchPageViewModel>();
         services.AddTransient<UploadViewModel>();
         services.AddTransient<RecordingViewModel>();
         services.AddTransient<EditorViewModel>();

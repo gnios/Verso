@@ -36,6 +36,13 @@ public class LibraryService(IDbContextFactory<TranscribaDbContext> dbContextFact
         return await ApplyFilter(context.Transcriptions.AsQueryable(), filter).CountAsync();
     }
 
+    public async Task<IReadOnlyList<TranscriptionSummary>> GetTranscriptionsForResearchAsync(int researchPageId)
+    {
+        await using var context = await dbContextFactory.CreateDbContextAsync();
+        var query = context.Transcriptions.Where(t => t.ResearchPageId == researchPageId);
+        return await ProjectSummariesAsync(query);
+    }
+
     public async Task<IReadOnlyList<TagSummary>> GetTagsAsync()
     {
         await using var context = await dbContextFactory.CreateDbContextAsync();
