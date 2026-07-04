@@ -428,5 +428,21 @@
         <Style Selector="Button.icon-picker-item:not(.none-icon) TextBlock">
             <Setter Property="FontSize" Value="18" />
         </Style>
+
+        <Style Selector="Button.color-picker-item">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="BorderThickness" Value="2" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.color-picker-item:pointerover">
+            <Setter Property="RenderTransform" Value="scale(1.15)" />
+        </Style>
+        <Style Selector="Button.color-picker-item.selected">
+            <Setter Property="BorderBrush" Value="{DynamicResource TranscribaFg}" />
+        </Style>
     </Application.Styles>
 </Application>
