@@ -1,3 +1,152 @@
+using System;
+using System.Collections.ObjectModel;
+using System.Threading.Tasks;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.DependencyInjection;
+using Transcriba.App.Services;
+using Transcriba.Core.Data.Entities;
+using Transcriba.Core.Engine;
+using Transcriba.Core.Services;
+
 namespace Transcriba.App.ViewModels;
 
-public class DashboardViewModel : ViewModelBase;
+public partial class DashboardViewModel : ViewModelBase
+{
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IServiceProvider _serviceProvider;
+
+    public ObservableCollection<TranscriptionCardViewModel> Cards { get; } = [];
+
+    [ObservableProperty]
+    private LibraryStatusFilter _activeStatusFilter = LibraryStatusFilter.All;
+
+    [ObservableProperty]
+    private string _searchText = "";
+
+    [ObservableProperty]
+    private int? _tagFilterId;
+
+    [ObservableProperty]
+    private bool _isEmpty;
+
+    public bool IsAllFilterActive => ActiveStatusFilter == LibraryStatusFilter.All;
+    public bool IsProgressFilterActive => ActiveStatusFilter == LibraryStatusFilter.Progress;
+    public bool IsDoneFilterActive => ActiveStatusFilter == LibraryStatusFilter.Done;
+
+    public DashboardViewModel(IServiceScopeFactory scopeFactory, IServiceProvider serviceProvider)
+    {
+        _scopeFactory = scopeFactory;
+        _serviceProvider = serviceProvider;
+
+        if (serviceProvider.GetService<TranscriptionQueueService>() is { } queueService)
+        {
+            queueService.StatusChanged += OnQueueStatusChanged;
+        }
+    }
+
+    public void Initialize(NavigationParameter? parameter)
+    {
+        ApplyNavigationParameter(parameter);
+        _ = LoadAsync();
+    }
+
+    partial void OnActiveStatusFilterChanged(LibraryStatusFilter value)
+    {
+        OnPropertyChanged(nameof(IsAllFilterActive));
+        OnPropertyChanged(nameof(IsProgressFilterActive));
+        OnPropertyChanged(nameof(IsDoneFilterActive));
+        _ = LoadAsync();
+    }
+
+    partial void OnSearchTextChanged(string value) => _ = LoadAsync();
+
+    [RelayCommand]
+    private void SetAllFilter() => ActiveStatusFilter = LibraryStatusFilter.All;
+
+    [RelayCommand]
+    private void SetProgressFilter() => ActiveStatusFilter = LibraryStatusFilter.Progress;
+
+    [RelayCommand]
+    private void SetDoneFilter() => ActiveStatusFilter = LibraryStatusFilter.Done;
+
+    internal void OpenTranscription(Guid transcriptionId) =>
+        _serviceProvider.GetRequiredService<NavigationService>().NavigateTo(
+            ScreenKey.Editor,
+            new NavigationParameter(TranscriptionId: transcriptionId));
+
+    private void ApplyNavigationParameter(NavigationParameter? parameter)
+    {
+        if (parameter is null)
+        {
+            return;
+        }
+
+        if (parameter.StatusFilter is LibraryStatusFilter statusFilter)
+        {
+            ActiveStatusFilter = statusFilter;
+        }
+
+        if (parameter.TagId is int tagId)
+        {
+            TagFilterId = tagId;
+            ActiveStatusFilter = LibraryStatusFilter.All;
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
+        var filter = new LibraryFilter(ActiveStatusFilter, TagFilterId);
+        var summaries = string.IsNullOrWhiteSpace(SearchText)
+            ? await libraryService.GetTranscriptions(filter)
+            : await libraryService.SearchText(SearchText, filter);
+
+        Cards.Clear();
+        foreach (var summary in summaries)
+        {
+            Cards.Add(new TranscriptionCardViewModel(summary, OpenTranscription));
+        }
+
+        IsEmpty = Cards.Count == 0;
+    }
+
+    private void OnQueueStatusChanged(object? sender, TranscriptionStatusChangedEventArgs e)
+    {
+        var card = FindCard(e.TranscriptionId);
+        if (card is null)
+        {
+            if (e.Status is TranscriptionStatusChanged.Queued or TranscriptionStatusChanged.InProgress
+                or TranscriptionStatusChanged.Done)
+            {
+                _ = LoadAsync();
+            }
+
+            return;
+        }
+
+        card.Status = MapQueueStatus(e.Status);
+    }
+
+    private TranscriptionCardViewModel? FindCard(Guid transcriptionId)
+    {
+        foreach (var card in Cards)
+        {
+            if (card.Id == transcriptionId)
+            {
+                return card;
+            }
+        }
+
+        return null;
+    }
+
+    private static TranscriptionStatus MapQueueStatus(TranscriptionStatusChanged status) =>
+        status switch
+        {
+            TranscriptionStatusChanged.Done => TranscriptionStatus.Done,
+            TranscriptionStatusChanged.Error => TranscriptionStatus.Error,
+            _ => TranscriptionStatus.InProgress
+        };
+}

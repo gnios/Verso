@@ -648,8 +648,7 @@ T16, T30 → T50
 **Gate**: quick
 
 **Commit**: `feat(app): implementa NavigationService`
-
----
+**Status**: ✅ Concluída
 
 ### T24: ThemeService
 
@@ -668,8 +667,7 @@ T16, T30 → T50
 **Gate**: quick
 
 **Commit**: `feat(app): implementa ThemeService com persistência`
-
----
+**Status**: ✅ Concluída
 
 ### T25: MainWindowViewModel + MainWindow.axaml
 
@@ -688,8 +686,7 @@ T16, T30 → T50
 **Gate**: build
 
 **Commit**: `feat(app): implementa MainWindow e shell de navegação`
-
----
+**Status**: ✅ Concluída
 
 ### T26: SidebarViewModel
 
@@ -710,8 +707,7 @@ T16, T30 → T50
 **Gate**: quick
 
 **Commit**: `feat(app): implementa SidebarViewModel com pesquisas, tags e filtros`
-
----
+**Status**: ✅ Concluída
 
 ### T27: DashboardViewModel
 
@@ -723,17 +719,16 @@ T16, T30 → T50
 **Tools**: MCP: NONE / Skill: NONE
 
 **Done when**:
-- [ ] Alterar filtro/busca atualiza a lista observável imediatamente
-- [ ] Estado vazio exibido quando nenhum resultado (AC5)
-- [ ] Testes cobrem cada combinação de filtro (unit, sobre o ViewModel com `LibraryService` mockado)
-- [ ] Gate `quick` passa
+- [x] Alterar filtro/busca atualiza a lista observável imediatamente
+- [x] Estado vazio exibido quando nenhum resultado (AC5)
+- [x] Testes cobrem cada combinação de filtro (unit, sobre o ViewModel com `LibraryService` mockado)
+- [x] Gate `quick` passa
 
 **Tests**: unit
 **Gate**: quick
 
 **Commit**: `feat(dashboard): implementa DashboardViewModel`
-
----
+**Status**: ✅ Concluída
 
 ### T28: DashboardView.axaml
 

@@ -11,5 +11,10 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         Navigation = navigation;
         Sidebar = sidebar;
+
+        if (navigation.CurrentViewModel is null)
+        {
+            navigation.NavigateTo(ScreenKey.Dashboard);
+        }
     }
 }
