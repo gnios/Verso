@@ -4,6 +4,7 @@ using Transcriba.App;
 using Transcriba.App.Services;
 using Transcriba.App.ViewModels;
 using Transcriba.Core;
+using Transcriba.Core.Engine;
 using Transcriba.Core.Data;
 using Transcriba.Core.Data.Entities;
 using Transcriba.Tests.Services;
@@ -19,6 +20,7 @@ public class NewPageModalViewModelTests
 
         var services = new ServiceCollection();
         services.AddTranscribaDatabase(dbPath);
+        services.AddTranscribaEngine();
         services.AddTranscribaServices();
         services.AddTranscribaAppServices();
         var provider = services.BuildServiceProvider();

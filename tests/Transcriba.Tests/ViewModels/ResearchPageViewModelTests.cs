@@ -5,6 +5,7 @@ using Transcriba.App.ViewModels;
 using Transcriba.Core;
 using Transcriba.Core.Data;
 using Transcriba.Core.Data.Entities;
+using Transcriba.Core.Engine;
 using Transcriba.Core.Services;
 using Transcriba.Tests.Services;
 
@@ -20,6 +21,7 @@ public class ResearchPageViewModelTests
 
         var services = new ServiceCollection();
         services.AddTranscribaDatabase(dbPath);
+        services.AddTranscribaEngine();
         services.AddTranscribaServices();
         services.AddTranscribaAppServices();
         var provider = services.BuildServiceProvider();
@@ -138,6 +140,7 @@ public class ResearchPageViewModelTests
             var dbPath = Path.Combine(directory, "transcriba.db");
             var services = new ServiceCollection();
             services.AddTranscribaDatabase(dbPath);
+            services.AddTranscribaEngine();
             services.AddTranscribaServices();
             services.AddTranscribaAppServices();
             var scopedProvider = services.BuildServiceProvider();

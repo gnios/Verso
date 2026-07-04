@@ -60,6 +60,10 @@
                                            TextTrimming="CharacterEllipsis"
                                            TextWrapping="Wrap" />
 
+                                <TextBlock Text="{Binding ErrorMessage}"
+                                           Classes="dash-card-error"
+                                           IsVisible="{Binding IsError}" />
+
                                 <ItemsControl ItemsSource="{Binding Tags}"
                                               Margin="0,0,0,8">
                                     <ItemsControl.ItemsPanel>
@@ -96,6 +100,14 @@
                                             IsVisible="{Binding IsDone}">
                                         <TextBlock Text="{Binding StatusLabel}" />
                                     </Border>
+                                    <Border Classes="status-badge status-error"
+                                            IsVisible="{Binding IsError}">
+                                        <TextBlock Text="{Binding StatusLabel}" />
+                                    </Border>
+                                    <Button Classes="dash-retry-btn"
+                                            Content="Tentar novamente"
+                                            Command="{Binding RetryCommand}"
+                                            IsVisible="{Binding CanRetry}" />
                                     <TextBlock Text="{Binding Date}" />
                                     <TextBlock Text="·"
                                                Foreground="{DynamicResource TranscribaMuted}" />

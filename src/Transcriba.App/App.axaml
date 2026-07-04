@@ -302,6 +302,30 @@
         <Style Selector="Border.status-done TextBlock">
             <Setter Property="Foreground" Value="{StaticResource TagGreen}" />
         </Style>
+        <Style Selector="Border.status-error">
+            <Setter Property="Background" Value="{StaticResource TagRedLight}" />
+        </Style>
+        <Style Selector="Border.status-error TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TagRed}" />
+        </Style>
+        <Style Selector="Button.dash-retry-btn">
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaAccent}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.dash-retry-btn:pointerover">
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaAccentHover}" />
+        </Style>
+        <Style Selector="TextBlock.dash-card-error">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{StaticResource TagRed}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
 
         <Style Selector="Button.breadcrumb-link">
             <Setter Property="Background" Value="Transparent" />
