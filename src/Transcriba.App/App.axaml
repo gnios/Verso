@@ -851,5 +851,159 @@
             <Setter Property="CornerRadius" Value="{DynamicResource TranscribaRadius}" />
             <Setter Property="Cursor" Value="Hand" />
         </Style>
+
+        <Style Selector="StackPanel.rec-container">
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="Spacing" Value="0" />
+        </Style>
+        <Style Selector="StackPanel.rec-devices">
+            <Setter Property="Orientation" Value="Horizontal" />
+            <Setter Property="Spacing" Value="14" />
+            <Setter Property="Margin" Value="0,0,0,28" />
+            <Setter Property="MaxWidth" Value="480" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="ComboBox.rec-select">
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="Padding" Value="8,8,12,8" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Background" Value="{DynamicResource TranscribaBg}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource TranscribaBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="{DynamicResource TranscribaRadius}" />
+        </Style>
+        <Style Selector="StackPanel.rec-main">
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="Spacing" Value="0" />
+            <Setter Property="Margin" Value="0,0,0,28" />
+        </Style>
+        <Style Selector="TextBlock.rec-timer">
+            <Setter Property="FontSize" Value="48" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="FontFamily" Value="Consolas,Courier New,monospace" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaFg}" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+            <Setter Property="LetterSpacing" Value="0.5" />
+        </Style>
+        <Style Selector="StackPanel.rec-status">
+            <Setter Property="Orientation" Value="Horizontal" />
+            <Setter Property="Spacing" Value="6" />
+            <Setter Property="Margin" Value="0,0,0,20" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBlock.rec-status-text">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaMuted}" />
+        </Style>
+        <Style Selector="Ellipse.rec-dot">
+            <Setter Property="Width" Value="8" />
+            <Setter Property="Height" Value="8" />
+            <Setter Property="Fill" Value="{DynamicResource TranscribaMuted}" />
+        </Style>
+        <Style Selector="Ellipse.rec-dot.live">
+            <Setter Property="Fill" Value="{StaticResource TagRed}" />
+        </Style>
+        <Style Selector="StackPanel.rec-controls">
+            <Setter Property="Orientation" Value="Horizontal" />
+            <Setter Property="Spacing" Value="14" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.rec-btn">
+            <Setter Property="Width" Value="56" />
+            <Setter Property="Height" Value="56" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CornerRadius" Value="28" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.rec-btn-record">
+            <Setter Property="Background" Value="{StaticResource TagRed}" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+        <Style Selector="Button.rec-btn-record:pointerover">
+            <Setter Property="Background" Value="#D94545" />
+        </Style>
+        <Style Selector="Button.rec-btn-record.recording">
+            <Setter Property="Background" Value="{DynamicResource TranscribaFg}" />
+        </Style>
+        <Style Selector="Button.rec-btn-secondary">
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="44" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CornerRadius" Value="22" />
+            <Setter Property="Background" Value="{DynamicResource TranscribaSurface}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource TranscribaBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaFgSecondary}" />
+        </Style>
+        <Style Selector="Button.rec-btn-secondary:pointerover">
+            <Setter Property="Background" Value="{DynamicResource TranscribaSurfaceHover}" />
+        </Style>
+        <Style Selector="StackPanel.rec-waveform">
+            <Setter Property="Orientation" Value="Horizontal" />
+            <Setter Property="Spacing" Value="2" />
+            <Setter Property="Height" Value="56" />
+            <Setter Property="Margin" Value="0,0,0,28" />
+            <Setter Property="MaxWidth" Value="480" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Bottom" />
+        </Style>
+        <Style Selector="Border.rec-wave-bar">
+            <Setter Property="MinHeight" Value="3" />
+            <Setter Property="Background" Value="{DynamicResource TranscribaAccent}" />
+            <Setter Property="CornerRadius" Value="2,2,0,0" />
+            <Setter Property="Opacity" Value="0.5" />
+            <Setter Property="VerticalAlignment" Value="Bottom" />
+        </Style>
+        <Style Selector="Border.rec-wave-bar.active">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="Border.rec-live-section">
+            <Setter Property="MaxWidth" Value="680" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="BorderBrush" Value="{DynamicResource TranscribaBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="{DynamicResource TranscribaRadiusLg}" />
+            <Setter Property="ClipToBounds" Value="True" />
+        </Style>
+        <Style Selector="Border.rec-live-header">
+            <Setter Property="Padding" Value="10,10,16,10" />
+            <Setter Property="Background" Value="{DynamicResource TranscribaSurface}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource TranscribaBorder}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+        </Style>
+        <Style Selector="StackPanel.rec-live-header">
+            <Setter Property="Orientation" Value="Horizontal" />
+            <Setter Property="Spacing" Value="8" />
+        </Style>
+        <Style Selector="TextBlock.rec-live-header-title">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaFg}" />
+        </Style>
+        <Style Selector="ScrollViewer.rec-live-body">
+            <Setter Property="MaxHeight" Value="220" />
+            <Setter Property="Padding" Value="14,14,16,14" />
+        </Style>
+        <Style Selector="StackPanel.rec-live-segment">
+            <Setter Property="Margin" Value="0,0,0,8" />
+            <Setter Property="Spacing" Value="1" />
+        </Style>
+        <Style Selector="TextBlock.rec-live-speaker">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="TextBlock.rec-live-speaker.speaker-a">
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaAccent}" />
+        </Style>
+        <Style Selector="TextBlock.rec-live-speaker.speaker-b">
+            <Setter Property="Foreground" Value="{StaticResource TagPurple}" />
+        </Style>
+        <Style Selector="TextBlock.rec-live-text">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="LineHeight" Value="22" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaFgSecondary}" />
+        </Style>
     </Application.Styles>
 </Application>
