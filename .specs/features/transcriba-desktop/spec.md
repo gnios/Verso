@@ -338,8 +338,8 @@ Toda ambiguidade foi resolvida ou registrada aqui — nada fica sem definição.
 | REC-01 | P1: Tela de Gravação ao vivo (mockada) | Design | Pending |
 | SETTINGS-01 | P1: Configurações | Design | Pending |
 | DATA-01 | P1: Persistência de dados e mídia | Design | Pending |
-| EXPORT-01 | P2: Exportação de transcrição | - | Pending |
-| CRUD-01 | P2: Exclusão de pesquisas e transcrições | - | Pending |
+| EXPORT-01 | P2: Exportação de transcrição | T48 | Implementing |
+| CRUD-01 | P2: Exclusão de pesquisas e transcrições | T49, T50 | Implementing |
 
 **ID format:** `[CATEGORY]-[NUMBER]`
 
@@ -354,5 +354,5 @@ Toda ambiguidade foi resolvida ou registrada aqui — nada fica sem definição.
 - [ ] Todas as telas do protótipo (Dashboard, Pesquisa, Upload, Gravação, Editor, Configurações, modais) existem no app com fidelidade visual e de interação equivalente.
 - [ ] Um arquivo de áudio real importado gera uma transcrição real (não mockada) em menos de um tempo proporcional razoável ao motor `transcrever.cs`, visível e editável no Editor.
 - [ ] Dados sobrevivem ao fechamento/reabertura do app (persistência real).
-- [ ] Exportação em TXT/SRT/VTT produz arquivos válidos e abríveis por outras ferramentas.
+- [x] Exportação em TXT/SRT/VTT produz arquivos válidos e abríveis por outras ferramentas.
 - [ ] Zero funcionalidades do protótipo ficam sem equivalente no app (fidelidade total), exceto os itens listados em "Out of Scope".

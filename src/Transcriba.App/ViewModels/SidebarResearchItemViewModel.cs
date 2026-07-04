@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -10,6 +11,8 @@ namespace Transcriba.App.ViewModels;
 
 public partial class SidebarResearchItemViewModel : ViewModelBase
 {
+    private readonly Action<int>? _deleteHandler;
+
     public int Id { get; }
     public string Title { get; }
     public string Icon { get; }
@@ -17,11 +20,17 @@ public partial class SidebarResearchItemViewModel : ViewModelBase
     public int TranscriptionCount { get; }
     public IReadOnlyList<SidebarTranscriptionItemViewModel> Transcriptions { get; }
 
+    public bool CanDelete => _deleteHandler is not null;
+
     [ObservableProperty]
     private bool _isExpanded;
 
-    public SidebarResearchItemViewModel(ResearchPage research, NavigationService navigation)
+    public SidebarResearchItemViewModel(
+        ResearchPage research,
+        NavigationService navigation,
+        Action<int>? deleteHandler = null)
     {
+        _deleteHandler = deleteHandler;
         Id = research.Id;
         Title = TruncateTitle(research.Title);
         Icon = research.Icon;
@@ -36,6 +45,9 @@ public partial class SidebarResearchItemViewModel : ViewModelBase
 
     [RelayCommand]
     private void ToggleExpand() => IsExpanded = !IsExpanded;
+
+    [RelayCommand(CanExecute = nameof(CanDelete))]
+    private void Delete() => _deleteHandler?.Invoke(Id);
 
     private static string TruncateTitle(string title) =>
         title.Length <= 18 ? title : $"{title[..18]}…";

@@ -15,6 +15,7 @@ public partial class SidebarViewModel : ViewModelBase
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ThemeService _themeService;
     private readonly NewPageModalViewModel _newPageModal;
+    private readonly IConfirmationService _confirmation;
 
     public ObservableCollection<SidebarResearchItemViewModel> Researches { get; } = [];
     public ObservableCollection<SidebarTagItemViewModel> Tags { get; } = [];
@@ -40,12 +41,14 @@ public partial class SidebarViewModel : ViewModelBase
         NavigationService navigation,
         IServiceScopeFactory scopeFactory,
         ThemeService themeService,
-        NewPageModalViewModel newPageModal)
+        NewPageModalViewModel newPageModal,
+        IConfirmationService confirmation)
     {
         _navigation = navigation;
         _scopeFactory = scopeFactory;
         _themeService = themeService;
         _newPageModal = newPageModal;
+        _confirmation = confirmation;
         _themeService.PropertyChanged += OnThemePropertyChanged;
         _ = LoadAsync();
     }
@@ -62,7 +65,10 @@ public partial class SidebarViewModel : ViewModelBase
         Researches.Clear();
         foreach (var research in researches)
         {
-            Researches.Add(new SidebarResearchItemViewModel(research, _navigation));
+            Researches.Add(new SidebarResearchItemViewModel(
+                research,
+                _navigation,
+                id => _ = DeleteResearchAsync(id)));
         }
 
         Tags.Clear();
@@ -133,6 +139,43 @@ public partial class SidebarViewModel : ViewModelBase
 
     [RelayCommand]
     private async Task ToggleThemeAsync() => await _themeService.ToggleAsync();
+
+    internal async Task DeleteResearchAsync(int researchId)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var researchService = scope.ServiceProvider.GetRequiredService<ResearchService>();
+        var research = await researchService.GetByIdAsync(researchId);
+        if (research is null)
+        {
+            return;
+        }
+
+        var count = research.Transcriptions.Count;
+        var countMessage = count switch
+        {
+            0 => "Nenhuma transcrição está associada.",
+            1 => "1 transcrição ficará avulsa na biblioteca.",
+            _ => $"{count} transcrições ficarão avulsas na biblioteca.",
+        };
+
+        if (!await _confirmation.ConfirmAsync(
+                "Excluir pesquisa",
+                $"A pesquisa \"{research.Title}\" será excluída. {countMessage} Deseja continuar?"))
+        {
+            return;
+        }
+
+        await researchService.DeleteAsync(researchId);
+
+        if (_navigation.CurrentScreen == ScreenKey.Research
+            && _navigation.NavigationParameter is NavigationParameter parameter
+            && parameter.ResearchId == researchId)
+        {
+            _navigation.NavigateTo(ScreenKey.Dashboard);
+        }
+
+        await LoadAsync();
+    }
 
     private void OnThemePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
