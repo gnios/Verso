@@ -14,6 +14,7 @@ public partial class SidebarViewModel : ViewModelBase
     private readonly NavigationService _navigation;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ThemeService _themeService;
+    private readonly NewPageModalViewModel _newPageModal;
 
     public ObservableCollection<SidebarResearchItemViewModel> Researches { get; } = [];
     public ObservableCollection<SidebarTagItemViewModel> Tags { get; } = [];
@@ -38,11 +39,13 @@ public partial class SidebarViewModel : ViewModelBase
     public SidebarViewModel(
         NavigationService navigation,
         IServiceScopeFactory scopeFactory,
-        ThemeService themeService)
+        ThemeService themeService,
+        NewPageModalViewModel newPageModal)
     {
         _navigation = navigation;
         _scopeFactory = scopeFactory;
         _themeService = themeService;
+        _newPageModal = newPageModal;
         _themeService.PropertyChanged += OnThemePropertyChanged;
         _ = LoadAsync();
     }
@@ -111,14 +114,14 @@ public partial class SidebarViewModel : ViewModelBase
     private void NewResearch()
     {
         IsNewMenuOpen = false;
-        _navigation.NavigateTo(ScreenKey.Research);
+        _newPageModal.Open(NewPageMode.Research);
     }
 
     [RelayCommand]
     private void NewTranscription()
     {
         IsNewMenuOpen = false;
-        _navigation.NavigateTo(ScreenKey.Upload);
+        _newPageModal.Open(NewPageMode.Transcription);
     }
 
     [RelayCommand]

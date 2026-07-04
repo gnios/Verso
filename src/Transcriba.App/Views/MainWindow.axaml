@@ -26,5 +26,11 @@
                 <local:ViewLocator />
             </ContentControl.ContentTemplate>
         </ContentControl>
+
+        <Panel Grid.ColumnSpan="2"
+               IsVisible="{Binding NewPageModal.IsOpen}"
+               ZIndex="1000">
+            <views:NewPageModal DataContext="{Binding NewPageModal}" />
+        </Panel>
     </Grid>
 </Window>

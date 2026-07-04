@@ -12,6 +12,7 @@ public static class AppServiceCollectionExtensions
         services.AddSingleton<IThemeApplicator, AvaloniaThemeApplicator>();
         services.AddSingleton<ThemeService>();
         services.AddSingleton<SidebarViewModel>();
+        services.AddSingleton<NewPageModalViewModel>();
         services.AddSingleton<MainWindowViewModel>();
 
         services.AddTransient<DashboardViewModel>();
