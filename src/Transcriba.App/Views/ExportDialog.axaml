@@ -1,0 +1,34 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Transcriba.App.ViewModels"
+             x:Class="Transcriba.App.Views.ExportDialog"
+             x:DataType="vm:EditorViewModel">
+    <Grid Background="#73000000"
+          IsVisible="{Binding IsExportDialogOpen}">
+        <Border Classes="modal"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Background="{DynamicResource TranscribaBg}"
+                CornerRadius="{DynamicResource TranscribaRadiusLg}"
+                Padding="24"
+                Width="360"
+                BoxShadow="0 8 32 0 #40000000">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Exportar transcrição"
+                           Classes="modal-title" />
+                <TextBlock Text="Escolha o formato de exportação:"
+                           Foreground="{DynamicResource TranscribaMuted}"
+                           FontSize="13" />
+                <Button Content="TXT — texto simples"
+                        Command="{Binding ExportAsTxtCommand}" />
+                <Button Content="SRT — legendas"
+                        Command="{Binding ExportAsSrtCommand}" />
+                <Button Content="VTT — legendas WebVTT"
+                        Command="{Binding ExportAsVttCommand}" />
+                <Button Content="Cancelar"
+                        Classes="modal-cancel"
+                        Command="{Binding CloseExportDialogCommand}" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

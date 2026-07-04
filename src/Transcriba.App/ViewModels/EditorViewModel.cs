@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Transcriba.App.Services;
+using ExportFormat = Transcriba.App.Services.ExportFormat;
 using Transcriba.Core.Catalogs;
 using Transcriba.Core.Data.Entities;
 using Transcriba.Core.Engine;
@@ -23,6 +24,7 @@ public partial class EditorViewModel : ViewModelBase
     private readonly NavigationService _navigation;
     private readonly SegmentEditingService _segmentEditing;
     private readonly SidebarViewModel _sidebar;
+    private readonly IFileSaveService _fileSaveService;
     private Guid _transcriptionId;
     private SegmentItemViewModel? _focusedSegment;
     private int _focusedCaretIndex;
@@ -77,7 +79,11 @@ public partial class EditorViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isIconPickerOpen;
 
+    [ObservableProperty]
+    private bool _isExportDialogOpen;
+
     public bool HasIcon => !string.IsNullOrWhiteSpace(Icon);
+    public bool CanExport => HasSegments;
     public bool HasActiveSegment => _playbackStarted && GetActiveSegmentEntity() is not null;
 
     public EditorViewModel(
@@ -85,12 +91,14 @@ public partial class EditorViewModel : ViewModelBase
         NavigationService navigation,
         SegmentEditingService segmentEditing,
         SidebarViewModel sidebar,
+        IFileSaveService fileSaveService,
         IServiceProvider serviceProvider)
     {
         _scopeFactory = scopeFactory;
         _navigation = navigation;
         _segmentEditing = segmentEditing;
         _sidebar = sidebar;
+        _fileSaveService = fileSaveService;
         SpeakerDropdown = new SpeakerDropdownViewModel(scopeFactory);
         PlayerBar = new PlayerBarViewModel(serviceProvider.GetRequiredService<IMediaPlaybackService>());
         PlayerBar.PositionChanged += (_, position) => SetPlaybackPosition(position, markStarted: true);
@@ -141,10 +149,51 @@ public partial class EditorViewModel : ViewModelBase
     [RelayCommand]
     private void ToggleSpeakerDropdown() => SpeakerDropdown.ToggleCommand.Execute(null);
 
+    [RelayCommand(CanExecute = nameof(CanExport))]
+    private void Export() => IsExportDialogOpen = true;
+
     [RelayCommand]
-    private void Export()
+    private void CloseExportDialog() => IsExportDialogOpen = false;
+
+    [RelayCommand]
+    private Task ExportAsTxtAsync() => ExportWithFormatAsync(ExportFormat.Txt);
+
+    [RelayCommand]
+    private Task ExportAsSrtAsync() => ExportWithFormatAsync(ExportFormat.Srt);
+
+    [RelayCommand]
+    private Task ExportAsVttAsync() => ExportWithFormatAsync(ExportFormat.Vtt);
+
+    internal async Task ExportWithFormatAsync(ExportFormat format)
     {
-        // stub até T48
+        if (!HasSegments || _transcriptionId == Guid.Empty)
+        {
+            return;
+        }
+
+        IsExportDialogOpen = false;
+
+        var destPath = await _fileSaveService.PickSavePathAsync(Title, format);
+        if (destPath is null)
+        {
+            return;
+        }
+
+        using var scope = _scopeFactory.CreateScope();
+        var exportService = scope.ServiceProvider.GetRequiredService<ExportService>();
+
+        switch (format)
+        {
+            case ExportFormat.Txt:
+                await exportService.ExportTxtAsync(_transcriptionId, destPath);
+                break;
+            case ExportFormat.Srt:
+                await exportService.ExportSrtAsync(_transcriptionId, destPath);
+                break;
+            case ExportFormat.Vtt:
+                await exportService.ExportVttAsync(_transcriptionId, destPath);
+                break;
+        }
     }
 
     [RelayCommand]
@@ -381,6 +430,7 @@ public partial class EditorViewModel : ViewModelBase
             }
 
             HasSegments = Segments.Count > 0;
+            NotifyExportAvailability();
             UpdateActiveSegmentHighlight();
         }
         else
@@ -388,6 +438,7 @@ public partial class EditorViewModel : ViewModelBase
             _segmentEntities = [];
             Segments.Clear();
             HasSegments = false;
+            NotifyExportAvailability();
         }
 
         await PlayerBar.LoadAsync(transcription.MediaFilePath);
@@ -412,7 +463,16 @@ public partial class EditorViewModel : ViewModelBase
         }
 
         HasSegments = Segments.Count > 0;
+        NotifyExportAvailability();
         UpdateActiveSegmentHighlight();
+    }
+
+    partial void OnHasSegmentsChanged(bool value) => NotifyExportAvailability();
+
+    private void NotifyExportAvailability()
+    {
+        OnPropertyChanged(nameof(CanExport));
+        ExportCommand.NotifyCanExecuteChanged();
     }
 
     private void UpdateActiveSegmentHighlight()
@@ -449,6 +509,7 @@ public partial class EditorViewModel : ViewModelBase
         HasResearchBreadcrumb = false;
         ResearchTitle = "";
         ResearchId = null;
+        NotifyExportAvailability();
     }
 
     private void OnQueueStatusChanged(object? sender, TranscriptionStatusChangedEventArgs e)
@@ -469,6 +530,7 @@ public partial class EditorViewModel : ViewModelBase
         StatusMessage = "Transcrição em andamento…";
         Segments.Clear();
         HasSegments = false;
+        NotifyExportAvailability();
     }
 
     private static string FormatDurationDisplay(double seconds)
