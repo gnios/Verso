@@ -324,9 +324,9 @@ T16, T30 → T50
 **Tools**: MCP: NONE / Skill: NONE
 
 **Done when**:
-- [ ] Mesma lógica de busca em PATH + WinGet Packages do POC
-- [ ] Teste unitário cobre "ffmpeg encontrado no PATH" (mock de diretórios) e "não encontrado → exceção customizada"
-- [ ] Gate `quick` passa
+- [x] Mesma lógica de busca em PATH + WinGet Packages do POC
+- [x] Teste unitário cobre "ffmpeg encontrado no PATH" (mock de diretórios) e "não encontrado → exceção customizada"
+- [x] Gate `quick` passa
 
 **Tests**: unit
 **Gate**: quick
@@ -345,9 +345,9 @@ T16, T30 → T50
 **Tools**: MCP: NONE / Skill: NONE
 
 **Done when**:
-- [ ] Suporta `.wav`/`.mp3` via NAudio e fallback via ffmpeg para outros formatos
-- [ ] Teste unitário cobre `ConverterPcm16ParaFloat` (conversão determinística, sem I/O) incluindo caso de buffer menor que 2 bytes (exceção)
-- [ ] Gate `quick` passa
+- [x] Suporta `.wav`/`.mp3` via NAudio e fallback via ffmpeg para outros formatos
+- [x] Teste unitário cobre `ConverterPcm16ParaFloat` (conversão determinística, sem I/O) incluindo caso de buffer menor que 2 bytes (exceção)
+- [x] Gate `quick` passa
 
 **Tests**: unit
 **Gate**: quick
@@ -366,9 +366,9 @@ T16, T30 → T50
 **Tools**: MCP: NONE / Skill: NONE
 
 **Done when**:
-- [ ] Mesmo algoritmo de VAD por energia/silêncio do POC
-- [ ] Testes unitários: áudio vazio → lista vazia; áudio todo silêncio → 1 trecho (fallback); áudio com 2 blocos de fala separados por silêncio → 2 trechos com offsets corretos
-- [ ] Gate `quick` passa (mín. 4 testes)
+- [x] Mesmo algoritmo de VAD por energia/silêncio do POC
+- [x] Testes unitários: áudio vazio → lista vazia; áudio todo silêncio → 1 trecho (fallback); áudio com 2 blocos de fala separados por silêncio → 2 trechos com offsets corretos
+- [x] Gate `quick` passa (mín. 4 testes)
 
 **Tests**: unit
 **Gate**: quick
@@ -387,9 +387,9 @@ T16, T30 → T50
 **Tools**: MCP: NONE / Skill: NONE
 
 **Done when**:
-- [ ] Mesmo cálculo de paralelismo/agrupamento do POC (cpu/cuda/vulkan)
-- [ ] Testes unitários: trechos ≤ maxPartes retornam inalterados; trechos > maxPartes são agrupados respeitando offsets; dispositivo cuda/vulkan produz paralelismo ≤2
-- [ ] Gate `quick` passa (mín. 4 testes)
+- [x] Mesmo cálculo de paralelismo/agrupamento do POC (cpu/cuda/vulkan)
+- [x] Testes unitários: trechos ≤ maxPartes retornam inalterados; trechos > maxPartes são agrupados respeitando offsets; dispositivo cuda/vulkan produz paralelismo ≤2
+- [x] Gate `quick` passa (mín. 4 testes)
 
 **Tests**: unit
 **Gate**: quick
@@ -408,9 +408,9 @@ T16, T30 → T50
 **Tools**: MCP: NONE / Skill: NONE
 
 **Done when**:
-- [ ] Download automático se modelo ausente, reaproveitamento se já existe (mesma lógica do POC)
-- [ ] Teste unitário do mapeamento `ModelQuality → GgmlType`
-- [ ] Gate `quick` passa
+- [x] Download automático se modelo ausente, reaproveitamento se já existe (mesma lógica do POC)
+- [x] Teste unitário do mapeamento `ModelQuality → GgmlType`
+- [x] Gate `quick` passa
 
 **Tests**: unit
 **Gate**: quick
@@ -429,10 +429,10 @@ T16, T30 → T50
 **Tools**: MCP: NONE / Skill: NONE
 
 **Done when**:
-- [ ] Pipeline completo roda ponta a ponta com um arquivo de áudio real de teste (curto, poucos segundos) e produz segmentos com tempos/texto
-- [ ] Cache de `WhisperFactory` reaproveitado entre duas chamadas consecutivas com o mesmo `modelPath` (verificável via teste com contador de carregamentos)
-- [ ] `CancellationToken` interrompe o processamento
-- [ ] Gate `full` passa
+- [x] Pipeline completo roda ponta a ponta com um arquivo de áudio real de teste (curto, poucos segundos) e produz segmentos com tempos/texto
+- [x] Cache de `WhisperFactory` reaproveitado entre duas chamadas consecutivas com o mesmo `modelPath` (verificável via teste com contador de carregamentos)
+- [x] `CancellationToken` interrompe o processamento
+- [x] Gate `full` passa
 
 **Tests**: integration
 **Gate**: full
@@ -451,11 +451,11 @@ T16, T30 → T50
 **Tools**: MCP: NONE / Skill: NONE
 
 **Done when**:
-- [ ] `Enqueue` retorna imediatamente e o job roda em background
-- [ ] Falha do engine é capturada e vira `Transcription.Status = Error` + `ErrorMessage` (spec UPLOAD-01 AC7)
-- [ ] Dois jobs enfileirados em sequência são processados um de cada vez, nunca simultaneamente (teste de integração comprova serialização)
-- [ ] Na inicialização, transcrições `InProgress` órfãs viram `Error` (edge case do spec)
-- [ ] Gate `full` passa
+- [x] `Enqueue` retorna imediatamente e o job roda em background
+- [x] Falha do engine é capturada e vira `Transcription.Status = Error` + `ErrorMessage` (spec UPLOAD-01 AC7)
+- [x] Dois jobs enfileirados em sequência são processados um de cada vez, nunca simultaneamente (teste de integração comprova serialização)
+- [x] Na inicialização, transcrições `InProgress` órfãs viram `Error` (edge case do spec)
+- [x] Gate `full` passa
 
 **Tests**: integration
 **Gate**: full
