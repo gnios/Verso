@@ -12,6 +12,7 @@ using Transcriba.Core.Catalogs;
 using Transcriba.Core.Data.Entities;
 using Transcriba.Core.Engine;
 using Transcriba.Core.Export;
+using Transcriba.Core.Media;
 using Transcriba.Core.Services;
 
 namespace Transcriba.App.ViewModels;
@@ -33,6 +34,7 @@ public partial class EditorViewModel : ViewModelBase
     public ObservableCollection<TranscriptionCardTagViewModel> Tags { get; } = [];
     public IconPickerViewModel IconPicker { get; } = new();
     public SpeakerDropdownViewModel SpeakerDropdown { get; }
+    public PlayerBarViewModel PlayerBar { get; }
 
     [ObservableProperty]
     private bool _isInProgress;
@@ -90,6 +92,8 @@ public partial class EditorViewModel : ViewModelBase
         _segmentEditing = segmentEditing;
         _sidebar = sidebar;
         SpeakerDropdown = new SpeakerDropdownViewModel(scopeFactory);
+        PlayerBar = new PlayerBarViewModel(serviceProvider.GetRequiredService<IMediaPlaybackService>());
+        PlayerBar.PositionChanged += (_, position) => SetPlaybackPosition(position, markStarted: true);
 
         IconPicker.UseTranscriptionIcons = true;
         IconPicker.AllowNoIcon = true;
@@ -232,6 +236,8 @@ public partial class EditorViewModel : ViewModelBase
     {
         _focusedSegment = segment;
         SegmentSeekRequested?.Invoke(this, segment.StartSeconds);
+        PlayerBar.SeekToTime(TimeSpan.FromSeconds(segment.StartSeconds));
+        SetPlaybackPosition(TimeSpan.FromSeconds(segment.StartSeconds), markStarted: true);
     }
 
     internal async Task AssignSpeakerToActiveSegmentAsync(Guid speakerId)
@@ -381,6 +387,8 @@ public partial class EditorViewModel : ViewModelBase
             Segments.Clear();
             HasSegments = false;
         }
+
+        await PlayerBar.LoadAsync(transcription.MediaFilePath);
     }
 
     private async Task ReloadSegmentsAsync()
