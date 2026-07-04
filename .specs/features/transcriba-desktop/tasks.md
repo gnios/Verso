@@ -204,6 +204,7 @@ T16, T30 → T50
 **Gate**: build
 
 **Commit**: `feat(app): configura Generic Host e DI no bootstrap do Avalonia`
+**Status**: ✅ Concluída
 
 ---
 
