@@ -310,6 +310,7 @@ T16, T30 → T50
 **Gate**: quick
 
 **Commit**: `feat(core): adiciona catálogos de ícones, cores e tags`
+**Status**: ✅ Concluída
 
 ---
 
