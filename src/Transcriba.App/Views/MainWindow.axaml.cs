@@ -1,6 +1,6 @@
 using Avalonia.Controls;
 
-namespace Transcriba.App;
+namespace Transcriba.App.Views;
 
 public partial class MainWindow : Window
 {

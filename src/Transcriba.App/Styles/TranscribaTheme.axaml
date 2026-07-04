@@ -1,0 +1,54 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+            <Color x:Key="TranscribaBgColor">#FFFFFF</Color>
+            <Color x:Key="TranscribaSurfaceColor">#F7F6F3</Color>
+            <Color x:Key="TranscribaFgColor">#37352F</Color>
+            <Color x:Key="TranscribaFgSecondaryColor">#787774</Color>
+            <Color x:Key="TranscribaMutedColor">#9B9A97</Color>
+            <Color x:Key="TranscribaBorderColor">#E9E9E7</Color>
+            <Color x:Key="TranscribaBorderDarkColor">#D4D3CF</Color>
+            <Color x:Key="TranscribaAccentColor">#2EAADC</Color>
+            <Color x:Key="TranscribaAccentHoverColor">#2383A7</Color>
+            <Color x:Key="TranscribaAccentLightColor">#242EAADC</Color>
+            <Color x:Key="TranscribaSurfaceHoverColor">#1437352F</Color>
+            <Color x:Key="TranscribaSurfaceActiveColor">#2937352F</Color>
+        </ResourceDictionary>
+
+        <ResourceDictionary x:Key="Dark">
+            <Color x:Key="TranscribaBgColor">#191919</Color>
+            <Color x:Key="TranscribaSurfaceColor">#252525</Color>
+            <Color x:Key="TranscribaFgColor">#E4E4E3</Color>
+            <Color x:Key="TranscribaFgSecondaryColor">#9B9A97</Color>
+            <Color x:Key="TranscribaMutedColor">#6B6B69</Color>
+            <Color x:Key="TranscribaBorderColor">#333332</Color>
+            <Color x:Key="TranscribaBorderDarkColor">#3E3E3C</Color>
+            <Color x:Key="TranscribaAccentColor">#4FC4F8</Color>
+            <Color x:Key="TranscribaAccentHoverColor">#70D0FF</Color>
+            <Color x:Key="TranscribaAccentLightColor">#1F4FC4F8</Color>
+            <Color x:Key="TranscribaSurfaceHoverColor">#0EFFFFFF</Color>
+            <Color x:Key="TranscribaSurfaceActiveColor">#1AFFFFFF</Color>
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+
+    <SolidColorBrush x:Key="TranscribaBg" Color="{DynamicResource TranscribaBgColor}" />
+    <SolidColorBrush x:Key="TranscribaSurface" Color="{DynamicResource TranscribaSurfaceColor}" />
+    <SolidColorBrush x:Key="TranscribaFg" Color="{DynamicResource TranscribaFgColor}" />
+    <SolidColorBrush x:Key="TranscribaFgSecondary" Color="{DynamicResource TranscribaFgSecondaryColor}" />
+    <SolidColorBrush x:Key="TranscribaMuted" Color="{DynamicResource TranscribaMutedColor}" />
+    <SolidColorBrush x:Key="TranscribaBorder" Color="{DynamicResource TranscribaBorderColor}" />
+    <SolidColorBrush x:Key="TranscribaBorderDark" Color="{DynamicResource TranscribaBorderDarkColor}" />
+    <SolidColorBrush x:Key="TranscribaAccent" Color="{DynamicResource TranscribaAccentColor}" />
+    <SolidColorBrush x:Key="TranscribaAccentHover" Color="{DynamicResource TranscribaAccentHoverColor}" />
+    <SolidColorBrush x:Key="TranscribaAccentLight" Color="{DynamicResource TranscribaAccentLightColor}" />
+    <SolidColorBrush x:Key="TranscribaSurfaceHover" Color="{DynamicResource TranscribaSurfaceHoverColor}" />
+    <SolidColorBrush x:Key="TranscribaSurfaceActive" Color="{DynamicResource TranscribaSurfaceActiveColor}" />
+
+    <Thickness x:Key="SidebarWidth">260</Thickness>
+    <CornerRadius x:Key="TranscribaRadius">4</CornerRadius>
+    <CornerRadius x:Key="TranscribaRadiusMd">6</CornerRadius>
+    <CornerRadius x:Key="TranscribaRadiusLg">8</CornerRadius>
+
+</ResourceDictionary>
