@@ -56,6 +56,59 @@ public class LibraryService(IDbContextFactory<TranscribaDbContext> dbContextFact
             .ToListAsync();
     }
 
+    public async Task<Transcription> CreateForUploadAsync(
+        Guid id,
+        string title,
+        string mediaFilePath,
+        string language,
+        ModelQuality quality,
+        SpeakerMode speakerMode,
+        int? researchPageId)
+    {
+        await using var context = await dbContextFactory.CreateDbContextAsync();
+
+        var transcription = new Transcription
+        {
+            Id = id,
+            Title = title,
+            Icon = "📝",
+            Status = TranscriptionStatus.InProgress,
+            MediaFilePath = mediaFilePath,
+            Language = language,
+            Quality = quality,
+            SpeakerMode = speakerMode,
+            ResearchPageId = researchPageId,
+            CreatedAt = DateTime.UtcNow,
+        };
+
+        context.Transcriptions.Add(transcription);
+        await context.SaveChangesAsync();
+        return transcription;
+    }
+
+    public async Task<Transcription?> GetTranscriptionAsync(Guid id)
+    {
+        await using var context = await dbContextFactory.CreateDbContextAsync();
+        return await context.Transcriptions
+            .AsNoTracking()
+            .SingleOrDefaultAsync(t => t.Id == id);
+    }
+
+    public async Task ResetToInProgressAsync(Guid id)
+    {
+        await using var context = await dbContextFactory.CreateDbContextAsync();
+        var updated = await context.Transcriptions
+            .Where(t => t.Id == id)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(t => t.Status, TranscriptionStatus.InProgress)
+                .SetProperty(t => t.ErrorMessage, (string?)null));
+
+        if (updated == 0)
+        {
+            throw new InvalidOperationException($"Transcrição {id} não encontrada.");
+        }
+    }
+
     public async Task<Transcription> CreateStandaloneAsync(
         string title,
         string? icon,
@@ -123,6 +176,7 @@ public class LibraryService(IDbContextFactory<TranscribaDbContext> dbContextFact
                 t.Title,
                 t.Icon,
                 t.Status,
+                t.ErrorMessage,
                 t.CreatedAt,
                 t.DurationSeconds,
                 t.Speakers.Count,

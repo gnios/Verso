@@ -16,6 +16,7 @@ public sealed record TranscriptionSummary(
     string Title,
     string? Icon,
     TranscriptionStatus Status,
+    string? ErrorMessage,
     DateTime Date,
     double DurationSeconds,
     int SpeakersCount,
