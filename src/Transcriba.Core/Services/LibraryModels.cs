@@ -21,3 +21,5 @@ public sealed record TranscriptionSummary(
     int SpeakersCount,
     IReadOnlyList<string> Tags,
     string Preview);
+
+public sealed record TagSummary(int Id, string Name, int Count);

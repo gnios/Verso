@@ -30,6 +30,24 @@ public class LibraryService(IDbContextFactory<TranscribaDbContext> dbContextFact
         return await ProjectSummariesAsync(filtered);
     }
 
+    public async Task<int> GetCountAsync(LibraryFilter filter)
+    {
+        await using var context = await dbContextFactory.CreateDbContextAsync();
+        return await ApplyFilter(context.Transcriptions.AsQueryable(), filter).CountAsync();
+    }
+
+    public async Task<IReadOnlyList<TagSummary>> GetTagsAsync()
+    {
+        await using var context = await dbContextFactory.CreateDbContextAsync();
+        return await context.Tags
+            .Select(t => new TagSummary(
+                t.Id,
+                t.Name,
+                context.Transcriptions.Count(tr => tr.Tags.Any(tag => tag.Id == t.Id))))
+            .OrderBy(t => t.Name)
+            .ToListAsync();
+    }
+
     private static IQueryable<Transcription> ApplyFilter(IQueryable<Transcription> query, LibraryFilter filter)
     {
         query = filter.Status switch

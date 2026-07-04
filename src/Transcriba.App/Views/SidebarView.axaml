@@ -1,0 +1,203 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Transcriba.App.ViewModels"
+             x:Class="Transcriba.App.Views.SidebarView"
+             x:DataType="vm:SidebarViewModel">
+    <DockPanel>
+        <Grid DockPanel.Dock="Top"
+              Margin="14,12,14,6"
+              ColumnDefinitions="*,Auto">
+            <Button Grid.Column="0"
+                    Classes="sidebar-logo"
+                    Command="{Binding NavigateDashboardCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="📝" FontSize="18" VerticalAlignment="Center" />
+                    <TextBlock Text="Transcriba"
+                               FontSize="14"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource TranscribaFg}"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+            <Button Grid.Column="1"
+                    Classes="sidebar-theme-btn"
+                    Command="{Binding ToggleThemeCommand}"
+                    ToolTip.Tip="Alternar tema">
+                <TextBlock Text="{Binding ThemeIcon}" FontSize="14" />
+            </Button>
+        </Grid>
+
+        <Border DockPanel.Dock="Top"
+                Margin="14,4,14,2"
+                CornerRadius="{DynamicResource TranscribaRadius}"
+                BorderBrush="{DynamicResource TranscribaBorder}"
+                BorderThickness="1"
+                Background="{DynamicResource TranscribaBg}">
+            <Grid ColumnDefinitions="Auto,*" Margin="8,0">
+                <TextBlock Text="🔍"
+                           FontSize="12"
+                           Foreground="{DynamicResource TranscribaMuted}"
+                           VerticalAlignment="Center" />
+                <TextBox Grid.Column="1"
+                         Text="{Binding SearchText}"
+                         PlaceholderText="Buscar..."
+                         BorderThickness="0"
+                         Background="Transparent"
+                         FontSize="13"
+                         Padding="6,7"
+                         IsReadOnly="True"
+                         Focusable="False" />
+            </Grid>
+        </Border>
+
+        <Grid DockPanel.Dock="Top" Margin="14,2,14,6">
+            <Button Classes="sidebar-new"
+                    Command="{Binding ToggleNewMenuCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="5">
+                    <TextBlock Text="＋" FontSize="14" />
+                    <TextBlock Text="Nova" />
+                </StackPanel>
+            </Button>
+            <Border IsVisible="{Binding IsNewMenuOpen}"
+                    Margin="0,36,0,0"
+                    Background="{DynamicResource TranscribaBg}"
+                    BorderBrush="{DynamicResource TranscribaBorder}"
+                    BorderThickness="1"
+                    CornerRadius="{DynamicResource TranscribaRadiusLg}"
+                    Padding="4">
+                <StackPanel Spacing="2">
+                    <Button Classes="sidebar-dropdown-item" Command="{Binding NewResearchCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="📚" />
+                            <TextBlock Text="Pesquisa / Tese" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="sidebar-dropdown-item" Command="{Binding NewTranscriptionCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="📝" />
+                            <TextBlock Text="Transcrição" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="sidebar-dropdown-item" Command="{Binding NewRecordingCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="🎙️" />
+                            <TextBlock Text="Gravar agora" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <Border DockPanel.Dock="Bottom"
+                BorderBrush="{DynamicResource TranscribaBorder}"
+                BorderThickness="0,1,0,0"
+                Padding="0,4">
+            <Button Classes="sidebar-item" Command="{Binding NavigateSettingsCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="7">
+                    <TextBlock Text="⚙️" Classes="sidebar-icon" />
+                    <TextBlock Text="Configurações" />
+                </StackPanel>
+            </Button>
+        </Border>
+
+        <ScrollViewer>
+            <StackPanel>
+                <TextBlock Text="PESQUISAS" Classes="sidebar-section-title" />
+                <ItemsControl ItemsSource="{Binding Researches}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:SidebarResearchItemViewModel">
+                            <StackPanel>
+                                <Button Classes="sidebar-item" Command="{Binding ToggleExpandCommand}">
+                                    <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+                                        <TextBlock Grid.Column="0" Text="{Binding Icon}" Classes="page-icon" />
+                                        <TextBlock Grid.Column="1"
+                                                   Text="›"
+                                                   Classes="chevron"
+                                                   Classes.expanded="{Binding IsExpanded}" />
+                                        <TextBlock Grid.Column="2"
+                                                   Text="{Binding Title}"
+                                                   Margin="7,0,0,0"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <Border Grid.Column="3" Classes="sidebar-badge" Margin="8,0,0,0">
+                                            <TextBlock Text="{Binding TranscriptionCount}" />
+                                        </Border>
+                                    </Grid>
+                                </Button>
+                                <ItemsControl IsVisible="{Binding IsExpanded}"
+                                              ItemsSource="{Binding Transcriptions}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:SidebarTranscriptionItemViewModel">
+                                            <Button Classes="sidebar-trans-item"
+                                                    Command="{Binding OpenCommand}">
+                                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                                    <TextBlock Text="{Binding Icon}" />
+                                                    <TextBlock Text="{Binding Title}"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock Text="TRANSCRIÇÕES" Classes="sidebar-section-title" />
+                <Button Classes="sidebar-item" Command="{Binding NavigateAllCommand}">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <TextBlock Grid.Column="0" Text="📋" Classes="sidebar-icon" />
+                        <TextBlock Grid.Column="1" Text="Todas" Margin="7,0,0,0" />
+                        <Border Grid.Column="2" Classes="sidebar-badge">
+                            <TextBlock Text="{Binding TotalCount}" />
+                        </Border>
+                    </Grid>
+                </Button>
+                <Button Classes="sidebar-item" Command="{Binding NavigateInProgressCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="7">
+                        <TextBlock Text="⏳" Classes="sidebar-icon" />
+                        <TextBlock Text="Em andamento" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="sidebar-item" Command="{Binding NavigateDoneCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="7">
+                        <TextBlock Text="✅" Classes="sidebar-icon" />
+                        <TextBlock Text="Concluídas" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="sidebar-item" Command="{Binding NavigateRecordingCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="7">
+                        <TextBlock Text="🎙️" Classes="sidebar-icon" />
+                        <TextBlock Text="Gravar agora" />
+                    </StackPanel>
+                </Button>
+
+                <TextBlock Text="TAGS" Classes="sidebar-section-title" />
+                <ItemsControl ItemsSource="{Binding Tags}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:SidebarTagItemViewModel">
+                            <Button Classes="sidebar-item"
+                                    Command="{Binding NavigateCommand}">
+                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                    <Border Grid.Column="0"
+                                            Width="8"
+                                            Height="8"
+                                            CornerRadius="4"
+                                            Background="{DynamicResource TranscribaAccent}"
+                                            VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding Name}"
+                                               Margin="7,0,0,0" />
+                                    <TextBlock Grid.Column="2"
+                                               Text="{Binding Count}"
+                                               Foreground="{DynamicResource TranscribaMuted}"
+                                               FontSize="12" />
+                                </Grid>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>
