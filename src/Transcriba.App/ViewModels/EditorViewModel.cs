@@ -230,10 +230,12 @@ public partial class EditorViewModel : ViewModelBase
         _ = PersistSegmentTextAsync(segment.Id, text);
     }
 
+    internal event EventHandler<double>? SegmentSeekRequested;
+
     internal void OnSegmentClicked(SegmentItemViewModel segment)
     {
-        // wire seek em T43
         _focusedSegment = segment;
+        SegmentSeekRequested?.Invoke(this, segment.StartSeconds);
     }
 
     internal void SetPlaybackPosition(TimeSpan position)
