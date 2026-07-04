@@ -232,6 +232,8 @@ public partial class EditorViewModel : ViewModelBase
 
     internal event EventHandler<double>? SegmentSeekRequested;
 
+    internal event EventHandler<SegmentItemViewModel>? ScrollToSegmentRequested;
+
     internal void OnSegmentClicked(SegmentItemViewModel segment)
     {
         _focusedSegment = segment;
@@ -416,9 +418,19 @@ public partial class EditorViewModel : ViewModelBase
     private void UpdateActiveSegmentHighlight()
     {
         var activeId = GetActiveSegmentId();
+        SegmentItemViewModel? activeVm = null;
         foreach (var segment in Segments)
         {
             segment.IsActive = segment.Id == activeId;
+            if (segment.IsActive)
+            {
+                activeVm = segment;
+            }
+        }
+
+        if (activeVm is not null)
+        {
+            ScrollToSegmentRequested?.Invoke(this, activeVm);
         }
     }
 

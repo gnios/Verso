@@ -687,5 +687,169 @@
             <Setter Property="FontSize" Value="12" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
+
+        <Style Selector="Grid.editor-shell">
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+        </Style>
+        <Style Selector="ScrollViewer.editor-transcript">
+            <Setter Property="Padding" Value="28,28,56,24" />
+        </Style>
+        <Style Selector="StackPanel.editor-transcript-inner">
+            <Setter Property="MaxWidth" Value="700" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="StackPanel.editor-title-row">
+            <Setter Property="Margin" Value="0,0,0,2" />
+        </Style>
+        <Style Selector="Button.editor-page-icon">
+            <Setter Property="Width" Value="40" />
+            <Setter Property="Height" Value="40" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CornerRadius" Value="{DynamicResource TranscribaRadiusLg}" />
+            <Setter Property="Background" Value="{DynamicResource TranscribaSurface}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource TranscribaBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.editor-page-icon.has-icon">
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="TextBox.editor-title-input">
+            <Setter Property="FontSize" Value="22" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaFg}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="2,2,4,2" />
+            <Setter Property="CornerRadius" Value="{DynamicResource TranscribaRadius}" />
+        </Style>
+        <Style Selector="StackPanel.editor-meta">
+            <Setter Property="Margin" Value="0,0,0,16" />
+        </Style>
+        <Style Selector="StackPanel.editor-meta TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaMuted}" />
+        </Style>
+        <Style Selector="Border.editor-meta-dot">
+            <Setter Property="Background" Value="{DynamicResource TranscribaMuted}" />
+        </Style>
+        <Style Selector="ItemsControl.editor-tags">
+            <Setter Property="Margin" Value="0,0,0,16" />
+        </Style>
+        <Style Selector="Grid.editor-toolbar">
+            <Setter Property="Margin" Value="0,0,0,16" />
+        </Style>
+        <Style Selector="Grid.editor-toolbar > Button">
+            <Setter Property="Padding" Value="5,5,9,5" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaFgSecondary}" />
+            <Setter Property="CornerRadius" Value="{DynamicResource TranscribaRadius}" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Grid.editor-toolbar > Button:pointerover">
+            <Setter Property="Background" Value="{DynamicResource TranscribaSurfaceHover}" />
+        </Style>
+        <Style Selector="Border.editor-toolbar-sep">
+            <Setter Property="Background" Value="{DynamicResource TranscribaBorder}" />
+            <Setter Property="Margin" Value="3,0" />
+        </Style>
+        <Style Selector="Border.icon-popup">
+            <Setter Property="Background" Value="{DynamicResource TranscribaBg}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource TranscribaBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="{DynamicResource TranscribaRadiusLg}" />
+            <Setter Property="Padding" Value="16" />
+            <Setter Property="Width" Value="320" />
+            <Setter Property="BoxShadow" Value="0 4px 12px #00000022" />
+        </Style>
+        <Style Selector="TextBlock.icon-popup-title">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaMuted}" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+            <Setter Property="LetterSpacing" Value="0.5" />
+        </Style>
+        <Style Selector="Border.seg">
+            <Setter Property="Padding" Value="8,8,12,8" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+            <Setter Property="CornerRadius" Value="{DynamicResource TranscribaRadiusMd}" />
+            <Setter Property="BorderThickness" Value="0,0,0,0" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Border.seg.active-seg">
+            <Setter Property="Background" Value="{DynamicResource TranscribaAccentLight}" />
+            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderBrush" Value="{DynamicResource TranscribaAccent}" />
+        </Style>
+        <Style Selector="TextBlock.seg-time">
+            <Setter Property="FontFamily" Value="Consolas,Courier New,monospace" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaMuted}" />
+            <Setter Property="MinWidth" Value="56" />
+            <Setter Property="Padding" Value="0,3,0,0" />
+        </Style>
+        <Style Selector="TextBlock.seg-speaker">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="TextBox.seg-text">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="LineHeight" Value="22" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaFg}" />
+            <Setter Property="Padding" Value="2" />
+            <Setter Property="CornerRadius" Value="2" />
+        </Style>
+        <Style Selector="TextBox.seg-text:focus">
+            <Setter Property="Background" Value="{DynamicResource TranscribaSurface}" />
+        </Style>
+        <Style Selector="Border.player-bar">
+            <Setter Property="Height" Value="52" />
+            <Setter Property="Background" Value="{DynamicResource TranscribaBg}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource TranscribaBorder}" />
+            <Setter Property="BorderThickness" Value="1,1,0,0" />
+            <Setter Property="Padding" Value="20,0" />
+        </Style>
+        <Style Selector="Button.player-btn">
+            <Setter Property="Width" Value="34" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="17" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.player-btn-main">
+            <Setter Property="Width" Value="38" />
+            <Setter Property="Height" Value="38" />
+            <Setter Property="Background" Value="{DynamicResource TranscribaAccent}" />
+            <Setter Property="CornerRadius" Value="19" />
+        </Style>
+        <Style Selector="Button.player-btn-main:pointerover">
+            <Setter Property="Background" Value="{DynamicResource TranscribaAccentHover}" />
+        </Style>
+        <Style Selector="StackPanel.player-progress TextBlock.player-time">
+            <Setter Property="FontFamily" Value="Consolas,Courier New,monospace" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaMuted}" />
+            <Setter Property="MinWidth" Value="56" />
+        </Style>
+        <Style Selector="Border.player-bar-track">
+            <Setter Property="CornerRadius" Value="2" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.player-speed">
+            <Setter Property="Padding" Value="3,3,8,3" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Background" Value="{DynamicResource TranscribaSurface}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource TranscribaBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="{DynamicResource TranscribaRadius}" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
     </Application.Styles>
 </Application>
