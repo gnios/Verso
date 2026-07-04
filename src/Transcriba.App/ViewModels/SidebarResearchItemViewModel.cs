@@ -1,0 +1,42 @@
+using System.Collections.Generic;
+using System.Linq;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Transcriba.App.Services;
+using Transcriba.Core.Catalogs;
+using Transcriba.Core.Data.Entities;
+
+namespace Transcriba.App.ViewModels;
+
+public partial class SidebarResearchItemViewModel : ViewModelBase
+{
+    public int Id { get; }
+    public string Title { get; }
+    public string Icon { get; }
+    public string ColorHex { get; }
+    public int TranscriptionCount { get; }
+    public IReadOnlyList<SidebarTranscriptionItemViewModel> Transcriptions { get; }
+
+    [ObservableProperty]
+    private bool _isExpanded;
+
+    public SidebarResearchItemViewModel(ResearchPage research, NavigationService navigation)
+    {
+        Id = research.Id;
+        Title = TruncateTitle(research.Title);
+        Icon = research.Icon;
+        ColorHex = ColorCatalog.PageColors.FirstOrDefault(c => c.Name == research.ColorName).Hex
+                   ?? ColorCatalog.PageColors[0].Hex;
+        TranscriptionCount = research.Transcriptions.Count;
+        Transcriptions = research.Transcriptions
+            .OrderByDescending(t => t.CreatedAt)
+            .Select(t => new SidebarTranscriptionItemViewModel(t, navigation))
+            .ToList();
+    }
+
+    [RelayCommand]
+    private void ToggleExpand() => IsExpanded = !IsExpanded;
+
+    private static string TruncateTitle(string title) =>
+        title.Length <= 18 ? title : $"{title[..18]}…";
+}

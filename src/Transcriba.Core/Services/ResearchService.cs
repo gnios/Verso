@@ -31,6 +31,16 @@ public class ResearchService(IDbContextFactory<TranscribaDbContext> dbContextFac
             .FirstOrDefaultAsync(r => r.Id == id);
     }
 
+    public async Task<IReadOnlyList<ResearchPage>> GetAllAsync()
+    {
+        await using var context = await dbContextFactory.CreateDbContextAsync();
+        return await context.ResearchPages
+            .Include(r => r.Transcriptions)
+            .OrderByDescending(r => r.CreatedAt)
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
     public async Task DeleteAsync(int id)
     {
         await using var context = await dbContextFactory.CreateDbContextAsync();
