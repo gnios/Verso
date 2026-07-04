@@ -16,7 +16,7 @@ namespace Transcriba.Tests.ViewModels;
 
 public class EditorViewModelTests
 {
-    private static async Task<(IServiceProvider Provider, string Directory, Guid TranscriptionId)>
+    internal static async Task<(IServiceProvider Provider, string Directory, Guid TranscriptionId)>
         CreateEditorProviderAsync(TranscriptionStatus status, Action<Transcription>? configure = null)
     {
         var (baseProvider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();
