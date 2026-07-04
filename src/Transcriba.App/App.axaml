@@ -302,5 +302,103 @@
         <Style Selector="Border.status-done TextBlock">
             <Setter Property="Foreground" Value="{StaticResource TagGreen}" />
         </Style>
+
+        <Style Selector="Button.breadcrumb-link">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaAccent}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.breadcrumb-link:pointerover">
+            <Setter Property="TextBlock.TextDecorations" Value="Underline" />
+        </Style>
+
+        <Style Selector="StackPanel.editor-breadcrumb">
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
+
+        <Style Selector="StackPanel.page-header">
+            <Setter Property="Margin" Value="0,0,0,20" />
+        </Style>
+        <Style Selector="Border.page-header-icon">
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="44" />
+            <Setter Property="CornerRadius" Value="{DynamicResource TranscribaRadiusLg}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBlock.page-header-title">
+            <Setter Property="FontSize" Value="18" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaFg}" />
+        </Style>
+        <Style Selector="TextBlock.page-header-desc">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaMuted}" />
+        </Style>
+
+        <Style Selector="StackPanel.research-section">
+            <Setter Property="Margin" Value="0,0,0,28" />
+        </Style>
+        <Style Selector="Grid.research-section-head">
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+        <Style Selector="TextBlock.research-section-title">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaFg}" />
+            <Setter Property="LetterSpacing" Value="0.6" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.research-add-btn">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="4,4,10,4" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaAccent}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="CornerRadius" Value="{DynamicResource TranscribaRadius}" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.research-add-btn:pointerover">
+            <Setter Property="Background" Value="{DynamicResource TranscribaAccentLight}" />
+        </Style>
+
+        <Style Selector="ItemsControl.research-list">
+            <Setter Property="Margin" Value="0" />
+        </Style>
+        <Style Selector="Button.research-item">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="10,10,14,10" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+            <Setter Property="CornerRadius" Value="{DynamicResource TranscribaRadiusMd}" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.research-item:pointerover">
+            <Setter Property="Background" Value="{DynamicResource TranscribaSurfaceHover}" />
+        </Style>
+        <Style Selector="Border.research-item-icon">
+            <Setter Property="Width" Value="32" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="CornerRadius" Value="{DynamicResource TranscribaRadius}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBlock.research-item-title">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaFg}" />
+        </Style>
+        <Style Selector="StackPanel.research-item-sub TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaMuted}" />
+        </Style>
+        <Style Selector="ItemsControl.research-item-right">
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
     </Application.Styles>
 </Application>
