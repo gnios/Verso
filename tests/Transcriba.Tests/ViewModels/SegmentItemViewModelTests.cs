@@ -51,7 +51,7 @@ public class SegmentItemViewModelTests
             var editor = Assert.IsType<EditorViewModel>(navigation.CurrentViewModel);
             await Task.Delay(50);
 
-            editor.SetPlaybackPosition(TimeSpan.FromSeconds(12));
+            editor.SetPlaybackPosition(TimeSpan.FromSeconds(12), markStarted: true);
 
             Assert.False(editor.Segments[0].IsActive);
             Assert.True(editor.Segments[1].IsActive);

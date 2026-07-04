@@ -224,7 +224,7 @@ public class EditorViewModelTests
         try
         {
             var editor = await CreateEditorAsync(provider, transcriptionId);
-            editor.SetPlaybackPosition(TimeSpan.FromSeconds(12));
+            editor.SetPlaybackPosition(TimeSpan.FromSeconds(12), markStarted: true);
             editor.OnSegmentFocused(editor.Segments[0], caretIndex: 5);
             await editor.SplitSegmentCommand.ExecuteAsync(null);
             await Task.Delay(50);
@@ -283,7 +283,7 @@ public class EditorViewModelTests
         try
         {
             var editor = await CreateEditorAsync(provider, transcriptionId);
-            editor.SetPlaybackPosition(TimeSpan.FromSeconds(12));
+            editor.SetPlaybackPosition(TimeSpan.FromSeconds(12), markStarted: true);
             await editor.MergeSegmentCommand.ExecuteAsync(null);
             await Task.Delay(50);
 

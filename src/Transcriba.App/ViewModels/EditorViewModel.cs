@@ -26,11 +26,13 @@ public partial class EditorViewModel : ViewModelBase
     private SegmentItemViewModel? _focusedSegment;
     private int _focusedCaretIndex;
     private TimeSpan _playbackPosition;
+    private bool _playbackStarted;
     private IReadOnlyList<Segment> _segmentEntities = [];
 
     public ObservableCollection<SegmentItemViewModel> Segments { get; } = [];
     public ObservableCollection<TranscriptionCardTagViewModel> Tags { get; } = [];
     public IconPickerViewModel IconPicker { get; } = new();
+    public SpeakerDropdownViewModel SpeakerDropdown { get; }
 
     [ObservableProperty]
     private bool _isInProgress;
@@ -73,11 +75,8 @@ public partial class EditorViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isIconPickerOpen;
 
-    [ObservableProperty]
-    private bool _isSpeakerDropdownOpen;
-
     public bool HasIcon => !string.IsNullOrWhiteSpace(Icon);
-    public bool HasActiveSegment => GetActiveSegmentEntity() is not null;
+    public bool HasActiveSegment => _playbackStarted && GetActiveSegmentEntity() is not null;
 
     public EditorViewModel(
         IServiceScopeFactory scopeFactory,
@@ -90,6 +89,7 @@ public partial class EditorViewModel : ViewModelBase
         _navigation = navigation;
         _segmentEditing = segmentEditing;
         _sidebar = sidebar;
+        SpeakerDropdown = new SpeakerDropdownViewModel(scopeFactory);
 
         IconPicker.UseTranscriptionIcons = true;
         IconPicker.AllowNoIcon = true;
@@ -135,11 +135,7 @@ public partial class EditorViewModel : ViewModelBase
     private void CloseIconPicker() => IsIconPickerOpen = false;
 
     [RelayCommand]
-    private void ToggleSpeakerDropdown()
-    {
-        // stub até T39 — apenas alterna visibilidade
-        IsSpeakerDropdownOpen = !IsSpeakerDropdownOpen;
-    }
+    private void ToggleSpeakerDropdown() => SpeakerDropdown.ToggleCommand.Execute(null);
 
     [RelayCommand]
     private void Export()
@@ -238,10 +234,43 @@ public partial class EditorViewModel : ViewModelBase
         SegmentSeekRequested?.Invoke(this, segment.StartSeconds);
     }
 
-    internal void SetPlaybackPosition(TimeSpan position)
+    internal async Task AssignSpeakerToActiveSegmentAsync(Guid speakerId)
     {
+        var active = GetActiveSegmentEntity();
+        if (active is null)
+        {
+            return;
+        }
+
+        using var scope = _scopeFactory.CreateScope();
+        var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
+        var speakerService = scope.ServiceProvider.GetRequiredService<SpeakerService>();
+        await libraryService.AssignSpeakerToSegmentAsync(active.Id, speakerId);
+
+        var speaker = (await speakerService.GetSpeakersAsync(_transcriptionId))
+            .First(s => s.Id == speakerId);
+        active.SpeakerId = speakerId;
+        active.Speaker = speaker;
+
+        var segmentVm = Segments.FirstOrDefault(s => s.Id == active.Id);
+        segmentVm?.UpdateSpeaker(speaker);
+        OnPropertyChanged(nameof(HasActiveSegment));
+        SpeakerDropdown.NotifyAssignAvailability();
+        SpeakerDropdown.RefreshActiveIndicator();
+    }
+
+    internal void SetPlaybackPosition(TimeSpan position, bool markStarted = false)
+    {
+        if (markStarted)
+        {
+            _playbackStarted = true;
+        }
+
         _playbackPosition = position;
         UpdateActiveSegmentHighlight();
+        OnPropertyChanged(nameof(HasActiveSegment));
+        SpeakerDropdown.NotifyAssignAvailability();
+        SpeakerDropdown.RefreshActiveIndicator();
     }
 
     internal Segment? GetActiveSegmentEntity() =>
@@ -302,6 +331,10 @@ public partial class EditorViewModel : ViewModelBase
         {
             return;
         }
+
+        SpeakerDropdown.Initialize(this, _transcriptionId);
+        await SpeakerDropdown.LoadSpeakersAsync();
+        _playbackStarted = false;
 
         Title = transcription.Title;
         Icon = transcription.Icon;
@@ -386,6 +419,7 @@ public partial class EditorViewModel : ViewModelBase
         Segments.Clear();
         Tags.Clear();
         _segmentEntities = [];
+        _playbackStarted = false;
         IsInProgress = false;
         IsError = false;
         HasSegments = false;
