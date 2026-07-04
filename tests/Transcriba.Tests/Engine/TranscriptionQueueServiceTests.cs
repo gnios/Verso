@@ -1,0 +1,251 @@
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Transcriba.Core.Data;
+using Transcriba.Core.Data.Entities;
+using Transcriba.Core.Engine;
+
+namespace Transcriba.Tests.Engine;
+
+public class TranscriptionQueueServiceTests
+{
+    [Fact]
+    public async Task Enqueue_WhenEngineSucceeds_UpdatesStatusToDone()
+    {
+        await using var fixture = await QueueFixture.CreateAsync(new SuccessTranscriptionEngine());
+        var transcriptionId = await fixture.SeedTranscriptionAsync();
+
+        fixture.Queue.Enqueue(fixture.CreateRequest(transcriptionId));
+        await fixture.WaitForStatusAsync(transcriptionId, TranscriptionStatus.Done);
+
+        await using var context = await fixture.Factory.CreateDbContextAsync();
+        var transcription = await context.Transcriptions
+            .Include(t => t.Segments)
+            .SingleAsync(t => t.Id == transcriptionId);
+        Assert.Equal(TranscriptionStatus.Done, transcription.Status);
+        Assert.Null(transcription.ErrorMessage);
+        Assert.Single(transcription.Segments);
+        Assert.Equal("segmento ok", transcription.Segments[0].Text);
+    }
+
+    [Fact]
+    public async Task Enqueue_WhenEngineThrows_UpdatesStatusToError()
+    {
+        await using var fixture = await QueueFixture.CreateAsync(new FailingTranscriptionEngine("falha simulada"));
+        var transcriptionId = await fixture.SeedTranscriptionAsync();
+
+        fixture.Queue.Enqueue(fixture.CreateRequest(transcriptionId));
+        await fixture.WaitForStatusAsync(transcriptionId, TranscriptionStatus.Error);
+
+        await using var context = await fixture.Factory.CreateDbContextAsync();
+        var transcription = await context.Transcriptions.SingleAsync(t => t.Id == transcriptionId);
+
+        Assert.Equal(TranscriptionStatus.Error, transcription.Status);
+        Assert.Equal("falha simulada", transcription.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task Enqueue_TwoJobs_ProcessesSeriallyNeverConcurrently()
+    {
+        var trackingEngine = new TrackingTranscriptionEngine();
+        await using var fixture = await QueueFixture.CreateAsync(trackingEngine);
+        var firstId = await fixture.SeedTranscriptionAsync();
+        var secondId = await fixture.SeedTranscriptionAsync();
+
+        fixture.Queue.Enqueue(fixture.CreateRequest(firstId));
+        fixture.Queue.Enqueue(fixture.CreateRequest(secondId));
+
+        await fixture.WaitForStatusAsync(firstId, TranscriptionStatus.Done);
+        await fixture.WaitForStatusAsync(secondId, TranscriptionStatus.Done);
+
+        Assert.Equal(1, trackingEngine.MaxConcurrent);
+    }
+
+    [Fact]
+    public async Task Startup_WhenOrphanInProgressExists_MarksAsErrorInterrompida()
+    {
+        var dbPath = CreateTempDbPath();
+        try
+        {
+            var services = new ServiceCollection();
+            services.AddTranscribaDatabase(dbPath);
+            var provider = services.BuildServiceProvider();
+            await DbBootstrapper.MigrateAsync(provider);
+
+            var factory = provider.GetRequiredService<IDbContextFactory<TranscribaDbContext>>();
+            var orphanId = Guid.NewGuid();
+            await using (var context = await factory.CreateDbContextAsync())
+            {
+                context.Transcriptions.Add(new Transcription
+                {
+                    Id = orphanId,
+                    Title = "orphan",
+                    Status = TranscriptionStatus.InProgress,
+                    CreatedAt = DateTime.UtcNow,
+                });
+                await context.SaveChangesAsync();
+            }
+
+            var queue = new TranscriptionQueueService(factory, new SuccessTranscriptionEngine());
+            await queue.StartAsync(CancellationToken.None);
+            await Task.Delay(300);
+            await queue.StopAsync(CancellationToken.None);
+
+            await using var readContext = await factory.CreateDbContextAsync();
+            var transcription = await readContext.Transcriptions.SingleAsync(t => t.Id == orphanId);
+
+            Assert.Equal(TranscriptionStatus.Error, transcription.Status);
+            Assert.Equal("Interrompida", transcription.ErrorMessage);
+        }
+        finally
+        {
+            CleanupDb(dbPath);
+        }
+    }
+
+    private static string CreateTempDbPath() =>
+        Path.Combine(Path.GetTempPath(), $"transcriba-queue-{Guid.NewGuid():N}", "transcriba.db");
+
+    private static void CleanupDb(string dbPath)
+    {
+        SqliteConnection.ClearAllPools();
+        var directory = Path.GetDirectoryName(dbPath);
+        if (!string.IsNullOrEmpty(directory) && Directory.Exists(directory))
+            Directory.Delete(directory, recursive: true);
+    }
+
+    private sealed class QueueFixture : IAsyncDisposable
+    {
+        public required TranscriptionQueueService Queue { get; init; }
+        public required IDbContextFactory<TranscribaDbContext> Factory { get; init; }
+        public required string DbPath { get; init; }
+
+        public static async Task<QueueFixture> CreateAsync(ITranscriptionEngine engine)
+        {
+            var dbPath = CreateTempDbPath();
+            var services = new ServiceCollection();
+            services.AddTranscribaDatabase(dbPath);
+            var provider = services.BuildServiceProvider();
+            await DbBootstrapper.MigrateAsync(provider);
+
+            var factory = provider.GetRequiredService<IDbContextFactory<TranscribaDbContext>>();
+            var queue = new TranscriptionQueueService(factory, engine);
+            await queue.StartAsync(CancellationToken.None);
+            await queue.StartupCompleted;
+
+            return new QueueFixture
+            {
+                Queue = queue,
+                Factory = factory,
+                DbPath = dbPath,
+            };
+        }
+
+        public async Task<Guid> SeedTranscriptionAsync()
+        {
+            var id = Guid.NewGuid();
+            await using var context = await Factory.CreateDbContextAsync();
+            context.Transcriptions.Add(new Transcription
+            {
+                Id = id,
+                Title = "teste",
+                Status = TranscriptionStatus.InProgress,
+                CreatedAt = DateTime.UtcNow,
+                MediaFilePath = "sample.wav",
+                Language = "pt",
+            });
+            await context.SaveChangesAsync();
+            return id;
+        }
+
+        public TranscriptionJobRequest CreateRequest(Guid transcriptionId) =>
+            new(
+                transcriptionId,
+                MediaFilePath: "sample.wav",
+                Language: "pt",
+                Quality: ModelQuality.Standard,
+                Device: ExecutionDevice.Cpu);
+
+        public async Task WaitForStatusAsync(Guid transcriptionId, TranscriptionStatus expectedStatus)
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(10);
+            while (DateTime.UtcNow < deadline)
+            {
+                await using var context = await Factory.CreateDbContextAsync();
+                var status = await context.Transcriptions
+                    .Where(t => t.Id == transcriptionId)
+                    .Select(t => t.Status)
+                    .SingleAsync();
+
+                if (status == expectedStatus)
+                    return;
+
+                await Task.Delay(50);
+            }
+
+            await using var finalContext = await Factory.CreateDbContextAsync();
+            var finalStatus = await finalContext.Transcriptions
+                .Where(t => t.Id == transcriptionId)
+                .Select(t => t.Status)
+                .SingleAsync();
+            Assert.Equal(expectedStatus, finalStatus);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await Queue.StopAsync(CancellationToken.None);
+            CleanupDb(DbPath);
+        }
+    }
+
+    private sealed class SuccessTranscriptionEngine : ITranscriptionEngine
+    {
+        public Task<TranscriptionResult> TranscribeAsync(
+            TranscriptionJobRequest request,
+            IProgress<EngineProgress>? progress,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(new TranscriptionResult(
+            [
+                new TranscriptionSegmentResult(0, 1.5, "segmento ok"),
+            ]));
+        }
+    }
+
+    private sealed class FailingTranscriptionEngine(string message) : ITranscriptionEngine
+    {
+        public Task<TranscriptionResult> TranscribeAsync(
+            TranscriptionJobRequest request,
+            IProgress<EngineProgress>? progress,
+            CancellationToken cancellationToken) =>
+            throw new InvalidOperationException(message);
+    }
+
+    private sealed class TrackingTranscriptionEngine : ITranscriptionEngine
+    {
+        private int _running;
+        public int MaxConcurrent { get; private set; }
+
+        public async Task<TranscriptionResult> TranscribeAsync(
+            TranscriptionJobRequest request,
+            IProgress<EngineProgress>? progress,
+            CancellationToken cancellationToken)
+        {
+            var current = Interlocked.Increment(ref _running);
+            MaxConcurrent = Math.Max(MaxConcurrent, current);
+            try
+            {
+                await Task.Delay(300, cancellationToken);
+                return new TranscriptionResult(
+                [
+                    new TranscriptionSegmentResult(0, 1, "ok"),
+                ]);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _running);
+            }
+        }
+    }
+}
