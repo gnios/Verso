@@ -1,0 +1,500 @@
+
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transcriba — Transcrição Acadêmica</title>
+<style>
+:root{--bg:#ffffff;--surface:#f7f6f3;--surface-hover:rgba(55,53,47,.08);--surface-active:rgba(55,53,47,.16);--fg:#37352f;--fg-secondary:#787774;--muted:#9b9a97;--border:#e9e9e7;--border-dark:#d4d3cf;--accent:#2eaadc;--accent-hover:#2383a7;--accent-light:rgba(46,170,220,.14);--red:#eb5757;--red-light:rgba(235,87,87,.1);--green:#4dab6f;--green-light:rgba(77,171,111,.1);--yellow:#cb912f;--yellow-light:rgba(203,145,47,.12);--purple:#9065b0;--purple-light:rgba(144,101,176,.1);--blue:#2eaadc;--blue-light:rgba(46,170,220,.1);--orange:#d9730d;--orange-light:rgba(217,115,13,.1);--pink:#c14c8a;--pink-light:rgba(193,76,138,.1);--teal:#0d9488;--teal-light:rgba(13,148,136,.1);--sidebar-w:260px;--player-h:72px;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;--font-mono:'SF Mono','Menlo','Consolas',ui-monospace,monospace;--radius:4px;--radius-md:6px;--radius-lg:8px;--shadow-sm:0 1px 3px rgba(0,0,0,.06);--shadow-md:0 4px 12px rgba(0,0,0,.08)}
+html.dark{--bg:#191919;--surface:#252525;--surface-hover:rgba(255,255,255,.055);--surface-active:rgba(255,255,255,.1);--fg:#e4e4e3;--fg-secondary:#9b9a97;--muted:#6b6b69;--border:#333332;--border-dark:#3e3e3c;--accent:#4fc4f8;--accent-hover:#70d0ff;--accent-light:rgba(79,196,248,.12);--red-light:rgba(235,87,87,.15);--green-light:rgba(77,171,111,.15);--yellow-light:rgba(203,145,47,.15);--purple-light:rgba(144,101,176,.15);--blue-light:rgba(46,170,220,.15);--orange-light:rgba(217,115,13,.15);--pink-light:rgba(193,76,138,.15);--teal-light:rgba(13,148,136,.15);--shadow-sm:0 1px 3px rgba(0,0,0,.2);--shadow-md:0 4px 12px rgba(0,0,0,.3)}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--font);color:var(--fg);background:var(--bg);-webkit-font-smoothing:antialiased;line-height:1.5;transition:background .25s,color .25s}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select,textarea{font-family:inherit;color:inherit}
+.app{display:flex;height:100vh;width:100%}
+
+.sidebar{width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;transition:background .25s}
+.sidebar-header{padding:12px 14px 6px;display:flex;align-items:center;justify-content:space-between}
+.sidebar-logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;color:var(--fg);text-decoration:none;padding:4px 6px;border-radius:var(--radius)}
+.sidebar-logo svg{width:22px;height:22px;color:var(--accent)}
+.sidebar-theme-btn{width:30px;height:30px;border-radius:var(--radius);display:grid;place-items:center;transition:background .15s;color:var(--muted)}
+.sidebar-theme-btn:hover{background:var(--surface-hover);color:var(--fg-secondary)}
+.sidebar-search{margin:4px 14px 2px;position:relative}
+.sidebar-search input{width:100%;padding:7px 10px 7px 32px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);font-size:13px;outline:none;transition:border .15s}
+.sidebar-search input:focus{border-color:var(--accent)}
+.sidebar-search svg{position:absolute;left:8px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--muted)}
+.sidebar-actions{padding:2px 14px 6px;display:flex;gap:6px}
+.sidebar-new{flex:1;padding:7px 10px;background:var(--accent);color:#fff;border-radius:var(--radius);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:5px;transition:background .15s;position:relative}
+.sidebar-new:hover{background:var(--accent-hover)}
+.sidebar-new svg{width:14px;height:14px}
+.dropdown{position:absolute;top:100%;left:0;margin-top:4px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);min-width:220px;z-index:999;padding:4px;display:none}
+.dropdown.open{display:block}
+.dropdown-item{display:flex;align-items:center;gap:8px;padding:8px 10px;font-size:13px;color:var(--fg-secondary);border-radius:var(--radius);cursor:pointer;transition:background .1s}
+.dropdown-item:hover{background:var(--surface-hover);color:var(--fg)}
+.dropdown-item svg{width:16px;height:16px;color:var(--muted)}
+.sidebar-section{margin-bottom:2px}
+.sidebar-section-title{padding:8px 14px 4px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;justify-content:space-between}
+.sidebar-section-title button{width:20px;height:20px;display:grid;place-items:center;border-radius:var(--radius);color:var(--muted);transition:background .1s}
+.sidebar-section-title button:hover{background:var(--surface-hover);color:var(--fg-secondary)}
+.sidebar-item{display:flex;align-items:center;gap:7px;padding:4px 14px 4px 12px;font-size:13px;color:var(--fg-secondary);cursor:pointer;transition:background .1s;position:relative}
+.sidebar-item:hover{background:var(--surface-hover)}
+.sidebar-item.active{background:var(--surface-active);color:var(--fg);font-weight:500}
+.sidebar-item svg{width:16px;height:16px;flex-shrink:0;color:var(--muted)}
+.sidebar-item.active svg{color:var(--fg)}
+.sidebar-item .badge{margin-left:auto;background:var(--accent-light);color:var(--accent);font-size:11px;font-weight:600;padding:1px 7px;border-radius:99px}
+.sidebar-item .chevron{width:14px;height:14px;flex-shrink:0;transition:transform .2s;color:var(--muted)}
+.sidebar-item .chevron.expanded{transform:rotate(90deg)}
+.sidebar-item .page-icon{font-size:15px;line-height:1;flex-shrink:0;width:18px;text-align:center}
+.sidebar-sub{overflow:hidden;transition:max-height .25s ease}
+.sidebar-sub.collapsed{max-height:0!important}
+/* Deeper indentation for transcriptions under research */
+.sidebar-trans-item{display:flex;align-items:center;gap:7px;padding:3px 14px 3px 50px;font-size:13px;color:var(--fg-secondary);cursor:pointer;transition:background .1s;border-left:2px solid var(--border);margin-left:24px}
+.sidebar-trans-item:hover{background:var(--surface-hover)}
+.sidebar-trans-item.active{background:var(--surface-active);color:var(--fg);font-weight:500;border-left-color:var(--accent)}
+.sidebar-trans-item svg{width:14px;height:14px;color:var(--muted);flex-shrink:0}
+.sidebar-trans-item .trans-icon{font-size:14px;flex-shrink:0;width:18px;text-align:center}
+.sidebar-spacer{flex:1}
+.sidebar-footer{border-top:1px solid var(--border);padding:4px 0}
+
+.content{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative}
+.screen{display:none;flex:1;overflow-y:auto;padding:40px 56px 32px}
+.screen.active{display:flex;flex-direction:column;animation:fadeIn .2s ease-out}
+.screen-header{margin-bottom:28px}
+.screen-title{font-size:28px;font-weight:700;color:var(--fg);letter-spacing:-.01em}
+.screen-subtitle{font-size:14px;color:var(--fg-secondary);margin-top:4px}
+
+.dash-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+.dash-filter{padding:5px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);font-size:13px;cursor:pointer;transition:all .15s;color:var(--fg-secondary)}
+.dash-filter:hover{border-color:var(--border-dark)}
+.dash-filter.active{background:var(--accent-light);border-color:var(--accent);color:var(--accent)}
+.dash-search{flex:1;min-width:180px;padding:7px 12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);font-size:13px;outline:none;transition:border .15s}
+.dash-search:focus{border-color:var(--accent)}
+.tag{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;cursor:default;white-space:nowrap}
+.tag-sm{padding:1px 6px;font-size:10px}
+.tag-blue{background:var(--blue-light);color:var(--blue)}
+.tag-purple{background:var(--purple-light);color:var(--purple)}
+.tag-green{background:var(--green-light);color:var(--green)}
+.tag-yellow{background:var(--yellow-light);color:var(--yellow)}
+.tag-red{background:var(--red-light);color:var(--red)}
+.tag-orange{background:var(--orange-light);color:var(--orange)}
+.tag-pink{background:var(--pink-light);color:var(--pink)}
+.tag-teal{background:var(--teal-light);color:var(--teal)}
+.tags-row{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+.page-header{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+.page-header-icon{width:44px;height:44px;border-radius:var(--radius-lg);display:grid;place-items:center;flex-shrink:0;font-size:24px;cursor:pointer;transition:background .15s}
+.page-header-icon:hover{filter:brightness(.95)}
+.page-header-text h2{font-size:18px;font-weight:700;color:var(--fg)}
+.page-header-text p{font-size:13px;color:var(--muted);margin-top:2px}
+.dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.dash-card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px;cursor:pointer;transition:box-shadow .15s,border-color .15s}
+.dash-card:hover{border-color:var(--border-dark);box-shadow:var(--shadow-sm)}
+.dash-card-title{font-size:14px;font-weight:600;color:var(--fg);margin-bottom:4px}
+.dash-card-preview{font-size:13px;color:var(--fg-secondary);line-height:1.4;margin-bottom:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.dash-card-meta{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.status-badge{display:inline-flex;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600}
+.status-progress{background:var(--yellow-light);color:var(--yellow)}
+.status-done{background:var(--green-light);color:var(--green)}
+.research-section{margin-bottom:28px}
+.research-section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.research-section-head h3{font-size:14px;font-weight:600;color:var(--fg);text-transform:uppercase;letter-spacing:.04em}
+.research-add-btn{padding:4px 10px;font-size:12px;font-weight:500;border-radius:var(--radius);display:flex;align-items:center;gap:4px;color:var(--accent);transition:background .15s}
+.research-add-btn:hover{background:var(--accent-light)}
+.research-add-btn svg{width:14px;height:14px}
+.research-list{display:flex;flex-direction:column;gap:2px}
+.research-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:var(--radius-md);cursor:pointer;transition:background .1s}
+.research-item:hover{background:var(--surface-hover)}
+.research-item-icon{width:32px;height:32px;border-radius:var(--radius);display:grid;place-items:center;flex-shrink:0;font-size:18px}
+.research-item-info{flex:1;min-width:0}
+.research-item-title{font-size:14px;font-weight:500;color:var(--fg)}
+.research-item-sub{font-size:12px;color:var(--muted)}
+.research-item-right{display:flex;align-items:center;gap:6px}
+
+.upload-zone{border:2px dashed var(--border);border-radius:var(--radius-lg);padding:48px 40px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;margin-bottom:28px}
+.upload-zone:hover{border-color:var(--accent);background:var(--accent-light)}
+.upload-zone svg{width:44px;height:44px;color:var(--muted);margin-bottom:10px}
+.upload-zone-title{font-size:15px;font-weight:600;color:var(--fg);margin-bottom:4px}
+.upload-zone-sub{font-size:13px;color:var(--fg-secondary)}
+.upload-form{display:grid;grid-template-columns:1fr 1fr;gap:16px 32px;max-width:560px}
+.upload-label{font-size:12px;font-weight:600;color:var(--fg-secondary);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;display:block}
+.upload-select,.upload-input{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;background:var(--bg);outline:none;transition:border .15s}
+.upload-select:focus,.upload-input:focus{border-color:var(--accent)}
+.upload-btn{padding:10px 28px;background:var(--accent);color:#fff;border-radius:var(--radius);font-size:14px;font-weight:600;margin-top:20px;transition:background .15s;align-self:start}
+.upload-btn:hover{background:var(--accent-hover)}
+.upload-file-info{display:none;align-items:center;gap:12px;padding:14px 18px;background:var(--surface);border-radius:var(--radius-md);margin-bottom:20px}
+.upload-file-info.show{display:flex}
+.upload-file-info svg{width:28px;height:28px;color:var(--accent);flex-shrink:0}
+.upload-file-name{font-size:14px;font-weight:600}
+.upload-file-size{font-size:12px;color:var(--muted)}
+
+.rec-container{display:flex;flex-direction:column;align-items:center;flex:1}
+.rec-devices{display:flex;gap:14px;margin-bottom:28px;width:100%;max-width:480px}
+.rec-devices select{flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;background:var(--bg)}
+.rec-main{display:flex;flex-direction:column;align-items:center;margin-bottom:28px}
+.rec-timer{font-size:48px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--fg);margin-bottom:6px;letter-spacing:.02em}
+.rec-status{font-size:13px;color:var(--muted);margin-bottom:20px;display:flex;align-items:center;gap:6px}
+.rec-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.rec-dot.live{background:var(--red);animation:pulse-dot 1.2s ease-in-out infinite}
+@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.3}}
+.rec-controls{display:flex;align-items:center;gap:14px}
+.rec-btn{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;transition:background .15s,transform .1s}
+.rec-btn:active{transform:scale(.95)}
+.rec-btn svg{width:24px;height:24px}
+.rec-btn-record{background:var(--red);color:#fff;box-shadow:0 2px 12px rgba(235,87,87,.35)}
+.rec-btn-record:hover{background:#d94545}
+.rec-btn-record.recording{background:var(--fg);box-shadow:0 2px 12px rgba(0,0,0,.2)}
+html.dark .rec-btn-record.recording{background:#e4e4e3}
+.rec-btn-secondary{width:44px;height:44px;background:var(--surface);border:1px solid var(--border);color:var(--fg-secondary)}
+.rec-btn-secondary:hover{background:var(--surface-hover)}
+.rec-waveform{display:flex;align-items:end;gap:2px;height:56px;margin-bottom:28px;width:100%;max-width:480px}
+.rec-wave-bar{flex:1;background:var(--accent);border-radius:2px 2px 0 0;min-height:3px;transition:height .1s;opacity:.5}
+.rec-wave-bar.active{opacity:1}
+.rec-live-section{width:100%;max-width:680px;border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.rec-live-header{padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
+.rec-live-body{padding:14px 16px;max-height:220px;overflow-y:auto;font-size:14px;line-height:1.6;color:var(--fg-secondary)}
+.rec-live-segment{margin-bottom:8px}
+.rec-live-speaker{font-size:12px;font-weight:600;margin-bottom:1px}
+.speaker-a{color:var(--accent)}
+.speaker-b{color:var(--purple)}
+.speaker-c{color:var(--green)}
+
+/* Editor */
+.editor-shell{display:flex;flex-direction:column;flex:1;overflow:hidden}
+.editor-transcript{flex:1;overflow-y:auto;padding:28px 56px 24px}
+.editor-transcript-inner{max-width:700px;margin:0 auto}
+.editor-breadcrumb{font-size:12px;color:var(--muted);margin-bottom:6px}
+.editor-breadcrumb a{color:var(--accent);text-decoration:none}
+.editor-breadcrumb a:hover{text-decoration:underline}
+/* Title area with icon + editable title */
+.editor-title-row{display:flex;align-items:center;gap:12px;margin-bottom:2px}
+.editor-page-icon{width:40px;height:40px;border-radius:var(--radius-lg);display:grid;place-items:center;flex-shrink:0;font-size:22px;cursor:pointer;transition:background .15s,transform .1s;border:1px dashed var(--border);color:var(--muted);background:var(--surface)}
+.editor-page-icon:hover{background:var(--surface-hover);transform:scale(1.05)}
+.editor-page-icon.has-icon{border-style:solid;border-color:transparent;color:var(--fg)}
+.editor-title-input{font-size:22px;font-weight:700;color:var(--fg);border:none;background:transparent;outline:none;width:100%;line-height:1.2;padding:2px 4px;border-radius:var(--radius);transition:background .15s}
+.editor-title-input:hover{background:var(--surface)}
+.editor-title-input:focus{background:var(--surface);box-shadow:0 0 0 2px var(--accent-light)}
+.editor-meta{font-size:13px;color:var(--muted);margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.editor-meta-dot{width:3px;height:3px;border-radius:50%;background:var(--muted)}
+.editor-tags{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:16px}
+.editor-toolbar{display:flex;align-items:center;gap:5px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border);flex-wrap:wrap;position:relative}
+.editor-toolbar button{padding:5px 9px;font-size:12px;border-radius:var(--radius);display:flex;align-items:center;gap:4px;color:var(--fg-secondary);transition:background .1s;white-space:nowrap}
+.editor-toolbar button:hover{background:var(--surface-hover)}
+.editor-toolbar button svg{width:14px;height:14px}
+.editor-toolbar .sep{width:1px;height:16px;background:var(--border);margin:0 3px}
+
+/* Icon picker popup */
+.icon-popup{position:absolute;top:100%;left:0;margin-top:4px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);width:320px;z-index:500;padding:16px;display:none}
+.icon-popup.open{display:block}
+.icon-popup-title{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.icon-popup-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;margin-bottom:12px}
+.icon-popup-item{width:34px;height:34px;display:grid;place-items:center;font-size:18px;border-radius:var(--radius);cursor:pointer;transition:background .1s,transform .1s;border:2px solid transparent}
+.icon-popup-item:hover{background:var(--surface-hover);transform:scale(1.15)}
+.icon-popup-item.selected{border-color:var(--accent);background:var(--accent-light)}
+.icon-popup-item.none-icon{font-size:13px;font-weight:600;color:var(--muted)}
+.icon-popup-item.none-icon:hover{color:var(--fg)}
+
+/* Speaker dropdown */
+.speaker-dropdown{position:absolute;top:100%;left:0;margin-top:4px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);min-width:220px;z-index:500;padding:4px;display:none}
+.speaker-dropdown.open{display:block}
+.speaker-dropdown-title{padding:6px 10px 4px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.speaker-option{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius);cursor:pointer;transition:background .1s;font-size:13px;color:var(--fg-secondary)}
+.speaker-option:hover{background:var(--surface-hover);color:var(--fg)}
+.speaker-option .sp-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.speaker-option.active{background:var(--accent-light);color:var(--accent)}
+.speaker-divider{height:1px;background:var(--border);margin:4px 0}
+.speaker-new-row{display:flex;gap:6px;padding:6px 10px;align-items:center}
+.speaker-new-row input{flex:1;padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius);font-size:12px;background:var(--bg);outline:none;min-width:0}
+.speaker-new-row input:focus{border-color:var(--accent)}
+.speaker-new-row button{padding:5px 10px;background:var(--accent);color:#fff;border-radius:var(--radius);font-size:12px;font-weight:600;white-space:nowrap}
+.speaker-new-row button:hover{background:var(--accent-hover)}
+
+.seg{display:flex;gap:10px;padding:8px 12px;border-radius:var(--radius-md);margin-bottom:2px;cursor:pointer;transition:background .1s;border-left:3px solid transparent}
+.seg:hover{background:var(--surface)}
+.seg.active-seg{background:var(--accent-light);border-left-color:var(--accent)}
+.seg-time{font-family:var(--font-mono);font-size:11px;color:var(--muted);min-width:56px;padding-top:3px;flex-shrink:0}
+.seg-body{flex:1;min-width:0}
+.seg-speaker{font-size:12px;font-weight:600;margin-bottom:1px}
+.seg-text{font-size:14px;line-height:1.6;color:var(--fg);outline:none;border-radius:2px;transition:background .15s}
+.seg-text:focus{background:var(--surface);box-shadow:0 0 0 2px var(--accent-light)}
+
+/* Player */
+.player-bar{height:var(--player-h);background:var(--bg);border-top:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0;transition:background .25s}
+.player-btn{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;transition:background .15s}
+.player-btn:hover{background:var(--surface-hover)}
+.player-btn svg{width:16px;height:16px}
+.player-btn-main{background:var(--accent);color:#fff;width:38px;height:38px}
+.player-btn-main:hover{background:var(--accent-hover)}
+.player-progress{flex:1;display:flex;align-items:center;gap:10px}
+.player-time{font-family:var(--font-mono);font-size:12px;color:var(--muted);min-width:56px}
+.player-time:last-child{text-align:right}
+.player-bar-track{flex:1;height:4px;background:var(--border);border-radius:2px;cursor:pointer;position:relative;overflow:hidden}
+.player-bar-fill{height:100%;background:var(--accent);border-radius:2px;width:0%;transition:width .3s linear}
+.player-speed{padding:3px 8px;font-size:12px;font-weight:600;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer}
+.player-speed:hover{border-color:var(--border-dark)}
+.player-volume{display:flex;align-items:center;gap:4px}
+.player-volume svg{width:16px;height:16px;color:var(--muted)}
+.player-volume input[type=range]{width:60px;accent-color:var(--accent)}
+
+.settings-section{margin-bottom:32px}
+.settings-section-title{font-size:14px;font-weight:700;color:var(--fg);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.settings-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
+.settings-row:last-child{border-bottom:none}
+.settings-row-label{font-size:14px;color:var(--fg)}
+.settings-row-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.settings-row input[type=text],.settings-row input[type=email],.settings-row select{padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;min-width:220px;background:var(--bg);transition:border .15s}
+.settings-row input:focus,.settings-row select:focus{border-color:var(--accent);outline:none}
+.toggle{width:38px;height:20px;border-radius:10px;background:var(--border-dark);position:relative;cursor:pointer;transition:background .2s;flex-shrink:0}
+.toggle.on{background:var(--accent)}
+.toggle::after{content:'';position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;top:2px;left:2px;transition:transform .2s}
+.toggle.on::after{transform:translateX(18px)}
+.storage-bar{width:100%;max-width:300px;height:7px;background:var(--surface);border-radius:4px;overflow:hidden;margin-top:6px}
+.storage-bar-fill{height:100%;background:var(--accent);border-radius:4px;width:24%}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;display:none;place-items:center}
+.modal-overlay.open{display:grid}
+.modal{background:var(--bg);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);width:460px;max-width:90vw;padding:24px;position:relative}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:16px;color:var(--fg)}
+.modal-field{margin-bottom:14px}
+.modal-field label{display:block;font-size:12px;font-weight:600;color:var(--fg-secondary);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}
+.modal-field input,.modal-field select{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;background:var(--bg);outline:none;transition:border .15s}
+.modal-field input:focus,.modal-field select:focus{border-color:var(--accent)}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
+.modal-cancel{padding:8px 16px;border-radius:var(--radius);font-size:13px;color:var(--fg-secondary);transition:background .1s}
+.modal-cancel:hover{background:var(--surface-hover)}
+.modal-confirm{padding:8px 20px;background:var(--accent);color:#fff;border-radius:var(--radius);font-size:13px;font-weight:600;transition:background .15s}
+.modal-confirm:hover{background:var(--accent-hover)}
+
+.icon-picker-label{font-size:12px;font-weight:600;color:var(--fg-secondary);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;display:block}
+.icon-picker-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;margin-bottom:16px}
+.icon-picker-item{width:34px;height:34px;display:grid;place-items:center;font-size:18px;border-radius:var(--radius);cursor:pointer;transition:background .1s,transform .1s;border:2px solid transparent}
+.icon-picker-item:hover{background:var(--surface-hover);transform:scale(1.15)}
+.icon-picker-item.selected{border-color:var(--accent);background:var(--accent-light)}
+.icon-picker-item.none-icon{font-size:13px;font-weight:600;color:var(--muted)}
+.icon-picker-item.none-icon:hover{color:var(--fg)}
+.color-picker-label{font-size:12px;font-weight:600;color:var(--fg-secondary);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;display:block}
+.color-picker-grid{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+.color-picker-item{width:28px;height:28px;border-radius:50%;cursor:pointer;transition:transform .1s,box-shadow .15s;border:2px solid transparent}
+.color-picker-item:hover{transform:scale(1.15)}
+.color-picker-item.selected{border-color:var(--fg);box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--fg)}
+.icon-preview{display:flex;align-items:center;gap:10px;padding:10px;background:var(--surface);border-radius:var(--radius-md);margin-bottom:16px}
+.icon-preview-emoji{font-size:28px;width:40px;height:40px;display:grid;place-items:center;border-radius:var(--radius);flex-shrink:0}
+.icon-preview-text{font-size:14px;color:var(--fg);font-weight:500}
+
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--border-dark)}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="sidebar-header"><a href="#" class="sidebar-logo" onclick="showScreen('dashboard');return false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>Transcriba</a><button class="sidebar-theme-btn" onclick="toggleTheme()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="theme-icon"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button></div>
+  <div class="sidebar-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input type="text" placeholder="Buscar…"></div>
+  <div class="sidebar-actions"><button class="sidebar-new" onclick="openNewMenu(event)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Nova<div class="dropdown" id="new-menu"><div class="dropdown-item" onclick="openNewPageModal('research')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>Pesquisa / Tese</div><div class="dropdown-item" onclick="openNewPageModal('transcription')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Transcrição</div><div class="dropdown-item" onclick="showScreen('recording')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>Gravar agora</div></div></button></div>
+  <div class="sidebar-section" id="sidebar-research"><div class="sidebar-section-title"><span>Pesquisas</span><button onclick="openNewPageModal('research')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div><div id="sidebar-research-list"></div></div>
+  <div class="sidebar-section"><div class="sidebar-section-title">Transcrições</div><div class="sidebar-item" onclick="showScreen('dashboard');filterByStatus('all')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Todas <span class="badge" id="badge-all">5</span></div><div class="sidebar-item" onclick="showScreen('dashboard');filterByStatus('progress')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Em andamento</div><div class="sidebar-item" onclick="showScreen('dashboard');filterByStatus('done')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg>Concluídas</div><div class="sidebar-item" onclick="showScreen('recording')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>Gravar agora</div></div>
+  <div class="sidebar-section"><div class="sidebar-section-title">Tags</div><div id="sidebar-tags"></div></div>
+  <div class="sidebar-spacer"></div>
+  <div class="sidebar-footer"><div class="sidebar-item" onclick="showScreen('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Configurações</div></div>
+</aside>
+<main class="content">
+  <section id="screen-dashboard" class="screen active"><div class="screen-header"><h1 class="screen-title">Biblioteca</h1><p class="screen-subtitle">Gerencie suas transcrições e pesquisas</p></div><div class="dash-toolbar"><button class="dash-filter active" onclick="filterByStatus('all')" data-filter="all">Todas</button><button class="dash-filter" onclick="filterByStatus('progress')" data-filter="progress">Em andamento</button><button class="dash-filter" onclick="filterByStatus('done')" data-filter="done">Concluídas</button><input class="dash-search" type="text" placeholder="Buscar por título ou conteúdo…" oninput="filterDash()"></div><div id="dash-grid" class="dash-grid"></div></section>
+  <section id="screen-research" class="screen"><div class="screen-header"><div class="editor-breadcrumb" id="research-breadcrumb"><a href="#" onclick="showScreen('dashboard');return false;">Biblioteca</a></div><div class="page-header" id="research-page-header"></div></div><div class="research-section"><div class="research-section-head"><h3>Transcrições</h3><button class="research-add-btn" onclick="showScreen('upload')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Adicionar</button></div><div class="research-list" id="research-list"></div></div></section>
+  <section id="screen-upload" class="screen"><div class="screen-header"><h1 class="screen-title">Nova transcrição</h1><p class="screen-subtitle">Faça upload de um arquivo de áudio ou vídeo</p></div><div class="upload-zone" id="upload-zone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><div class="upload-zone-title">Arraste um arquivo aqui</div><div class="upload-zone-sub">MP3, WAV, M4A, MP4, WEBM, OGG</div></div><div class="upload-file-info" id="upload-file-info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><div><div class="upload-file-name">entrevista_dr_silva.mp3</div><div class="upload-file-size">24,3 MB</div></div></div><div class="upload-form"><div><label class="upload-label">Idioma</label><select class="upload-select"><option selected>Português (Brasil)</option><option>Español</option><option>English</option></select></div><div><label class="upload-label">Qualidade</label><select class="upload-select"><option>Padrão</option><option selected>Alta</option></select></div><div><label class="upload-label">Locutores</label><select class="upload-select"><option selected>Automático</option><option>Desativado</option></select></div><div><label class="upload-label">Pesquisa</label><select class="upload-select" id="upload-research"></select></div></div><button class="upload-btn" onclick="startUpload()">Iniciar transcrição</button></section>
+  <section id="screen-recording" class="screen"><div class="screen-header"><h1 class="screen-title">Gravação ao vivo</h1><p class="screen-subtitle">Grave áudio ou vídeo e transcreva em tempo real</p></div><div class="rec-container"><div class="rec-devices"><select><option>Microfone interno</option><option>Microfone USB — Yeti</option></select><select><option>Somente áudio</option><option>Câmera FaceTime HD</option></select></div><div class="rec-main"><div class="rec-timer" id="rec-timer">00:00</div><div class="rec-status"><div class="rec-dot" id="rec-dot"></div><span id="rec-status-text">Pronto para gravar</span></div><div class="rec-controls"><button class="rec-btn rec-btn-secondary" id="rec-pause-btn" onclick="togglePause()" style="display:none"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg></button><button class="rec-btn rec-btn-record" id="rec-record-btn" onclick="toggleRecording()"><svg viewBox="0 0 24 24" fill="currentColor" id="rec-record-icon"><circle cx="12" cy="12" r="7"/></svg></button><button class="rec-btn rec-btn-secondary" id="rec-stop-btn" onclick="stopRecording()" style="display:none"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button></div></div><div class="rec-waveform" id="rec-waveform"></div><div class="rec-live-section" id="rec-live-section" style="display:none"><div class="rec-live-header"><div class="rec-dot live"></div>Transcrição em tempo real</div><div class="rec-live-body" id="rec-live-body"></div></div></div></section>
+
+  <!-- Editor with icon + editable title -->
+  <section id="screen-editor" class="screen" style="padding:0;overflow:hidden">
+    <div class="editor-shell">
+      <div class="editor-transcript" id="editor-transcript">
+        <div class="editor-transcript-inner">
+          <div class="editor-breadcrumb" id="editor-breadcrumb"><a href="#" onclick="showScreen('dashboard');return false;">Biblioteca</a></div>
+          <div class="editor-title-row" id="editor-title-row">
+            <div class="editor-page-icon" id="editor-page-icon" onclick="toggleEditorIconPicker()" title="Clique para trocar ícone"></div>
+            <input type="text" class="editor-title-input" id="editor-title" value="Entrevista — Dr. Carlos Silva" onblur="saveTranscriptionTitle()" onkeydown="if(event.key==='Enter'){this.blur();}">
+          </div>
+          <!-- Icon picker popup inside editor -->
+          <div class="icon-popup" id="editor-icon-popup">
+            <div class="icon-popup-title">Ícone da transcrição</div>
+            <div class="icon-picker-grid" id="editor-icon-grid"></div>
+            <div style="display:flex;gap:6px;justify-content:flex-end"><button onclick="setEditorIcon('')" style="padding:5px 12px;font-size:12px;border-radius:var(--radius);background:var(--surface);border:1px solid var(--border);color:var(--fg-secondary);cursor:pointer">Sem ícone</button><button onclick="closeEditorIconPicker()" style="padding:5px 12px;font-size:12px;border-radius:var(--radius);background:var(--accent);color:#fff;border:none;cursor:pointer">Feito</button></div>
+          </div>
+          <div class="editor-meta" id="editor-meta"><span>3 de maio de 2025</span><span class="editor-meta-dot"></span><span>42 min</span><span class="editor-meta-dot"></span><span>2 locutores</span></div>
+          <div class="editor-tags" id="editor-tags"></div>
+          <div class="editor-toolbar" id="editor-toolbar">
+            <button onclick="splitSegment()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8"/><path d="M21 3l-9 9"/><path d="M3 3l9 9"/></svg>Dividir</button>
+            <button onclick="mergeSegment()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6v6"/><path d="M16 6v6"/><path d="M2 12h20"/></svg>Mesclar</button>
+            <div class="sep"></div>
+            <div style="position:relative;display:inline-flex" id="speaker-btn-wrap"><button onclick="toggleSpeakerDropdown()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Locutor</button><div class="speaker-dropdown" id="speaker-dropdown"><div class="speaker-dropdown-title">Selecionar locutor</div><div id="speaker-dropdown-list"></div><div class="speaker-divider"></div><div class="speaker-new-row"><input type="text" id="new-speaker-input" placeholder="Novo locutor…" onkeydown="if(event.key==='Enter'){addNewSpeaker();}"><button onclick="addNewSpeaker()">Adicionar</button></div></div></div>
+            <div class="sep"></div>
+            <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Exportar</button>
+          </div>
+          <div id="transcript-segments"></div>
+        </div>
+      </div>
+      <div class="player-bar"><button class="player-btn player-btn-main" id="player-play-btn" onclick="togglePlay()"><svg viewBox="0 0 24 24" fill="currentColor" id="player-play-icon"><polygon points="5 3 19 12 5 21"/></svg></button><div class="player-progress"><span class="player-time" id="player-current">00:00</span><div class="player-bar-track" id="player-track" onclick="seekPlayer(event)"><div class="player-bar-fill" id="player-fill"></div></div><span class="player-time" id="player-total">42:15</span></div><button class="player-speed" id="player-speed-btn" onclick="cycleSpeed()">1×</button><div class="player-volume"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg><input type="range" min="0" max="100" value="80"></div></div>
+    </div>
+  </section>
+
+  <section id="screen-settings" class="screen"><div class="screen-header"><h1 class="screen-title">Configurações</h1><p class="screen-subtitle">Gerencie seu perfil e preferências</p></div><div class="settings-section"><div class="settings-section-title">Perfil</div><div class="settings-row"><div><div class="settings-row-label">Nome</div></div><input type="text" value="Maria Santos"></div><div class="settings-row"><div><div class="settings-row-label">E-mail</div></div><input type="email" value="maria.santos@usp.br"></div><div class="settings-row"><div><div class="settings-row-label">Instituição</div></div><input type="text" value="Universidade de São Paulo"></div></div><div class="settings-section"><div class="settings-section-title">Transcrição</div><div class="settings-row"><div><div class="settings-row-label">Idioma</div></div><select><option selected>Português (Brasil)</option><option>Español</option><option>English</option></select></div><div class="settings-row"><div><div class="settings-row-label">Identificar locutores</div><div class="settings-row-sub">Detecta vozes e atribui rótulos</div></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div><div class="settings-row"><div><div class="settings-row-label">Transcrição ao vivo</div><div class="settings-row-sub">Texto em tempo real durante gravação</div></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div></div></section>
+</main>
+</div>
+
+<div class="modal-overlay" id="modal-new-page"><div class="modal"><div class="modal-title" id="modal-new-title">Nova pesquisa</div><div class="icon-picker-label">Ícone</div><div class="icon-picker-grid" id="icon-picker-grid"></div><div class="color-picker-label">Cor</div><div class="color-picker-grid" id="color-picker-grid"></div><div class="icon-preview" id="icon-preview"><div class="icon-preview-emoji" id="icon-preview-emoji">📚</div><div class="icon-preview-text" id="icon-preview-text">Nova pesquisa</div></div><div class="modal-field"><label>Título</label><input type="text" id="modal-new-input" placeholder="Ex.: Mobilidade Urbana — Tese 2025" oninput="updateNewPagePreview()"></div><div class="modal-field" id="modal-tags-field" style="display:none"><label>Tags (vírgula)</label><input type="text" id="modal-new-tags" placeholder="entrevista, campo, piloto"></div><div class="modal-actions"><button class="modal-cancel" onclick="closeModal()">Cancelar</button><button class="modal-confirm" onclick="createNewPage()">Criar</button></div></div></div>
+
+<script>
+var TAG_COLORS={'mobilidade':'blue','educação':'green','saúde':'red','políticas públicas':'purple','entrevista':'orange','campo':'yellow','tese':'pink','acessibilidade':'green'};
+var allTags=[{name:'mobilidade',color:'blue'},{name:'educação',color:'green'},{name:'saúde',color:'red'},{name:'políticas públicas',color:'purple'},{name:'entrevista',color:'orange'},{name:'campo',color:'yellow'},{name:'tese',color:'pink'},{name:'acessibilidade',color:'green'}];
+var PAGE_ICONS=['📚','🔬','📝','🎓','💡','🏛️','📊','🧠','🌍','💊','⚖️','🎤','🎥','🗂️','💬','🤝','🔍','📐','📱','🧬','🎭','📰','🎵','📑','🧪','🏫','📈','💭','🎯','📖'];
+var PAGE_COLORS=[{name:'blue',hex:'#2eaadc',light:'var(--blue-light)'},{name:'green',hex:'#4dab6f',light:'var(--green-light)'},{name:'purple',hex:'#9065b0',light:'var(--purple-light)'},{name:'orange',hex:'#d9730d',light:'var(--orange-light)'},{name:'pink',hex:'#c14c8a',light:'var(--pink-light)'},{name:'yellow',hex:'#cb912f',light:'var(--yellow-light)'},{name:'red',hex:'#eb5757',light:'var(--red-light)'},{name:'teal',hex:'#0d9488',light:'var(--teal-light)'}];
+var TRANS_ICONS=['🎤','🎙️','📝','📖','📋','🗣️','🔊','🎧','💡','🔬','💬','🎥','📊','🗂️','📑','✍️','📞','🔍'];
+
+var researchPages=[{id:'r1',title:'Mobilidade Urbana — Tese 2025',icon:'🚇',color:'blue',colorHex:'#2eaadc',description:'Pesquisa sobre mobilidade urbana e transporte público nas periferias de SP.',transcriptions:['t1','t5']},{id:'r2',title:'Educação Inclusiva — Projeto FAPESP',icon:'🎓',color:'green',colorHex:'#4dab6f',description:'Estudo sobre políticas de inclusão no ensino superior.',transcriptions:['t2','t3']},{id:'r3',title:'Ações Afirmativas — Pós-doutorado',icon:'⚖️',color:'purple',colorHex:'#9065b0',description:'Análise de políticas afirmativas em universidades federais.',transcriptions:['t4']}];
+/* Transcriptions now have icons */
+var transcriptions=[{id:'t1',title:'Entrevista — Dr. Carlos Silva',icon:'🎤',status:'progress',date:'3 mai 2025',duration:'42 min',speakers:2,tags:['mobilidade','entrevista','tese'],preview:'Pesquisa sobre mobilidade urbana em São Paulo.',research:'r1'},{id:'t2',title:'Pesquisa — Prof. Mendes',icon:'🎙️',status:'done',date:'28 abr 2025',duration:'1h 12min',speakers:3,tags:['educação','políticas públicas'],preview:'Educação inclusiva e políticas públicas.',research:'r2'},{id:'t3',title:'Grupo focal — Educação',icon:'🗣️',status:'done',date:'15 abr 2025',duration:'58 min',speakers:5,tags:['educação','campo'],preview:'Discussão sobre práticas pedagógicas inclusivas.',research:'r2'},{id:'t4',title:'Entrevista — Ana Beatriz',icon:'📝',status:'done',date:'2 abr 2025',duration:'35 min',speakers:2,tags:['políticas públicas','acessibilidade'],preview:'Narrativas de mulheres negras no mercado de trabalho.',research:'r3'},{id:'t5',title:'Depoimento — Coord. Lima',icon:'📋',status:'progress',date:'27 mar 2025',duration:'27 min',speakers:1,tags:['mobilidade','campo'],preview:'Gestão de políticas afirmativas na universidade federal.',research:'r1'}];
+var speakers=[{name:'Entrevistador',color:'#2eaadc'},{name:'Dr. Carlos Silva',color:'#9065b0'},{name:'Ana Beatriz',color:'#4dab6f'},{name:'Prof. Mendes',color:'#d9730d'}];
+var transcriptData=[{id:'s1',time:'00:12',timeSec:12,speaker:'Entrevistador',text:'Obrigada por aceitar participar desta entrevista, Dr. Silva. Para começar, poderia me contar como você se envolveu com a pesquisa sobre mobilidade urbana?'},{id:'s2',time:'00:38',timeSec:38,speaker:'Dr. Carlos Silva',text:'Claro, Maria. Eu comecei a trabalhar com esse tema em 2005, quando fui convidado a participar de um programa interdisciplinar na USP que reunia pesquisadores de urbanismo, engenharia de transporte e ciências sociais.'},{id:'s3',time:'01:15',timeSec:75,speaker:'Dr. Carlos Silva',text:'Naquela época, a cidade passava por uma transformação grande no transporte público. Os corredores exclusivos de ônibus estavam sendo expandidos e a linha 4 do metrô ainda estava em obras.'},{id:'s4',time:'02:01',timeSec:121,speaker:'Entrevistador',text:'E como você enxerga as mudanças que aconteceram desde então, especialmente nos últimos quinze anos?'},{id:'s5',time:'02:35',timeSec:155,speaker:'Dr. Carlos Silva',text:'Houve avanços significativos, especialmente na integração dos modais. Mas os desafios de acessibilidade continuam enormes, sobretudo nas regiões periféricas onde a população depende de transporte informal.'},{id:'s6',time:'03:22',timeSec:202,speaker:'Entrevistador',text:'Você poderia falar um pouco sobre os principais desafios que identificou na sua pesquisa quanto à acessibilidade?'},{id:'s7',time:'03:58',timeSec:238,speaker:'Dr. Carlos Silva',text:'O maior desafio é a desigualdade no acesso. Regiões periféricas ainda dependem quase exclusivamente do transporte informal — vans e kombis — que não seguem regulamentações de segurança ou acessibilidade.'},{id:'s8',time:'05:10',timeSec:310,speaker:'Entrevistador',text:'Na sua opinião, quais políticas públicas seriam mais eficazes para reduzir essa desigualdade?'},{id:'s9',time:'05:45',timeSec:345,speaker:'Dr. Carlos Silva',text:'Primeiro, investimento em infraestrutura de trilhos — metrô e VLT — nas periferias. Segundo, integração tarifária real, não apenas física. Terceiro, programas de subsídio para população de baixa renda.'},{id:'s10',time:'07:20',timeSec:440,speaker:'Dr. Carlos Silva',text:'É preciso também pensar na mobilidade como um direito, não como um serviço. Quando a gente entende mobilidade como direito, as prioridades de investimento mudam completamente.'}];
+
+var selectedNewIcon='📚';var selectedNewColor=PAGE_COLORS[0];var selectedEditorIcon='🎤';
+
+/* THEME */
+function toggleTheme(){document.documentElement.classList.toggle('dark');var d=document.documentElement.classList.contains('dark');localStorage.setItem('transcriba-theme',d?'dark':'light');document.getElementById('theme-icon').innerHTML=d?'<circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>':'<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';}
+(function(){var s=localStorage.getItem('transcriba-theme');if(s==='dark')document.documentElement.classList.add('dark');var d=document.documentElement.classList.contains('dark');document.getElementById('theme-icon').innerHTML=d?'<circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>':'<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';})();
+
+var currentScreen='dashboard',currentTranscription='t1',currentFilter='all',currentTagFilter=null;
+function showScreen(id){document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active');s.style.display='none';});var t=document.getElementById('screen-'+id);if(t){t.classList.add('active');t.style.display='';}currentScreen=id;if(id==='editor')initEditor();if(id==='dashboard')renderDashboard();if(id==='research')renderResearchPage();closeEditorIconPicker();}
+
+/* SIDEBAR — transcriptions now show icons and deeper indent */
+function renderSidebar(){
+  var rl=document.getElementById('sidebar-research-list');rl.innerHTML='';
+  researchPages.forEach(function(rp){
+    var col=PAGE_COLORS.find(function(c){return c.name===rp.color;})||PAGE_COLORS[0];
+    var d=document.createElement('div');
+    d.innerHTML='<div class="sidebar-item" onclick="toggleResearchExpand(this,\''+rp.id+'\')"><svg class="chevron expanded" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg><span class="page-icon" style="color:'+col.hex+'">'+rp.icon+'</span>'+(rp.title.length>18?rp.title.slice(0,18)+'…':rp.title)+' <span class="badge">'+rp.transcriptions.length+'</span></div><div class="sidebar-sub" id="sub-'+rp.id+'" style="max-height:800px">'+rp.transcriptions.map(function(tid){
+      var t=transcriptions.find(function(x){return x.id===tid;});
+      var iconSpan=t&&t.icon?'<span class="trans-icon">'+t.icon+'</span>':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+      return '<div class="sidebar-trans-item" onclick="openTranscription(\''+tid+'\')">'+iconSpan+(t?(t.title.length>18?t.title.slice(0,18)+'…':t.title):'')+'</div>';
+    }).join('')+'</div>';
+    rl.appendChild(d);
+  });
+  var tl=document.getElementById('sidebar-tags');tl.innerHTML='';
+  allTags.forEach(function(tag){var c=transcriptions.filter(function(t){return t.tags.indexOf(tag.name)!==-1;}).length;var it=document.createElement('div');it.className='sidebar-item';it.onclick=function(){showScreen('dashboard');filterByTag(tag.name);};it.innerHTML='<span class="tag tag-sm tag-'+tag.color+'" style="margin-left:2px">'+tag.name+'</span><span style="margin-left:auto;font-size:12px;color:var(--muted)">'+c+'</span>';tl.appendChild(it);});
+  var sel=document.getElementById('upload-research');sel.innerHTML='<option value="">Nenhuma (avulsa)</option>';researchPages.forEach(function(rp){sel.innerHTML+='<option value="'+rp.id+'">'+rp.icon+' '+rp.title+'</option>';});
+}
+function toggleResearchExpand(el,id){var ch=el.querySelector('.chevron');var sub=document.getElementById('sub-'+id);if(sub.classList.contains('collapsed')){sub.classList.remove('collapsed');sub.style.maxHeight='800px';ch.classList.add('expanded');}else{sub.classList.add('collapsed');sub.style.maxHeight='0';ch.classList.remove('expanded');}}
+
+/* DASHBOARD */
+function renderDashboard(){var g=document.getElementById('dash-grid');g.innerHTML='';var items=transcriptions.slice();if(currentFilter==='progress')items=items.filter(function(t){return t.status==='progress';});if(currentFilter==='done')items=items.filter(function(t){return t.status==='done';});if(currentTagFilter&&currentTagFilter!=='all')items=items.filter(function(t){return t.tags.indexOf(currentTagFilter)!==-1;});if(!items.length){g.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:48px;color:var(--muted)">Nenhuma transcrição encontrada.</div>';return;}items.forEach(function(t){var c=document.createElement('div');c.className='dash-card';c.dataset.status=t.status;c.onclick=function(){openTranscription(t.id);};var sc=t.status==='progress'?'status-progress':'status-done';var sl=t.status==='progress'?'Em andamento':'Concluída';c.innerHTML='<div class="dash-card-title">'+t.icon+' '+t.title+'</div><div class="dash-card-preview">'+t.preview+'</div><div class="tags-row">'+t.tags.map(function(tag){var tc=TAG_COLORS[tag]||'blue';return '<span class="tag tag-sm tag-'+tc+'">'+tag+'</span>';}).join('')+'</div><div class="dash-card-meta"><span class="status-badge '+sc+'">'+sl+'</span><span>'+t.date+'</span><span>'+t.duration+'</span></div>';g.appendChild(c);});document.getElementById('badge-all').textContent=transcriptions.length;}
+function filterByStatus(s){currentFilter=s;currentTagFilter=null;document.querySelectorAll('.dash-filter').forEach(function(b){b.classList.remove('active');});var btn=document.querySelector('.dash-filter[data-filter="'+s+'"]');if(btn)btn.classList.add('active');renderDashboard();}
+function filterByTag(tag){currentTagFilter=tag;currentFilter='all';document.querySelectorAll('.dash-filter').forEach(function(b){b.classList.remove('active');});var ab=document.querySelector('.dash-filter[data-filter="all"]');if(ab)ab.classList.add('active');renderDashboard();}
+function filterDash(){renderDashboard();}
+
+/* RESEARCH PAGE */
+function renderResearchPage(rpId){var rp=rpId?researchPages.find(function(r){return r.id===rpId;}):researchPages[0];if(!rp)return;var col=PAGE_COLORS.find(function(c){return c.name===rp.color;})||PAGE_COLORS[0];document.getElementById('research-breadcrumb').innerHTML='<a href="#" onclick="showScreen(\'dashboard\');return false;">Biblioteca</a> &nbsp;→&nbsp; '+rp.title;document.getElementById('research-page-header').innerHTML='<div class="page-header-icon" style="background:'+col.light+'"><span style="font-size:24px">'+rp.icon+'</span></div><div class="page-header-text"><h2>'+rp.title+'</h2><p>'+rp.description+'</p></div>';var list=document.getElementById('research-list');list.innerHTML='';rp.transcriptions.forEach(function(tid){var t=transcriptions.find(function(x){return x.id===tid;});if(!t)return;var sc=t.status==='progress'?'status-progress':'status-done';var sl=t.status==='progress'?'Em andamento':'Concluída';var it=document.createElement('div');it.className='research-item';it.onclick=function(){openTranscription(t.id);};it.innerHTML='<div class="research-item-icon" style="background:'+col.light+';font-size:18px">'+t.icon+'</div><div class="research-item-info"><div class="research-item-title">'+t.title+'</div><div class="research-item-sub">'+t.date+' · '+t.duration+' · <span class="status-badge '+sc+'">'+sl+'</span></div></div><div class="research-item-right">'+t.tags.map(function(tag){var tc=TAG_COLORS[tag]||'blue';return '<span class="tag tag-sm tag-'+tc+'">'+tag+'</span>';}).join('')+'</div>';list.appendChild(it);});}
+function openTranscription(tid){currentTranscription=tid;showScreen('editor');}
+
+/* UPLOAD */
+var uploadZone=document.getElementById('upload-zone');
+uploadZone.addEventListener('dragover',function(e){e.preventDefault();uploadZone.classList.add('dragover');});
+uploadZone.addEventListener('dragleave',function(){uploadZone.classList.remove('dragover');});
+uploadZone.addEventListener('drop',function(e){e.preventDefault();uploadZone.classList.remove('dragover');document.getElementById('upload-file-info').classList.add('show');});
+function startUpload(){openTranscription('t1');}
+
+/* NEW PAGE */
+var newPageType='research';
+function openNewMenu(e){e.stopPropagation();document.getElementById('new-menu').classList.toggle('open');setTimeout(function(){document.addEventListener('click',closeNewMenu,{once:true});},0);}
+function closeNewMenu(){document.getElementById('new-menu').classList.remove('open');}
+function renderIconPicker(){var grid=document.getElementById('icon-picker-grid');grid.innerHTML='';PAGE_ICONS.forEach(function(icon){var item=document.createElement('div');item.className='icon-picker-item'+(icon===selectedNewIcon?' selected':'');item.textContent=icon;item.onclick=function(){selectedNewIcon=icon;renderIconPicker();updateNewPagePreview();};grid.appendChild(item);});}
+function renderColorPicker(){var grid=document.getElementById('color-picker-grid');grid.innerHTML='';PAGE_COLORS.forEach(function(col){var item=document.createElement('div');item.className='color-picker-item'+(col.name===selectedNewColor.name?' selected':'');item.style.background=col.hex;item.onclick=function(){selectedNewColor=col;renderColorPicker();updateNewPagePreview();};grid.appendChild(item);});}
+function updateNewPagePreview(){var title=document.getElementById('modal-new-input').value||'Nova pesquisa';document.getElementById('icon-preview-emoji').textContent=selectedNewIcon;document.getElementById('icon-preview-emoji').style.background=selectedNewColor.light;document.getElementById('icon-preview-text').textContent=title;}
+function openNewPageModal(type){newPageType=type;closeNewMenu();document.getElementById('modal-new-title').textContent=type==='research'?'Nova pesquisa / tese':'Nova transcrição avulsa';document.getElementById('modal-tags-field').style.display=type==='transcription'?'':'none';document.getElementById('modal-new-input').value='';document.getElementById('modal-new-tags').value='';selectedNewIcon='📚';selectedNewColor=PAGE_COLORS[0];renderIconPicker();renderColorPicker();updateNewPagePreview();document.getElementById('modal-new-page').classList.add('open');setTimeout(function(){document.getElementById('modal-new-input').focus();},100);}
+function closeModal(){document.getElementById('modal-new-page').classList.remove('open');}
+function createNewPage(){var title=document.getElementById('modal-new-input').value.trim();if(!title)return;if(newPageType==='research'){var id='r'+(researchPages.length+1);researchPages.push({id:id,title:title,icon:selectedNewIcon,color:selectedNewColor.name,colorHex:selectedNewColor.hex,description:'',transcriptions:[]});}else{var tags=document.getElementById('modal-new-tags').value.split(',').map(function(t){return t.trim();}).filter(Boolean);var id='t'+(transcriptions.length+1);tags.forEach(function(t){if(!allTags.find(function(at){return at.name===t;})){allTags.push({name:t,color:TAG_COLORS[t]||'blue'});}});transcriptions.push({id:id,title:title,icon:selectedNewIcon,status:'progress',date:'Hoje',duration:'—',speakers:0,tags:tags,preview:'Nova transcrição.',research:''});}closeModal();renderSidebar();renderDashboard();showScreen(newPageType==='research'?'dashboard':'editor');}
+
+/* RECORDING */
+var isRecording=false,isPaused=false,recInterval=null,recSeconds=0,liveInterval=null;
+var livePhrases=[{speaker:'Entrevistador',text:'Então, quando é que o senhor começou a se interessar por esses temas?'},{speaker:'Dr. Silva',text:'Foi ainda na graduação, por volta de 2003, quando fiz uma disciplina eletiva sobre políticas públicas.'},{speaker:'Entrevistador',text:'E como foi essa experiência inicial?'},{speaker:'Dr. Silva',text:'Foi transformadora. Percebi que a pesquisa acadêmica podia ter um impacto real.'},{speaker:'Entrevistador',text:'Você sentiu alguma dificuldade em conciliar a teoria com a prática?'},{speaker:'Dr. Silva',text:'Com certeza. A maior parte da literatura era estrangeira e os contextos eram muito diferentes.'}];
+var livePhraseIdx=0;
+function initWaveform(){var wf=document.getElementById('rec-waveform');if(wf.children.length)return;for(var i=0;i<48;i++){var b=document.createElement('div');b.className='rec-wave-bar';b.style.height=(3+Math.random()*8)+'px';wf.appendChild(b);}}
+function toggleRecording(){if(!isRecording){isRecording=true;isPaused=false;recSeconds=0;document.getElementById('rec-dot').classList.add('live');document.getElementById('rec-status-text').textContent='Gravando…';document.getElementById('rec-pause-btn').style.display='';document.getElementById('rec-stop-btn').style.display='';document.getElementById('rec-record-btn').classList.add('recording');document.getElementById('rec-record-icon').innerHTML='<rect x="6" y="6" width="12" height="12" rx="2"/>';document.getElementById('rec-live-section').style.display='';document.getElementById('rec-live-body').innerHTML='';livePhraseIdx=0;recInterval=setInterval(function(){if(!isPaused){recSeconds++;var m=String(Math.floor(recSeconds/60)).padStart(2,'0');var s=String(recSeconds%60).padStart(2,'0');document.getElementById('rec-timer').textContent=m+':'+s;document.querySelectorAll('.rec-wave-bar').forEach(function(b){b.style.height=(3+Math.random()*50)+'px';b.classList.toggle('active',Math.random()>.4);});}},1000);addLivePhrase();liveInterval=setInterval(addLivePhrase,4500);}else if(!isPaused){isPaused=true;document.getElementById('rec-status-text').textContent='Pausado';document.getElementById('rec-dot').classList.remove('live');}else{isPaused=false;document.getElementById('rec-status-text').textContent='Gravando…';document.getElementById('rec-dot').classList.add('live');}}
+function addLivePhrase(){if(livePhraseIdx>=livePhrases.length)livePhraseIdx=0;var p=livePhrases[livePhraseIdx++];var body=document.getElementById('rec-live-body');var seg=document.createElement('div');seg.className='rec-live-segment';var sc=p.speaker==='Entrevistador'?'speaker-a':'speaker-b';seg.innerHTML='<div class="rec-live-speaker '+sc+'">'+p.speaker+'</div><div class="rec-live-text">'+p.text+'</div>';body.appendChild(seg);body.scrollTop=body.scrollHeight;}
+function stopRecording(){isRecording=false;isPaused=false;clearInterval(recInterval);clearInterval(liveInterval);document.getElementById('rec-dot').classList.remove('live');document.getElementById('rec-status-text').textContent='Pronto para gravar';document.getElementById('rec-timer').textContent='00:00';document.getElementById('rec-pause-btn').style.display='none';document.getElementById('rec-stop-btn').style.display='none';document.getElementById('rec-record-btn').classList.remove('recording');document.getElementById('rec-record-icon').innerHTML='<circle cx="12" cy="12" r="7"/>';document.querySelectorAll('.rec-wave-bar').forEach(function(b){b.style.height=(3+Math.random()*8)+'px';b.classList.remove('active');});setTimeout(function(){showScreen('editor');},500);}
+
+/* EDITOR */
+var isPlaying=false,playInterval=null,currentTime=0,totalTime=2535,playbackSpeed=1,speeds=[1,1.25,1.5,2],speedIdx=0;
+
+function initEditor(){
+  var t=transcriptions.find(function(x){return x.id===currentTranscription;})||transcriptions[0];
+  /* Set icon */
+  selectedEditorIcon=t.icon||'';
+  var iconEl=document.getElementById('editor-page-icon');
+  if(selectedEditorIcon){iconEl.textContent=selectedEditorIcon;iconEl.classList.add('has-icon');iconEl.style.background='var(--surface)';}else{iconEl.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';iconEl.classList.remove('has-icon');iconEl.style.background='';}
+  document.getElementById('editor-title').value=t.title;
+  document.getElementById('editor-meta').innerHTML='<span>'+t.date+'</span><span class="editor-meta-dot"></span><span>'+t.duration+'</span><span class="editor-meta-dot"></span><span>'+t.speakers+' locutor'+(t.speakers>1?'es':'')+'</span>';
+  var research=t.research?researchPages.find(function(r){return r.id===t.research;}):null;
+  document.getElementById('editor-breadcrumb').innerHTML='<a href="#" onclick="showScreen(\'dashboard\');return false;">Biblioteca</a>'+(research?' &nbsp;→&nbsp; <a href="#" onclick="showScreen(\'research\');renderResearchPage(\''+research.id+'\');return false;">'+research.icon+' '+research.title+'</a>':'')+' &nbsp;→&nbsp; '+(t.icon?t.icon+' ':'')+t.title;
+  var tagsEl=document.getElementById('editor-tags');tagsEl.innerHTML=t.tags.map(function(tag){var tc=TAG_COLORS[tag]||'blue';return '<span class="tag tag-'+tc+'">'+tag+'</span>';}).join('');
+  currentTime=0;updatePlayerTime();renderSegments();
+}
+
+function saveTranscriptionTitle(){
+  var t=transcriptions.find(function(x){return x.id===currentTranscription;})||transcriptions[0];
+  var newTitle=document.getElementById('editor-title').value.trim();
+  if(newTitle&&newTitle!==t.title){t.title=newTitle;renderSidebar();}
+}
+
+/* Editor icon picker */
+function toggleEditorIconPicker(){
+  var popup=document.getElementById('editor-icon-popup');
+  if(popup.classList.contains('open')){closeEditorIconPicker();return;}
+  renderEditorIconGrid();
+  popup.classList.add('open');
+  setTimeout(function(){document.addEventListener('click',closeEditorIconPickerOutside,{once:true});},0);
+}
+function closeEditorIconPicker(){document.getElementById('editor-icon-popup').classList.remove('open');}
+function closeEditorIconPickerOutside(e){if(!e.target.closest('#editor-icon-popup')&&!e.target.closest('#editor-page-icon')){closeEditorIconPicker();}}
+function renderEditorIconGrid(){
+  var grid=document.getElementById('editor-icon-grid');grid.innerHTML='';
+  /* None option */
+  var noneItem=document.createElement('div');noneItem.className='icon-popup-item none-icon'+(selectedEditorIcon===''?' selected':'');
+  noneItem.textContent='✕';noneItem.onclick=function(e){e.stopPropagation();setEditorIcon('');};grid.appendChild(noneItem);
+  TRANS_ICONS.forEach(function(icon){var item=document.createElement('div');item.className='icon-popup-item'+(icon===selectedEditorIcon?' selected':'');item.textContent=icon;item.onclick=function(e){e.stopPropagation();setEditorIcon(icon);};grid.appendChild(item);});
+}
+function setEditorIcon(icon){
+  selectedEditorIcon=icon;var t=transcriptions.find(function(x){return x.id===currentTranscription;})||transcriptions[0];t.icon=icon;
+  var iconEl=document.getElementById('editor-page-icon');
+  if(icon){iconEl.textContent=icon;iconEl.classList.add('has-icon');iconEl.style.background='var(--surface)';}else{iconEl.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';iconEl.classList.remove('has-icon');iconEl.style.background='';}
+  renderEditorIconGrid();renderSidebar();
+}
+
+function getSpeakerColor(name){var s=speakers.find(function(sp){return sp.name===name;});return s?s.color:'#9b9a97';}
+function renderSegments(){var c=document.getElementById('transcript-segments');c.innerHTML='';transcriptData.forEach(function(seg){var color=getSpeakerColor(seg.speaker);var spClass=seg.speaker==='Entrevistador'?'speaker-a':'speaker-b';var d=document.createElement('div');d.className='seg';d.dataset.odId='seg-'+seg.id;d.dataset.time=seg.timeSec;d.onclick=function(){seekTo(seg.timeSec);};d.innerHTML='<div class="seg-time">'+seg.time+'</div><div class="seg-body"><div class="seg-speaker '+spClass+'" style="color:'+color+'">'+seg.speaker+'</div><div class="seg-text" contenteditable="true" onclick="event.stopPropagation()">'+seg.text+'</div></div>';c.appendChild(d);});}
+
+/* Speaker dropdown */
+function toggleSpeakerDropdown(){var dd=document.getElementById('speaker-dropdown');if(dd.classList.contains('open')){dd.classList.remove('open');return;}renderSpeakerDropdownList();dd.classList.add('open');setTimeout(function(){document.addEventListener('click',closeSpeakerDropdown,{once:true});},0);}
+function closeSpeakerDropdown(){document.getElementById('speaker-dropdown').classList.remove('open');}
+function renderSpeakerDropdownList(){var list=document.getElementById('speaker-dropdown-list');list.innerHTML='';var activeSeg=document.querySelector('.seg.active-seg');var currentSpeaker='';if(activeSeg){var idx=Array.from(document.querySelectorAll('.seg')).indexOf(activeSeg);if(idx>=0&&idx<transcriptData.length)currentSpeaker=transcriptData[idx].speaker;}
+  speakers.forEach(function(sp){var opt=document.createElement('div');opt.className='speaker-option'+(sp.name===currentSpeaker?' active':'');opt.onclick=function(e){e.stopPropagation();assignSpeakerFromDropdown(sp.name);};opt.innerHTML='<span class="sp-dot" style="background:'+sp.color+'"></span>'+sp.name+(sp.name===currentSpeaker?' ✓':'');list.appendChild(opt);});}
+function addNewSpeaker(){var input=document.getElementById('new-speaker-input');var name=input.value.trim();if(!name)return;var colors=['#2eaadc','#9065b0','#4dab6f','#d9730d','#cb912f','#eb5757','#c14c8a','#0d9488'];var color=colors[speakers.length%colors.length];speakers.push({name:name,color:color});assignSpeakerFromDropdown(name);input.value='';}
+function assignSpeakerFromDropdown(speakerName){var activeSeg=document.querySelector('.seg.active-seg');if(!activeSeg)return;var idx=Array.from(document.querySelectorAll('.seg')).indexOf(activeSeg);if(idx<0||idx>=transcriptData.length)return;transcriptData[idx].speaker=speakerName;renderSegments();highlightSegment();closeSpeakerDropdown();}
+
+/* Player */
+function togglePlay(){if(!isPlaying){isPlaying=true;document.getElementById('player-play-icon').innerHTML='<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>';playInterval=setInterval(function(){currentTime+=playbackSpeed;if(currentTime>=totalTime){stopPlay();return;}updatePlayerTime();highlightSegment();},1000);}else{stopPlay();}}
+function stopPlay(){isPlaying=false;clearInterval(playInterval);document.getElementById('player-play-icon').innerHTML='<polygon points="5 3 19 12 5 21"/>';}
+function updatePlayerTime(){var m=String(Math.floor(currentTime/60)).padStart(2,'0');var s=String(Math.floor(currentTime%60)).padStart(2,'0');document.getElementById('player-current').textContent=m+':'+s;document.getElementById('player-fill').style.width=(currentTime/totalTime*100)+'%';}
+function highlightSegment(){document.querySelectorAll('.seg').forEach(function(s){s.classList.remove('active-seg');});var cs=null;for(var i=transcriptData.length-1;i>=0;i--){if(currentTime>=transcriptData[i].timeSec){cs=transcriptData[i];break;}}if(cs){var el=document.querySelector('[data-od-id="seg-'+cs.id+'"]');if(!el)el=document.querySelector('[data-time="'+cs.timeSec+'"]');if(el){el.classList.add('active-seg');el.scrollIntoView({behavior:'smooth',block:'center'});}}}
+function seekTo(time){currentTime=time;updatePlayerTime();highlightSegment();}
+function seekPlayer(e){var track=document.getElementById('player-track');var rect=track.getBoundingClientRect();currentTime=Math.floor((e.clientX-rect.left)/rect.width*totalTime);updatePlayerTime();highlightSegment();}
+function cycleSpeed(){speedIdx=(speedIdx+1)%speeds.length;playbackSpeed=speeds[speedIdx];document.getElementById('player-speed-btn').textContent=speeds[speedIdx]+'×';}
+function splitSegment(){var sel=window.getSelection();if(!sel.rangeCount)return;var node=sel.anchorNode;var textEl=node.nodeType===3?node.parentElement:node;if(!textEl.classList.contains('seg-text'))return;var offset=sel.anchorOffset;var text=textEl.textContent;var before=text.slice(0,offset).trim();var after=text.slice(offset).trim();if(!before||!after)return;textEl.textContent=before;var segEl=textEl.closest('.seg');var idx=Array.from(segEl.parentNode.children).indexOf(segEl);if(idx<0||idx>=transcriptData.length)return;transcriptData[idx].text=before;var newSeg={id:'s'+(transcriptData.length+1),time:transcriptData[idx].time,timeSec:transcriptData[idx].timeSec,speaker:transcriptData[idx].speaker,text:after};transcriptData.splice(idx+1,0,newSeg);renderSegments();}
+function mergeSegment(){var activeSeg=document.querySelector('.seg.active-seg');if(!activeSeg)return;var idx=Array.from(document.querySelectorAll('.seg')).indexOf(activeSeg);if(idx<=0)return;transcriptData[idx-1].text+=' '+transcriptData[idx].text;transcriptData.splice(idx,1);renderSegments();}
+
+/* INIT */
+document.addEventListener('DOMContentLoaded',function(){renderSidebar();renderDashboard();initWaveform();document.addEventListener('click',function(e){if(!e.target.closest('.sidebar-new'))document.getElementById('new-menu').classList.remove('open');});});
+</script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+# WhisperX requer Python >= 3.10 e < 3.14
+# Use o ambiente virtual .venv-whisperx (Python 3.12):
+#   .\setup-whisperx.ps1
+whisperx>=3.8.0
+nvidia-cublas-cu12
+nvidia-cudnn-cu12==9.*
