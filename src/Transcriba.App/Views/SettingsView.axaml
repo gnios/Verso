@@ -1,9 +1,108 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="Transcriba.App.Views.SettingsView">
-    <TextBlock Text="Configurações"
-               FontSize="28"
-               FontWeight="Bold"
-               Foreground="{DynamicResource TranscribaFg}"
-               Margin="40,40,56,32" />
+             xmlns:vm="using:Transcriba.App.ViewModels"
+             x:Class="Transcriba.App.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                  VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="40,40,56,32" Spacing="0">
+            <StackPanel Classes="screen-header" Spacing="4">
+                <TextBlock Text="Configurações" Classes="screen-title" />
+                <TextBlock Text="Gerencie seu perfil e preferências"
+                           Classes="screen-subtitle" />
+            </StackPanel>
+
+            <StackPanel Classes="settings-section" Spacing="0">
+                <Border Classes="settings-section-title-border">
+                    <TextBlock Text="Perfil" Classes="settings-section-title" />
+                </Border>
+
+                <Border Classes="settings-row">
+                    <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                        <TextBlock Text="Nome" Classes="settings-row-label" />
+                        <TextBox Grid.Column="1"
+                                 Classes="settings-input"
+                                 Text="{Binding Name}"
+                                 LostFocus="OnProfileFieldLostFocus" />
+                    </Grid>
+                </Border>
+
+                <Border Classes="settings-row">
+                    <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                        <TextBlock Text="E-mail" Classes="settings-row-label" />
+                        <TextBox Grid.Column="1"
+                                 Classes="settings-input"
+                                 Text="{Binding Email}"
+                                 LostFocus="OnProfileFieldLostFocus" />
+                    </Grid>
+                </Border>
+
+                <Border Classes="settings-row">
+                    <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                        <TextBlock Text="Instituição" Classes="settings-row-label" />
+                        <TextBox Grid.Column="1"
+                                 Classes="settings-input"
+                                 Text="{Binding Institution}"
+                                 LostFocus="OnProfileFieldLostFocus" />
+                    </Grid>
+                </Border>
+            </StackPanel>
+
+            <StackPanel Classes="settings-section" Spacing="0">
+                <Border Classes="settings-section-title-border">
+                    <TextBlock Text="Transcrição" Classes="settings-section-title" />
+                </Border>
+
+                <Border Classes="settings-row">
+                    <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                        <TextBlock Text="Idioma" Classes="settings-row-label" />
+                        <ComboBox Grid.Column="1"
+                                  Classes="settings-select"
+                                  ItemsSource="{Binding LanguageOptions}"
+                                  SelectedItem="{Binding SelectedLanguageOption}" />
+                    </Grid>
+                </Border>
+
+                <Border Classes="settings-row">
+                    <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Identificar locutores" Classes="settings-row-label" />
+                            <TextBlock Text="Detecta vozes e atribui rótulos" Classes="settings-row-sub" />
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1"
+                                      Classes="settings-toggle"
+                                      IsChecked="{Binding IdentifySpeakersDefault}" />
+                    </Grid>
+                </Border>
+
+                <Border Classes="settings-row">
+                    <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Transcrição ao vivo" Classes="settings-row-label" />
+                            <TextBlock Text="Texto em tempo real durante gravação" Classes="settings-row-sub" />
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1"
+                                      Classes="settings-toggle"
+                                      IsChecked="{Binding LiveTranscriptionEnabled}" />
+                    </Grid>
+                </Border>
+            </StackPanel>
+
+            <StackPanel Classes="settings-section" Spacing="0">
+                <Border Classes="settings-section-title-border">
+                    <TextBlock Text="Motor de transcrição" Classes="settings-section-title" />
+                </Border>
+
+                <Border Classes="settings-row">
+                    <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                        <TextBlock Text="Dispositivo" Classes="settings-row-label" />
+                        <ComboBox Grid.Column="1"
+                                  Classes="settings-select"
+                                  ItemsSource="{Binding DeviceOptions}"
+                                  SelectedItem="{Binding SelectedDeviceOption}" />
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>
