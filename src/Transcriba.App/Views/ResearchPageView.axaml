@@ -1,0 +1,127 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Transcriba.App.ViewModels"
+             x:Class="Transcriba.App.Views.ResearchPageView"
+             x:DataType="vm:ResearchPageViewModel">
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                  VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="40,40,56,32" Spacing="0">
+            <StackPanel Classes="screen-header" Spacing="6">
+                <StackPanel Classes="editor-breadcrumb" Orientation="Horizontal" Spacing="4">
+                    <Button Classes="breadcrumb-link"
+                            Command="{Binding NavigateDashboardCommand}"
+                            Content="Biblioteca" />
+                    <TextBlock Text="→"
+                               Foreground="{DynamicResource TranscribaMuted}"
+                               VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding Title}"
+                               Foreground="{DynamicResource TranscribaMuted}"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+
+                <StackPanel Classes="page-header" Orientation="Horizontal" Spacing="12">
+                    <Border Classes="page-header-icon"
+                            Classes.tag-blue="{Binding IsBlue}"
+                            Classes.tag-green="{Binding IsGreen}"
+                            Classes.tag-purple="{Binding IsPurple}"
+                            Classes.tag-orange="{Binding IsOrange}"
+                            Classes.tag-pink="{Binding IsPink}"
+                            Classes.tag-yellow="{Binding IsYellow}"
+                            Classes.tag-red="{Binding IsRed}"
+                            Classes.tag-teal="{Binding IsTeal}">
+                        <TextBlock Text="{Binding Icon}" FontSize="24" />
+                    </Border>
+                    <StackPanel Classes="page-header-text" Spacing="2">
+                        <TextBlock Text="{Binding Title}" Classes="page-header-title" />
+                        <TextBlock Text="{Binding Description}"
+                                   Classes="page-header-desc"
+                                   IsVisible="{Binding Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel Classes="research-section" Spacing="0">
+                <Grid Classes="research-section-head" ColumnDefinitions="*,Auto">
+                    <TextBlock Text="TRANSCRIÇÕES" Classes="research-section-title" />
+                    <Button Grid.Column="1"
+                            Classes="research-add-btn"
+                            Command="{Binding AddTranscriptionCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <TextBlock Text="＋" FontSize="14" />
+                            <TextBlock Text="Adicionar" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+
+                <ItemsControl ItemsSource="{Binding Transcriptions}"
+                              Classes="research-list">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:TranscriptionCardViewModel">
+                            <Button Classes="research-item"
+                                    Command="{Binding OpenCommand}"
+                                    HorizontalContentAlignment="Stretch">
+                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                    <Border Grid.Column="0"
+                                            Classes="research-item-icon"
+                                            Background="{DynamicResource TranscribaSurface}">
+                                        <TextBlock Text="{Binding Icon}" FontSize="18" />
+                                    </Border>
+
+                                    <StackPanel Grid.Column="1"
+                                                Classes="research-item-info"
+                                                Spacing="2"
+                                                Margin="10,0,0,0">
+                                        <TextBlock Text="{Binding Title}" Classes="research-item-title" />
+                                        <StackPanel Classes="research-item-sub"
+                                                    Orientation="Horizontal"
+                                                    Spacing="4">
+                                            <TextBlock Text="{Binding Date}" />
+                                            <TextBlock Text="·"
+                                                       Foreground="{DynamicResource TranscribaMuted}" />
+                                            <TextBlock Text="{Binding Duration}" />
+                                            <TextBlock Text="·"
+                                                       Foreground="{DynamicResource TranscribaMuted}" />
+                                            <Border Classes="status-badge status-progress"
+                                                    IsVisible="{Binding IsInProgress}">
+                                                <TextBlock Text="{Binding StatusLabel}" />
+                                            </Border>
+                                            <Border Classes="status-badge status-done"
+                                                    IsVisible="{Binding IsDone}">
+                                                <TextBlock Text="{Binding StatusLabel}" />
+                                            </Border>
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <ItemsControl Grid.Column="2"
+                                                  ItemsSource="{Binding Tags}"
+                                                  Classes="research-item-right">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" Spacing="6" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:TranscriptionCardTagViewModel">
+                                                <Border Classes="tag"
+                                                        Classes.tag-blue="{Binding IsBlue}"
+                                                        Classes.tag-green="{Binding IsGreen}"
+                                                        Classes.tag-yellow="{Binding IsYellow}"
+                                                        Classes.tag-red="{Binding IsRed}"
+                                                        Classes.tag-purple="{Binding IsPurple}"
+                                                        Classes.tag-orange="{Binding IsOrange}"
+                                                        Classes.tag-pink="{Binding IsPink}"
+                                                        Classes.tag-teal="{Binding IsTeal}">
+                                                    <TextBlock Text="{Binding Name}" />
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Grid>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -2,9 +2,9 @@ using Avalonia.Controls;
 
 namespace Transcriba.App.Views;
 
-public partial class ResearchView : UserControl
+public partial class ResearchPageView : UserControl
 {
-    public ResearchView()
+    public ResearchPageView()
     {
         InitializeComponent();
     }
