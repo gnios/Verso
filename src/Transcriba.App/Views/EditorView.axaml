@@ -22,14 +22,14 @@
             <ItemsControl ItemsSource="{Binding Segments}"
                           IsVisible="{Binding HasSegments}">
                 <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:EditorSegmentViewModel">
+                    <DataTemplate x:DataType="vm:SegmentItemViewModel">
                         <Border BorderBrush="{DynamicResource TranscribaBorder}"
                                 BorderThickness="0,0,0,1"
                                 Padding="0,8">
                             <StackPanel Spacing="4">
                                 <TextBlock FontSize="12"
                                            Foreground="{DynamicResource TranscribaMuted}"
-                                           Text="{Binding StartSeconds, StringFormat='{}{0:0.0}s'}" />
+                                           Text="{Binding TimeDisplay}" />
                                 <TextBlock Text="{Binding Text}"
                                            TextWrapping="Wrap"
                                            Foreground="{DynamicResource TranscribaFg}" />

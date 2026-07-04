@@ -17,7 +17,7 @@ namespace Transcriba.Tests.ViewModels;
 public class EditorViewModelTests
 {
     private static async Task<(IServiceProvider Provider, string Directory, Guid TranscriptionId)>
-        CreateEditorProviderAsync(TranscriptionStatus status)
+        CreateEditorProviderAsync(TranscriptionStatus status, Action<Transcription>? configure = null)
     {
         var (baseProvider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();
         var dbPath = Path.Combine(directory, "transcriba.db");
@@ -37,9 +37,11 @@ public class EditorViewModelTests
             {
                 Id = transcriptionId,
                 Title = "Entrevista teste",
+                Icon = "🎤",
                 Status = status,
                 ErrorMessage = status == TranscriptionStatus.Error ? "falha simulada" : null,
                 CreatedAt = DateTime.UtcNow,
+                DurationSeconds = 120,
             };
 
             if (status == TranscriptionStatus.Done)
@@ -55,6 +57,7 @@ public class EditorViewModelTests
                 });
             }
 
+            configure?.Invoke(transcription);
             ctx.Transcriptions.Add(transcription);
             await ctx.SaveChangesAsync();
         }
@@ -155,6 +158,166 @@ public class EditorViewModelTests
             Assert.False(editor.IsInProgress);
             Assert.True(editor.HasSegments);
             Assert.Equal("Segmento gerado", editor.Segments[0].Text);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task CommitSegmentText_PersistsToDatabase()
+    {
+        var (provider, directory, transcriptionId) = await CreateEditorProviderAsync(TranscriptionStatus.Done);
+        try
+        {
+            var editor = await CreateEditorAsync(provider, transcriptionId);
+            var segment = editor.Segments[0];
+            segment.Text = "Texto corrigido";
+            segment.CommitText();
+            await Task.Delay(50);
+
+            await using var ctx = await TestDbHelper.GetFactory(provider).CreateDbContextAsync();
+            var saved = await ctx.Segments.SingleAsync(s => s.Id == segment.Id);
+            Assert.Equal("Texto corrigido", saved.Text);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task SplitSegment_UsesFocusedSegmentCaret_NotPlaybackActiveSegment()
+    {
+        var firstId = Guid.NewGuid();
+        var secondId = Guid.NewGuid();
+
+        var (provider, directory, transcriptionId) = await CreateEditorProviderAsync(
+            TranscriptionStatus.Done,
+            transcription =>
+            {
+                transcription.Segments.Clear();
+                transcription.Segments.AddRange(
+                [
+                    new Segment
+                    {
+                        Id = firstId,
+                        TranscriptionId = transcription.Id,
+                        StartSeconds = 0,
+                        EndSeconds = 5,
+                        Text = "alpha beta",
+                        SortOrder = 0,
+                    },
+                    new Segment
+                    {
+                        Id = secondId,
+                        TranscriptionId = transcription.Id,
+                        StartSeconds = 10,
+                        EndSeconds = 15,
+                        Text = "gamma",
+                        SortOrder = 1,
+                    },
+                ]);
+            });
+
+        try
+        {
+            var editor = await CreateEditorAsync(provider, transcriptionId);
+            editor.SetPlaybackPosition(TimeSpan.FromSeconds(12));
+            editor.OnSegmentFocused(editor.Segments[0], caretIndex: 5);
+            await editor.SplitSegmentCommand.ExecuteAsync(null);
+            await Task.Delay(50);
+
+            await using var ctx = await TestDbHelper.GetFactory(provider).CreateDbContextAsync();
+            var segments = await ctx.Segments
+                .Where(s => s.TranscriptionId == transcriptionId)
+                .OrderBy(s => s.SortOrder)
+                .ToListAsync();
+
+            Assert.Equal(3, segments.Count);
+            Assert.Equal("alpha", segments[0].Text);
+            Assert.Equal("beta", segments[1].Text);
+            Assert.Equal("gamma", segments[2].Text);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task MergeSegment_UsesPlaybackActiveSegment()
+    {
+        var firstId = Guid.NewGuid();
+        var secondId = Guid.NewGuid();
+
+        var (provider, directory, transcriptionId) = await CreateEditorProviderAsync(
+            TranscriptionStatus.Done,
+            transcription =>
+            {
+                transcription.Segments.Clear();
+                transcription.Segments.AddRange(
+                [
+                    new Segment
+                    {
+                        Id = firstId,
+                        TranscriptionId = transcription.Id,
+                        StartSeconds = 0,
+                        EndSeconds = 5,
+                        Text = "primeiro",
+                        SortOrder = 0,
+                    },
+                    new Segment
+                    {
+                        Id = secondId,
+                        TranscriptionId = transcription.Id,
+                        StartSeconds = 10,
+                        EndSeconds = 15,
+                        Text = "segundo",
+                        SortOrder = 1,
+                    },
+                ]);
+            });
+
+        try
+        {
+            var editor = await CreateEditorAsync(provider, transcriptionId);
+            editor.SetPlaybackPosition(TimeSpan.FromSeconds(12));
+            await editor.MergeSegmentCommand.ExecuteAsync(null);
+            await Task.Delay(50);
+
+            await using var ctx = await TestDbHelper.GetFactory(provider).CreateDbContextAsync();
+            var segments = await ctx.Segments
+                .Where(s => s.TranscriptionId == transcriptionId)
+                .OrderBy(s => s.SortOrder)
+                .ToListAsync();
+
+            Assert.Single(segments);
+            Assert.Equal("primeiro segundo", segments[0].Text);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task CommitTitle_UpdatesBreadcrumbTitle()
+    {
+        var (provider, directory, transcriptionId) = await CreateEditorProviderAsync(TranscriptionStatus.Done);
+        try
+        {
+            var editor = await CreateEditorAsync(provider, transcriptionId);
+            editor.Title = "Novo título";
+            await editor.CommitTitleCommand.ExecuteAsync(null);
+            await Task.Delay(50);
+
+            Assert.Equal("Novo título", editor.Title);
+
+            await using var ctx = await TestDbHelper.GetFactory(provider).CreateDbContextAsync();
+            var saved = await ctx.Transcriptions.SingleAsync(t => t.Id == transcriptionId);
+            Assert.Equal("Novo título", saved.Title);
         }
         finally
         {
