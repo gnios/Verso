@@ -21,14 +21,19 @@ public partial class NavigationService : ObservableObject
     public NavigationService(IServiceProvider services)
     {
         _services = services;
-        NavigateTo(ScreenKey.Dashboard);
     }
 
     public void NavigateTo(ScreenKey key, object? parameter = null)
     {
         CurrentScreen = key;
         NavigationParameter = parameter;
-        CurrentViewModel = ResolveViewModel(key);
+        var viewModel = ResolveViewModel(key);
+        if (viewModel is DashboardViewModel dashboard)
+        {
+            dashboard.Initialize(parameter as NavigationParameter);
+        }
+
+        CurrentViewModel = viewModel;
     }
 
     private object ResolveViewModel(ScreenKey key) => key switch
