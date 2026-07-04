@@ -627,6 +627,7 @@ T16, T30 → T50
 **Gate**: build
 
 **Commit**: `feat(media): implementa playback de áudio via LibVLC`
+**Status**: ✅ Concluída
 
 ---
 
