@@ -401,6 +401,90 @@
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
+        <Style Selector="Border.upload-zone">
+            <Setter Property="BorderBrush" Value="{DynamicResource TranscribaBorder}" />
+            <Setter Property="BorderThickness" Value="2" />
+            <Setter Property="CornerRadius" Value="{DynamicResource TranscribaRadiusLg}" />
+            <Setter Property="Padding" Value="48,40" />
+            <Setter Property="Margin" Value="0,0,0,28" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Border.upload-zone:pointerover">
+            <Setter Property="BorderBrush" Value="{DynamicResource TranscribaAccent}" />
+            <Setter Property="Background" Value="{DynamicResource TranscribaAccentLight}" />
+        </Style>
+        <Style Selector="Border.upload-zone.dragover">
+            <Setter Property="BorderBrush" Value="{DynamicResource TranscribaAccent}" />
+            <Setter Property="Background" Value="{DynamicResource TranscribaAccentLight}" />
+        </Style>
+        <Style Selector="TextBlock.upload-zone-title">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaFg}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+        </Style>
+        <Style Selector="TextBlock.upload-zone-sub">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaFgSecondary}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Border.upload-file-info">
+            <Setter Property="Background" Value="{DynamicResource TranscribaSurface}" />
+            <Setter Property="CornerRadius" Value="{DynamicResource TranscribaRadiusMd}" />
+            <Setter Property="Padding" Value="14,18" />
+            <Setter Property="Margin" Value="0,0,0,20" />
+        </Style>
+        <Style Selector="TextBlock.upload-file-name">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaFg}" />
+        </Style>
+        <Style Selector="TextBlock.upload-file-size">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaMuted}" />
+        </Style>
+        <Style Selector="TextBlock.upload-label">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource TranscribaFgSecondary}" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
+        <Style Selector="ComboBox.upload-select">
+            <Setter Property="Padding" Value="8,7" />
+            <Setter Property="Background" Value="{DynamicResource TranscribaBg}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource TranscribaBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="{DynamicResource TranscribaRadius}" />
+            <Setter Property="FontSize" Value="13" />
+        </Style>
+        <Style Selector="Grid.upload-form">
+            <Setter Property="MaxWidth" Value="560" />
+        </Style>
+        <Style Selector="Button.upload-btn">
+            <Setter Property="Padding" Value="10,28" />
+            <Setter Property="Margin" Value="0,20,0,0" />
+            <Setter Property="Background" Value="{DynamicResource TranscribaAccent}" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="{DynamicResource TranscribaRadius}" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+        </Style>
+        <Style Selector="Button.upload-btn:pointerover">
+            <Setter Property="Background" Value="{DynamicResource TranscribaAccentHover}" />
+        </Style>
+        <Style Selector="Button.upload-btn:disabled">
+            <Setter Property="Opacity" Value="0.5" />
+        </Style>
+        <Style Selector="TextBlock.upload-error">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{StaticResource TagRed}" />
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+
         <Style Selector="Button.icon-picker-item">
             <Setter Property="Width" Value="34" />
             <Setter Property="Height" Value="34" />

@@ -1,9 +1,92 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="Transcriba.App.Views.UploadView">
-    <TextBlock Text="Upload"
-               FontSize="28"
-               FontWeight="Bold"
-               Foreground="{DynamicResource TranscribaFg}"
-               Margin="40,40,56,32" />
+             xmlns:vm="using:Transcriba.App.ViewModels"
+             x:Class="Transcriba.App.Views.UploadView"
+             x:DataType="vm:UploadViewModel">
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                  VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="40,40,56,32" Spacing="0">
+            <StackPanel Classes="screen-header" Spacing="4">
+                <TextBlock Text="Nova transcrição" Classes="screen-title" />
+                <TextBlock Text="Faça upload de um arquivo de áudio ou vídeo"
+                           Classes="screen-subtitle" />
+            </StackPanel>
+
+            <TextBlock Text="{Binding ValidationError}"
+                       Classes="upload-error"
+                       IsVisible="{Binding ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+            <Border x:Name="UploadZone"
+                    Classes="upload-zone"
+                    Classes.dragover="{Binding IsDragOver}"
+                    IsVisible="{Binding !HasSelectedFile}">
+                <StackPanel HorizontalAlignment="Center" Spacing="10">
+                    <Path Width="44"
+                          Height="44"
+                          Stretch="Uniform"
+                          Data="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M17 8l-5-5-5 5 M12 3v12"
+                          Stroke="{DynamicResource TranscribaMuted}"
+                          StrokeThickness="1.5"
+                          Fill="Transparent" />
+                    <TextBlock Text="Arraste um arquivo aqui" Classes="upload-zone-title" />
+                    <TextBlock Text="{Binding SupportedFormatsLabel}" Classes="upload-zone-sub" />
+                </StackPanel>
+            </Border>
+
+            <Border Classes="upload-file-info"
+                    IsVisible="{Binding HasSelectedFile}">
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Path Width="28"
+                          Height="28"
+                          Stretch="Uniform"
+                          Data="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8"
+                          Stroke="{DynamicResource TranscribaAccent}"
+                          StrokeThickness="2"
+                          Fill="Transparent" />
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="{Binding SelectedFileName}" Classes="upload-file-name" />
+                        <TextBlock Text="{Binding SelectedFileSize}" Classes="upload-file-size" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Grid Classes="upload-form"
+                  IsVisible="{Binding HasSelectedFile}"
+                  ColumnSpacing="32"
+                  RowSpacing="16">
+                <StackPanel Grid.Row="0" Grid.Column="0" Spacing="0">
+                    <TextBlock Text="Idioma" Classes="upload-label" />
+                    <ComboBox Classes="upload-select"
+                              ItemsSource="{Binding LanguageOptions}"
+                              SelectedItem="{Binding SelectedLanguageOption}" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="0" Grid.Column="1" Spacing="0">
+                    <TextBlock Text="Qualidade" Classes="upload-label" />
+                    <ComboBox Classes="upload-select"
+                              ItemsSource="{Binding QualityOptions}"
+                              SelectedItem="{Binding SelectedQualityOption}" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="1" Grid.Column="0" Spacing="0">
+                    <TextBlock Text="Locutores" Classes="upload-label" />
+                    <ComboBox Classes="upload-select"
+                              ItemsSource="{Binding SpeakerModeOptions}"
+                              SelectedItem="{Binding SelectedSpeakerModeOption}" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="1" Grid.Column="1" Spacing="0">
+                    <TextBlock Text="Pesquisa" Classes="upload-label" />
+                    <ComboBox Classes="upload-select"
+                              ItemsSource="{Binding ResearchOptions}"
+                              SelectedItem="{Binding SelectedResearch}" />
+                </StackPanel>
+            </Grid>
+
+            <Button Classes="upload-btn"
+                    Content="Iniciar transcrição"
+                    Command="{Binding StartTranscriptionCommand}"
+                    IsEnabled="{Binding CanStart}" />
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>
