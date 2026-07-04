@@ -483,8 +483,7 @@ T16, T30 → T50
 **Gate**: quick
 
 **Commit**: `feat(services): implementa LibraryService com filtros e busca`
-
----
+**Status**: ✅ Concluída
 
 ### T16: ResearchService [P]
 
@@ -504,8 +503,7 @@ T16, T30 → T50
 **Gate**: quick
 
 **Commit**: `feat(services): implementa ResearchService (CRUD de pesquisas)`
-
----
+**Status**: ✅ Concluída
 
 ### T17: MediaStorageService [P]
 
@@ -525,8 +523,7 @@ T16, T30 → T50
 **Gate**: quick
 
 **Commit**: `feat(services): implementa MediaStorageService`
-
----
+**Status**: ✅ Concluída
 
 ### T18: SpeakerService [P]
 
@@ -547,8 +544,7 @@ T16, T30 → T50
 **Gate**: quick
 
 **Commit**: `feat(services): implementa SpeakerService escopado por transcrição`
-
----
+**Status**: ✅ Concluída
 
 ### T19: SegmentEditingService [P]
 
@@ -570,8 +566,7 @@ T16, T30 → T50
 **Gate**: quick
 
 **Commit**: `feat(services): implementa SegmentEditingService (dividir/mesclar/segmento ativo)`
-
----
+**Status**: ✅ Concluída
 
 ### T20: SettingsService [P]
 
@@ -591,8 +586,7 @@ T16, T30 → T50
 **Gate**: quick
 
 **Commit**: `feat(services): implementa SettingsService`
-
----
+**Status**: ✅ Concluída
 
 ### T21: ExportService (P2) [P]
 
@@ -613,8 +607,7 @@ T16, T30 → T50
 **Gate**: quick
 
 **Commit**: `feat(export): implementa exportação TXT/SRT/VTT`
-
----
+**Status**: ✅ Concluída
 
 ### T22: IMediaPlaybackService + LibVlcPlaybackService
 
