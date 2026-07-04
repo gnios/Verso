@@ -280,4 +280,59 @@ public class ResearchPageViewModelTests
             TestDbHelper.Cleanup(directory);
         }
     }
+
+    [Fact]
+    public async Task DeleteResearch_Confirmed_DissociatesTranscriptionsAndNavigatesToDashboard()
+    {
+        var confirmation = new FakeConfirmationService { NextResult = true };
+        var (provider, directory, researchId, doneId, _) =
+            await CreateResearchProviderAsync(confirmation);
+
+        try
+        {
+            var page = await CreateResearchPageAsync(provider, researchId);
+            var navigation = provider.GetRequiredService<NavigationService>();
+
+            await page.DeleteResearchCommand.ExecuteAsync(null);
+
+            Assert.Contains("2 transcrições", confirmation.LastMessage ?? "");
+            Assert.Equal(ScreenKey.Dashboard, navigation.CurrentScreen);
+
+            await using var ctx = await TestDbHelper.GetFactory(provider).CreateDbContextAsync();
+            Assert.Null(await ctx.ResearchPages.FindAsync(researchId));
+            var transcription = await ctx.Transcriptions.SingleAsync(t => t.Id == doneId);
+            Assert.Null(transcription.ResearchPageId);
+            Assert.Equal("Entrevista concluída", transcription.Title);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task DeleteResearch_Cancelled_KeepsResearchAndStaysOnPage()
+    {
+        var confirmation = new FakeConfirmationService { NextResult = false };
+        var (provider, directory, researchId, _, _) =
+            await CreateResearchProviderAsync(confirmation);
+
+        try
+        {
+            var page = await CreateResearchPageAsync(provider, researchId);
+            var navigation = provider.GetRequiredService<NavigationService>();
+
+            await page.DeleteResearchCommand.ExecuteAsync(null);
+
+            Assert.Equal(ScreenKey.Research, navigation.CurrentScreen);
+            Assert.Equal("Mobilidade urbana", page.Title);
+
+            await using var ctx = await TestDbHelper.GetFactory(provider).CreateDbContextAsync();
+            Assert.NotNull(await ctx.ResearchPages.FindAsync(researchId));
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
 }

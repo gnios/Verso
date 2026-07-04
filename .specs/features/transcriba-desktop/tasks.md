@@ -1155,14 +1155,15 @@ T16, T30 → T50
 **Tools**: MCP: NONE / Skill: NONE
 
 **Done when**:
-- [ ] Os 3 formatos disponíveis e funcionais end-to-end
-- [ ] Transcrição sem segmentos desabilita/avisa (AC4)
-- [ ] Gate `quick` passa (teste de ViewModel cobrindo chamada correta ao serviço por formato)
+- [x] Os 3 formatos disponíveis e funcionais end-to-end
+- [x] Transcrição sem segmentos desabilita/avisa (AC4)
+- [x] Gate `quick` passa (teste de ViewModel cobrindo chamada correta ao serviço por formato)
 
 **Tests**: unit
 **Gate**: quick
 
 **Commit**: `feat(export): conecta botão Exportar do editor ao ExportService`
+**Status**: ✅ Concluída
 
 ---
 
@@ -1175,15 +1176,16 @@ T16, T30 → T50
 **Tools**: MCP: NONE / Skill: NONE
 
 **Done when**:
-- [ ] Confirmação obrigatória antes de excluir
-- [ ] Exclusão remove transcrição, segmentos e mídia copiada (via `MediaStorageService`)
-- [ ] Cancelamento não altera nada
-- [ ] Gate `quick` passa
+- [x] Confirmação obrigatória antes de excluir
+- [x] Exclusão remove transcrição, segmentos e mídia copiada (via `MediaStorageService`)
+- [x] Cancelamento não altera nada
+- [x] Gate `quick` passa
 
 **Tests**: unit
 **Gate**: quick
 
 **Commit**: `feat(dashboard): adiciona exclusão de transcrição com confirmação`
+**Status**: ✅ Concluída
 
 ---
 
@@ -1196,14 +1198,15 @@ T16, T30 → T50
 **Tools**: MCP: NONE / Skill: NONE
 
 **Done when**:
-- [ ] Diálogo de confirmação informa contagem de transcrições afetadas
-- [ ] Transcrições ficam avulsas (não excluídas) após confirmação
-- [ ] Gate `quick` passa
+- [x] Diálogo de confirmação informa contagem de transcrições afetadas
+- [x] Transcrições ficam avulsas (não excluídas) após confirmação
+- [x] Gate `quick` passa
 
 **Tests**: unit
 **Gate**: quick
 
 **Commit**: `feat(research): adiciona exclusão de pesquisa com confirmação`
+**Status**: ✅ Concluída
 
 ---
 

@@ -84,6 +84,42 @@ public partial class ResearchPageViewModel : ViewModelBase
             ScreenKey.Upload,
             new NavigationParameter(ResearchId: _researchId));
 
+    [RelayCommand]
+    private async Task DeleteResearchAsync()
+    {
+        if (_researchId <= 0)
+        {
+            return;
+        }
+
+        using var scope = _scopeFactory.CreateScope();
+        var researchService = scope.ServiceProvider.GetRequiredService<ResearchService>();
+        var research = await researchService.GetByIdAsync(_researchId);
+        if (research is null)
+        {
+            return;
+        }
+
+        var count = research.Transcriptions.Count;
+        var countMessage = count switch
+        {
+            0 => "Nenhuma transcrição está associada.",
+            1 => "1 transcrição ficará avulsa na biblioteca.",
+            _ => $"{count} transcrições ficarão avulsas na biblioteca.",
+        };
+
+        if (!await _confirmation.ConfirmAsync(
+                "Excluir pesquisa",
+                $"A pesquisa \"{research.Title}\" será excluída. {countMessage} Deseja continuar?"))
+        {
+            return;
+        }
+
+        await researchService.DeleteAsync(_researchId);
+        await _sidebar.LoadAsync();
+        _navigation.NavigateTo(ScreenKey.Dashboard);
+    }
+
     internal void OpenTranscription(Guid transcriptionId) =>
         _navigation.NavigateTo(
             ScreenKey.Editor,

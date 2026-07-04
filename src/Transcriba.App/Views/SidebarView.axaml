@@ -108,6 +108,13 @@
                         <DataTemplate x:DataType="vm:SidebarResearchItemViewModel">
                             <StackPanel>
                                 <Button Classes="sidebar-item" Command="{Binding ToggleExpandCommand}">
+                                    <Button.ContextFlyout>
+                                        <MenuFlyout>
+                                            <MenuItem Header="Excluir pesquisa"
+                                                      Command="{Binding DeleteCommand}"
+                                                      IsVisible="{Binding CanDelete}" />
+                                        </MenuFlyout>
+                                    </Button.ContextFlyout>
                                     <Grid ColumnDefinitions="Auto,Auto,*,Auto">
                                         <TextBlock Grid.Column="0" Text="{Binding Icon}" Classes="page-icon" />
                                         <TextBlock Grid.Column="1"

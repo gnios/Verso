@@ -29,6 +29,12 @@
                             Classes.tag-yellow="{Binding IsYellow}"
                             Classes.tag-red="{Binding IsRed}"
                             Classes.tag-teal="{Binding IsTeal}">
+                        <Border.ContextFlyout>
+                            <MenuFlyout>
+                                <MenuItem Header="Excluir pesquisa"
+                                          Command="{Binding DeleteResearchCommand}" />
+                            </MenuFlyout>
+                        </Border.ContextFlyout>
                         <TextBlock Text="{Binding Icon}" FontSize="24" />
                     </Border>
                     <StackPanel Classes="page-header-text" Spacing="2">
