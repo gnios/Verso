@@ -1,0 +1,87 @@
+@*
+    Dashboard/Biblioteca (T60): grid de cards reaproveitando DashboardViewModel/TranscriptionCardViewModel
+    (filtros de status, busca, badges) — fiel às classes `.dash-*`/`.screen-*` do protótipo
+    (transcriba-v2-icons-transcriptions.html, seção `#screen-dashboard`).
+
+    Recebido como [Parameter] (não via @@inject): DashboardViewModel é registrado como Transient
+    em AppServiceCollectionExtensions.cs — o NavigationService resolve uma instância nova a cada
+    NavigateTo(ScreenKey.Dashboard) e guarda em CurrentViewModel. Injetar via DI aqui resolveria
+    uma instância diferente (não inicializada por Initialize/LoadAsync). Quem monta este
+    componente (MainLayout.razor, integração central pós-Fases 19-24) deve passar
+    NavigationService.CurrentViewModel convertido para DashboardViewModel.
+*@
+@implements IDisposable
+
+<section class="screen active">
+    <div class="screen-header">
+        <h1 class="screen-title">Biblioteca</h1>
+        <p class="screen-subtitle">Gerencie suas transcrições e pesquisas</p>
+    </div>
+    <div class="dash-toolbar">
+        <button class="dash-filter @(ViewModel.IsAllFilterActive ? "active" : "")" @onclick="() => ViewModel.SetAllFilterCommand.Execute(null)">Todas</button>
+        <button class="dash-filter @(ViewModel.IsProgressFilterActive ? "active" : "")" @onclick="() => ViewModel.SetProgressFilterCommand.Execute(null)">Em andamento</button>
+        <button class="dash-filter @(ViewModel.IsDoneFilterActive ? "active" : "")" @onclick="() => ViewModel.SetDoneFilterCommand.Execute(null)">Concluídas</button>
+        <input class="dash-search" type="text" placeholder="Buscar por título ou conteúdo…" value="@ViewModel.SearchText" @oninput="OnSearchInput" />
+    </div>
+    @if (ViewModel.IsEmpty)
+    {
+        <div style="grid-column:1/-1;text-align:center;padding:48px;color:var(--muted)">Nenhuma transcrição encontrada.</div>
+    }
+    else
+    {
+        <div class="dash-grid">
+            @foreach (var card in ViewModel.Cards)
+            {
+                <TranscriptionCard @key="card.Id" ViewModel="card" />
+            }
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public DashboardViewModel ViewModel { get; set; } = null!;
+
+    private DashboardViewModel? _subscribed;
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_subscribed, ViewModel))
+        {
+            return;
+        }
+
+        Unsubscribe();
+        _subscribed = ViewModel;
+        ViewModel.PropertyChanged += OnViewModelChanged;
+        ViewModel.Cards.CollectionChanged += OnCardsChanged;
+    }
+
+    private void OnSearchInput(ChangeEventArgs e)
+    {
+        ViewModel.SearchText = e.Value?.ToString() ?? "";
+    }
+
+    private void OnViewModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnCardsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void Unsubscribe()
+    {
+        if (_subscribed is null)
+        {
+            return;
+        }
+
+        _subscribed.PropertyChanged -= OnViewModelChanged;
+        _subscribed.Cards.CollectionChanged -= OnCardsChanged;
+    }
+
+    public void Dispose() => Unsubscribe();
+}
