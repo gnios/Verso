@@ -1,0 +1,122 @@
+@*
+    Página de pesquisa/tese (T61), reaproveitando `ResearchPageViewModel` — fiel às classes
+    `.research-*`/`.page-header`/`.editor-breadcrumb` do protótipo
+    (transcriba-v2-icons-transcriptions.html, seção `#screen-research`/`renderResearchPage`).
+
+    `ResearchPageViewModel` é registrado como Transient (ver `AppServiceCollectionExtensions`):
+    cada navegação para `ScreenKey.Research` resolve/Initialize uma instância nova via
+    `NavigationService`. Por isso este componente recebe o ViewModel como [Parameter] (via
+    `NavigationService.CurrentViewModel`, repassado pela integração central da shell) em vez de
+    `@@inject` — o mesmo padrão vale para as demais telas transient (Dashboard, Upload, Editor,
+    Settings).
+*@
+@implements IDisposable
+
+<section class="screen active">
+    <div class="screen-header">
+        <div class="editor-breadcrumb">
+            <a href="#" @onclick="() => ViewModel.NavigateDashboardCommand.Execute(null)" @onclick:preventDefault="true">Biblioteca</a>
+            &nbsp;→&nbsp; @ViewModel.Title
+        </div>
+        <div class="page-header">
+            <div class="page-header-icon" style="background:var(--@(ViewModel.ColorName)-light)">@ViewModel.Icon</div>
+            <div class="page-header-text">
+                <h2>@ViewModel.Title</h2>
+                <p>@ViewModel.Description</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="research-section">
+        <div class="research-section-head">
+            <h3>Transcrições</h3>
+            <button class="research-add-btn" @onclick="() => ViewModel.AddTranscriptionCommand.Execute(null)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg>
+                Adicionar
+            </button>
+        </div>
+
+        @if (ViewModel.IsEmpty)
+        {
+            <div style="text-align:center;padding:48px;color:var(--muted)">Nenhuma transcrição associada a esta pesquisa ainda.</div>
+        }
+        else
+        {
+            <div class="research-list">
+                @foreach (var transcription in ViewModel.Transcriptions)
+                {
+                    <div class="research-item" @onclick="() => transcription.OpenCommand.Execute(null)">
+                        <div class="research-item-icon" style="background:var(--@(ViewModel.ColorName)-light)">@transcription.Icon</div>
+                        <div class="research-item-info">
+                            <div class="research-item-title">@transcription.Title</div>
+                            <div class="research-item-sub">
+                                @transcription.Date · @transcription.Duration ·
+                                <span class="status-badge @StatusBadgeClass(transcription)" style="@StatusBadgeStyle(transcription)">@transcription.StatusLabel</span>
+                            </div>
+                        </div>
+                        <div class="research-item-right">
+                            @foreach (var tag in transcription.Tags)
+                            {
+                                <span class="tag tag-sm tag-@tag.ColorName">@tag.Name</span>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    private ResearchPageViewModel? _observedViewModel;
+
+    [Parameter, EditorRequired]
+    public required ResearchPageViewModel ViewModel { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_observedViewModel, ViewModel))
+        {
+            return;
+        }
+
+        Unsubscribe();
+        _observedViewModel = ViewModel;
+        ViewModel.PropertyChanged += OnViewModelChanged;
+        ViewModel.Transcriptions.CollectionChanged += OnCollectionChanged;
+    }
+
+    // Fidelidade ao protótipo: `renderResearchPage` não trata status de erro (mock só tem
+    // "progress"/"done"), mas o modelo de dados real suporta `TranscriptionStatus.Error`
+    // (ver design.md). Reaproveita as mesmas variáveis de cor (`--red`/`--red-light`) já
+    // usadas por outras badges/tags do app, sem introduzir classes novas no CSS compartilhado.
+    private static string StatusBadgeClass(TranscriptionCardViewModel transcription) =>
+        transcription switch
+        {
+            { IsInProgress: true } => "status-progress",
+            { IsDone: true } => "status-done",
+            _ => ""
+        };
+
+    private static string StatusBadgeStyle(TranscriptionCardViewModel transcription) =>
+        transcription.IsError ? "background:var(--red-light);color:var(--red)" : "";
+
+    private void OnViewModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) =>
+        InvokeAsync(StateHasChanged);
+
+    private void OnCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e) =>
+        InvokeAsync(StateHasChanged);
+
+    private void Unsubscribe()
+    {
+        if (_observedViewModel is null)
+        {
+            return;
+        }
+
+        _observedViewModel.PropertyChanged -= OnViewModelChanged;
+        _observedViewModel.Transcriptions.CollectionChanged -= OnCollectionChanged;
+    }
+
+    public void Dispose() => Unsubscribe();
+}
