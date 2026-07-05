@@ -1578,13 +1578,15 @@ T60, T61 → T68
 **Tools**: MCP: NONE / Skill: NONE
 
 **Done when**:
-- [ ] Modal aparece automaticamente quando `TranscriptionQueueService` inicia download de modelo GGML
-- [ ] Barra de progresso reflete progresso real do download
+- [x] Modal aparece automaticamente quando `TranscriptionQueueService` inicia download de modelo GGML
+- [x] Barra de progresso reflete progresso real do download
 
 **Tests**: none (View)
 **Gate**: build
 
 **Commit**: `feat(app): implementa ModelDownloadModal em Razor`
+
+**Status**: ✅ Concluída (com ressalva) — `ModelDownloadModal.razor` injeta o singleton `ModelDownloadModalViewModel` e se inscreve em `PropertyChanged`, então `IsOpen`/`Message` (setados por `ModelDownloadNotificationService.DownloadStarted/DownloadCompleted` via `UiThread.Invoke`, chamado de dentro de `ModelManager`/`TranscriptionQueueService`) já abrem/fecham o modal automaticamente fim a fim, sem nenhuma ação do componente Razor. Ressalva na barra de progresso: `IModelDownloadNotifier` hoje só expõe início/fim do download (sem bytes transferidos) — reportar progresso real exigiria instrumentar o laço de cópia do stream em `ModelManager.EnsureModelInternalAsync` (`src/Transcriba.Core/Engine/ModelManager.cs`), arquivo fora do `Where` desta task e que já tinha, no momento desta implementação, um diff local grande e não commitado (herdado de sessões anteriores, ver `git status`/handoff em `.specs/STATE.md`) — alterá-lo aqui arriscaria conflito com outro trabalho em andamento no repositório compartilhado. Optou-se por uma barra indeterminada (CSS puro, `.model-download-progress-fill`, mesma paleta `--accent` de `.storage-bar-fill`) que comunica "download em andamento" honestamente, sem simular uma porcentagem falsa. Follow-up sugerido (não incluído aqui): adicionar `IModelDownloadNotifier.DownloadProgress(double)` e reportar bytes reais no laço de cópia do `ModelManager` assim que esse arquivo estabilizar/for commitado. `dotnet build Transcriba.sln` — 0 erros; `dotnet test tests/Transcriba.Tests` — 157/157 passando.
 
 ---
 

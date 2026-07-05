@@ -1,0 +1,48 @@
+@*
+    Modal de download de modelo GGML (T59), reaproveitando ModelDownloadModalViewModel — aberto/
+    fechado automaticamente por ModelDownloadNotificationService (IModelDownloadNotifier) quando o
+    ModelManager, usado internamente pelo pipeline da TranscriptionQueueService, inicia/conclui o
+    download de um modelo Whisper.net (nenhuma ação do usuário abre este modal).
+
+    Barra de progresso: hoje `IModelDownloadNotifier`/`ModelManager` (Transcriba.Core) só notificam
+    início/fim do download (`DownloadStarted`/`DownloadCompleted`), sem reportar bytes transferidos.
+    Instrumentar progresso real exigiria alterar o laço de cópia do stream em
+    `ModelManager.EnsureModelInternalAsync` — um arquivo fora do `Where` desta task (só
+    `ModelDownloadModal.razor`) e que já tinha um diff local grande e não commitado no momento desta
+    implementação (ver `git status`/handoff em `.specs/STATE.md`); mexer nele aqui arriscaria
+    conflito com outro trabalho em andamento no mesmo repositório. Por isso a barra usa uma
+    animação indeterminada ("stripe" deslizante, mesma cor `--accent` do `.storage-bar-fill`/
+    `.player-bar-fill` já existentes) que comunica "download em andamento" sem simular uma
+    porcentagem falsa. Seguimento natural (fora deste escopo): expor
+    `IModelDownloadNotifier.DownloadProgress(double)` e reportar bytes reais no laço de cópia do
+    `ModelManager` assim que esse arquivo estabilizar.
+*@
+@implements IDisposable
+@inject ModelDownloadModalViewModel ViewModel
+
+<div class="modal-overlay @(ViewModel.IsOpen ? "open" : "")">
+    <div class="modal">
+        <div class="modal-title">Baixando modelo de transcrição…</div>
+        <p class="model-download-message">@ViewModel.Message</p>
+        <div class="storage-bar model-download-progress">
+            <div class="storage-bar-fill model-download-progress-fill"></div>
+        </div>
+    </div>
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        ViewModel.PropertyChanged += OnViewModelChanged;
+    }
+
+    private void OnViewModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        ViewModel.PropertyChanged -= OnViewModelChanged;
+    }
+}
