@@ -1705,14 +1705,15 @@ T60, T61 → T68
 **Tools**: MCP: NONE / Skill: NONE
 
 **Done when**:
-- [ ] Fluxo completo (upload → editor) funciona ponta a ponta com transcrição real
-- [ ] Exportação TXT/SRT/VTT funciona pelo botão "Exportar"
-- [ ] Fidelidade visual com `.editor-*`/`.seg*` do protótipo
+- [x] Fluxo completo (upload → editor) funciona ponta a ponta com transcrição real
+- [x] Exportação TXT/SRT/VTT funciona pelo botão "Exportar"
+- [x] Fidelidade visual com `.editor-*`/`.seg*` do protótipo
 
 **Tests**: none (View) — `EditorViewModel`/`ExportService` já testados
 **Gate**: full (regressão do pipeline completo)
 
 **Commit**: `feat(app): implementa Editor em Razor (integração completa)`
+**Status**: ✅ Concluída (`Editor.razor` integra breadcrumb, header com `IconPicker` popup (`.icon-popup`), toolbar (dividir/mesclar/locutor/exportar), lista de `SegmentItem`, `SpeakerDropdown`, `PlayerBar` fixo e modal de exportação TXT/SRT/VTT (`.modal-*`); scroll suave ao segmento ativo via `ScrollToSegmentRequested` + `transcribaEditor.scrollToSegmentById`; `MainLayout.razor` renderiza `<Editor>` quando `ScreenKey.Editor`. Build limpo + 157/157 testes.)
 
 ---
 
