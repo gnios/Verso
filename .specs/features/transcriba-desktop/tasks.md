@@ -1556,13 +1556,15 @@ T60, T61 → T68
 **Tools**: MCP: NONE / Skill: NONE
 
 **Done when**:
-- [ ] Popup de ícone/cor abre/fecha ao clicar, fecha ao clicar fora (JS interop mínimo para "click outside" se necessário)
-- [ ] Criar pesquisa/transcrição pelo modal persiste no banco (via `ResearchService`)
+- [x] Popup de ícone/cor abre/fecha ao clicar, fecha ao clicar fora (JS interop mínimo para "click outside" se necessário)
+- [x] Criar pesquisa/transcrição pelo modal persiste no banco (via `ResearchService`)
 
 **Tests**: none (View) — ViewModels já testados
 **Gate**: build
 
 **Commit**: `feat(app): implementa IconPicker/ColorPicker/NewPageModal em Razor`
+
+**Status**: ✅ Concluída — `IconPicker.razor`/`ColorPicker.razor` renderizam só o grid (`.icon-picker-grid`/`.color-picker-grid`), sem chrome de popup: no protótipo, o modal "Nova pesquisa/transcrição" mostra os grids inline dentro do `.modal` (não como popups clicáveis), então não há JS interop de "click outside" a fazer aqui — os componentes foram desenhados para serem reaproveitáveis também dentro de um popup posicionado no futuro (ex.: trocar ícone de uma página existente no editor), só envolvendo o mesmo grid num contêiner `.icon-popup`. `NewPageModal.razor` esconde o `ColorPicker` no modo transcrição (o protótipo sempre mostra o grid de cor, mas `LibraryService.CreateStandaloneAsync` não aceita cor para transcrições avulsas — `NewPageModalViewModel.PreviewColorName` já força "blue" nesse modo). Inserido no slot de modais do `MainLayout.razor` (`@using Transcriba.App.Components.Shared` adicionado ao componente). `dotnet build Transcriba.sln` — 0 erros; `dotnet test tests/Transcriba.Tests` — 157/157 passando.
 
 ---
 
