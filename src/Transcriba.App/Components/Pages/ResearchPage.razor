@@ -9,6 +9,15 @@
     `NavigationService.CurrentViewModel`, repassado pela integração central da shell) em vez de
     `@@inject` — o mesmo padrão vale para as demais telas transient (Dashboard, Upload, Editor,
     Settings).
+
+    Exclusão (T68): a versão Avalonia original (`ResearchPageView.axaml`) usava `ContextFlyout`
+    (menu de clique direito) tanto para "Excluir pesquisa" (no ícone do header) quanto para
+    "Excluir" por transcrição (no item da lista) — Blazor/HTML não tem um equivalente direto sem
+    JS interop extra, então aqui reaproveitamos o mesmo padrão de botão de ação visível ao lado do
+    conteúdo já adotado por `TranscriptionCard.razor` (`.dash-card-action`/`-danger`), em vez de
+    introduzir um menu de contexto novo só para isso. Ambos os comandos (`DeleteResearchCommand`/
+    `TranscriptionCardViewModel.DeleteCommand`) já existiam e já chamavam `IConfirmationService` —
+    só faltava o wiring na view.
 *@
 @implements IDisposable
 
@@ -24,6 +33,10 @@
                 <h2>@ViewModel.Title</h2>
                 <p>@ViewModel.Description</p>
             </div>
+            <button class="dash-card-action dash-card-action-danger" style="margin-left:auto" title="Excluir pesquisa" @onclick="() => ViewModel.DeleteResearchCommand.Execute(null)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+                Excluir pesquisa
+            </button>
         </div>
     </div>
 
@@ -58,6 +71,12 @@
                             @foreach (var tag in transcription.Tags)
                             {
                                 <span class="tag tag-sm tag-@tag.ColorName">@tag.Name</span>
+                            }
+                            @if (transcription.CanDelete)
+                            {
+                                <button class="dash-card-action dash-card-action-danger" title="Excluir" @onclick="() => transcription.DeleteCommand.Execute(null)" @onclick:stopPropagation="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+                                </button>
                             }
                         </div>
                     </div>
