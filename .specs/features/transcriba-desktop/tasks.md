@@ -1684,13 +1684,14 @@ T60, T61 → T68
 **Tools**: MCP: NONE / Skill: NONE
 
 **Done when**:
-- [ ] Split/merge/atribuição de locutor funcionam exatamente como no protótipo (mesma semântica validada na Fase 11 original)
-- [ ] `active-seg` sincroniza com a posição de playback (via evento do `PlayerBar`)
+- [x] Split/merge/atribuição de locutor funcionam exatamente como no protótipo (mesma semântica validada na Fase 11 original)
+- [x] `active-seg` sincroniza com a posição de playback (via evento do `PlayerBar`)
 
 **Tests**: none (View) — `SegmentEditingService` já testado
 **Gate**: build
 
 **Commit**: `feat(app): implementa SegmentItem e SpeakerDropdown em Razor`
+**Status**: ✅ Concluída (`SegmentItem.razor`: textarea estilizada como `.seg-text` + `transcribaEditor.caretIndex` (editor.js) para split no cursor via `NotifyFocused`/`CommitText`; `SpeakerDropdown.razor` lista opções e novo locutor; `active-seg` reflete `IsActive` já atualizado pelo `EditorViewModel.SetPlaybackPosition` wired em `PlayerBar.PositionChanged`. Build limpo + 157/157 testes.)
 
 ---
 
