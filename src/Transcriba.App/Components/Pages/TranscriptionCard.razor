@@ -1,0 +1,92 @@
+@*
+    Card individual do Dashboard (T60), reaproveitando TranscriptionCardViewModel — fiel às
+    classes `.dash-card*`/`.tag*`/`.status-*` do protótipo (transcriba-v2-icons-transcriptions.html,
+    função `renderDashboard`).
+
+    O botão "Excluir" já dispara `DeleteCommand` -> `DashboardViewModel.DeleteTranscriptionAsync`,
+    que por sua vez já pede confirmação via `IConfirmationService` (hoje `WpfConfirmationService`,
+    um `MessageBox` nativo provisório). O diálogo de confirmação fiel ao protótipo
+    (`ConfirmationDialog.razor`) é escopo da Fase 25/T68 — aqui só deixamos o botão disponível,
+    sem alterar o fluxo de confirmação existente.
+*@
+@implements IDisposable
+
+<div class="dash-card" @onclick="() => ViewModel.OpenCommand.Execute(null)">
+    <div class="dash-card-title">@ViewModel.Icon @ViewModel.Title</div>
+    <div class="dash-card-preview">@ViewModel.Preview</div>
+    <div class="tags-row">
+        @foreach (var tag in ViewModel.Tags)
+        {
+            <span class="tag tag-sm tag-@tag.ColorName">@tag.Name</span>
+        }
+    </div>
+    <div class="dash-card-meta">
+        <span class="status-badge @StatusBadgeClass">@ViewModel.StatusLabel</span>
+        <span>@ViewModel.Date</span>
+        <span>@ViewModel.Duration</span>
+        <div class="dash-card-actions">
+            @if (ViewModel.CanRetry)
+            {
+                <button class="dash-card-action" title="Tentar novamente" @onclick="() => ViewModel.RetryCommand.Execute(null)" @onclick:stopPropagation="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></svg>
+                    Tentar novamente
+                </button>
+            }
+            @if (ViewModel.CanDelete)
+            {
+                <!-- TODO(T68/Fase 25): trocar o clique direto por abertura do ConfirmationDialog.razor fiel ao protótipo. -->
+                <button class="dash-card-action dash-card-action-danger" title="Excluir" @onclick="() => ViewModel.DeleteCommand.Execute(null)" @onclick:stopPropagation="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+                    Excluir
+                </button>
+            }
+        </div>
+    </div>
+    @if (ViewModel.IsError && !string.IsNullOrWhiteSpace(ViewModel.ErrorMessage))
+    {
+        <div class="dash-card-error">@ViewModel.ErrorMessage</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public TranscriptionCardViewModel ViewModel { get; set; } = null!;
+
+    private TranscriptionCardViewModel? _subscribed;
+
+    private string StatusBadgeClass => ViewModel switch
+    {
+        { IsInProgress: true } => "status-progress",
+        { IsDone: true } => "status-done",
+        _ => "status-error"
+    };
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_subscribed, ViewModel))
+        {
+            return;
+        }
+
+        if (_subscribed is not null)
+        {
+            _subscribed.PropertyChanged -= OnViewModelChanged;
+        }
+
+        _subscribed = ViewModel;
+        ViewModel.PropertyChanged += OnViewModelChanged;
+    }
+
+    private void OnViewModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        if (_subscribed is not null)
+        {
+            _subscribed.PropertyChanged -= OnViewModelChanged;
+        }
+    }
+}
