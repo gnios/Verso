@@ -1,0 +1,46 @@
+@*
+    Diálogo de confirmação genérico (T68), reaproveitando `IConfirmationService`
+    (`BlazorConfirmationService`, novo, no lugar do antigo `WpfConfirmationService`/`MessageBox`).
+    Hoje só é usado pelos fluxos de exclusão de `DashboardViewModel`/`ResearchPageViewModel`
+    (`ConfirmAsync("Excluir transcrição"/"Excluir pesquisa", ...)`), mas a interface/serviço não é
+    específica de exclusão — qualquer chamador de `IConfirmationService.ConfirmAsync` reaproveita o
+    mesmo diálogo.
+
+    O protótipo (transcriba-v2-icons-transcriptions.html) não modela um fluxo de exclusão (mock só
+    tem criar página via `#modal-new-page`), então aqui portamos fielmente a mesma estrutura
+    `.modal-overlay` > `.modal` já usada por `NewPageModal.razor`, com um `.modal-message` novo
+    (parágrafo simples, ausente do protótipo) e `.modal-confirm-danger` para diferenciar
+    visualmente a ação destrutiva do azul padrão de `.modal-confirm`.
+
+    Montado uma única vez na shell (`MainLayout.razor`, integração central fora do escopo desta
+    task) e injetado via `@@inject`: `BlazorConfirmationService` é Singleton, mesmo espírito do
+    `NewPageModalViewModel` — um único diálogo atende qualquer chamador da interface.
+*@
+@implements IDisposable
+@inject BlazorConfirmationService Service
+
+<div class="modal-overlay @(Service.IsOpen ? "open" : "")">
+    <div class="modal">
+        <div class="modal-title">@Service.Title</div>
+        <p class="modal-message">@Service.Message</p>
+        <div class="modal-actions">
+            <button class="modal-cancel" @onclick="Service.Cancel">Cancelar</button>
+            <button class="modal-confirm modal-confirm-danger" @onclick="Service.Confirm">Confirmar</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Service.PropertyChanged += OnServiceChanged;
+    }
+
+    private void OnServiceChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) =>
+        InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Service.PropertyChanged -= OnServiceChanged;
+    }
+}

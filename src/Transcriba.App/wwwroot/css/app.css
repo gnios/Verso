@@ -117,21 +117,25 @@ input,select,textarea{font-family:inherit;color:inherit}
 .research-item-right{display:flex;align-items:center;gap:6px}
 
 .upload-zone{border:2px dashed var(--border);border-radius:var(--radius-lg);padding:48px 40px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;margin-bottom:28px}
-.upload-zone:hover{border-color:var(--accent);background:var(--accent-light)}
+.upload-zone:hover,.upload-zone.dragover{border-color:var(--accent);background:var(--accent-light)}
 .upload-zone svg{width:44px;height:44px;color:var(--muted);margin-bottom:10px}
 .upload-zone-title{font-size:15px;font-weight:600;color:var(--fg);margin-bottom:4px}
 .upload-zone-sub{font-size:13px;color:var(--fg-secondary)}
+.upload-error{font-size:13px;color:var(--red);margin-bottom:16px}
 .upload-form{display:grid;grid-template-columns:1fr 1fr;gap:16px 32px;max-width:560px}
 .upload-label{font-size:12px;font-weight:600;color:var(--fg-secondary);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;display:block}
 .upload-select,.upload-input{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;background:var(--bg);outline:none;transition:border .15s}
 .upload-select:focus,.upload-input:focus{border-color:var(--accent)}
-.upload-btn{padding:10px 28px;background:var(--accent);color:#fff;border-radius:var(--radius);font-size:14px;font-weight:600;margin-top:20px;transition:background .15s;align-self:start}
+.upload-btn{padding:10px 28px;background:var(--accent);color:#fff;border-radius:var(--radius);font-size:14px;font-weight:600;margin-top:20px;transition:background .15s;align-self:start;border:none;cursor:pointer}
 .upload-btn:hover{background:var(--accent-hover)}
+.upload-btn:disabled{background:var(--muted);cursor:not-allowed}
 .upload-file-info{display:none;align-items:center;gap:12px;padding:14px 18px;background:var(--surface);border-radius:var(--radius-md);margin-bottom:20px}
 .upload-file-info.show{display:flex}
 .upload-file-info svg{width:28px;height:28px;color:var(--accent);flex-shrink:0}
 .upload-file-name{font-size:14px;font-weight:600}
 .upload-file-size{font-size:12px;color:var(--muted)}
+.upload-file-clear{margin-left:auto;background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1;padding:4px 8px}
+.upload-file-clear:hover{color:var(--red)}
 
 .rec-container{display:flex;flex-direction:column;align-items:center;flex:1}
 .rec-devices{display:flex;gap:14px;margin-bottom:28px;width:100%;max-width:480px}
@@ -270,6 +274,9 @@ html.dark .rec-btn-record.recording{background:#e4e4e3}
 .modal-cancel:hover{background:var(--surface-hover)}
 .modal-confirm{padding:8px 20px;background:var(--accent);color:#fff;border-radius:var(--radius);font-size:13px;font-weight:600;transition:background .15s}
 .modal-confirm:hover{background:var(--accent-hover)}
+.modal-message{font-size:13px;color:var(--fg-secondary);line-height:1.5}
+.modal-confirm-danger{background:var(--red)}
+.modal-confirm-danger:hover{background:#d94545}
 
 /* Modal de download de modelo (T59) — sem equivalente no protótipo (nunca baixa modelos), reaproveita
    a paleta/formato de .storage-bar para a barra de progresso indeterminada (ver ModelDownloadModal.razor) */

@@ -13,7 +13,9 @@ public static class AppServiceCollectionExtensions
         services.AddSingleton<BlazorThemeApplicator>();
         services.AddSingleton<IThemeApplicator>(sp => sp.GetRequiredService<BlazorThemeApplicator>());
         services.AddSingleton<IFileSaveService, WpfFileSaveService>();
-        services.AddSingleton<IConfirmationService, WpfConfirmationService>();
+        services.AddSingleton<IFileOpenService, WpfFileOpenService>();
+        services.AddSingleton<BlazorConfirmationService>();
+        services.AddSingleton<IConfirmationService>(sp => sp.GetRequiredService<BlazorConfirmationService>());
         services.AddSingleton<ThemeService>();
         services.AddSingleton<SidebarViewModel>();
         services.AddSingleton<NewPageModalViewModel>();

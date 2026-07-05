@@ -4,10 +4,9 @@
     função `renderDashboard`).
 
     O botão "Excluir" já dispara `DeleteCommand` -> `DashboardViewModel.DeleteTranscriptionAsync`,
-    que por sua vez já pede confirmação via `IConfirmationService` (hoje `WpfConfirmationService`,
-    um `MessageBox` nativo provisório). O diálogo de confirmação fiel ao protótipo
-    (`ConfirmationDialog.razor`) é escopo da Fase 25/T68 — aqui só deixamos o botão disponível,
-    sem alterar o fluxo de confirmação existente.
+    que por sua vez já pede confirmação via `IConfirmationService` (T68: `BlazorConfirmationService`,
+    consumido pelo `ConfirmationDialog.razor` montado na shell). Nenhuma mudança de wiring foi
+    necessária aqui — a troca de implementação por trás da interface já é suficiente.
 *@
 @implements IDisposable
 
@@ -34,7 +33,6 @@
             }
             @if (ViewModel.CanDelete)
             {
-                <!-- TODO(T68/Fase 25): trocar o clique direto por abertura do ConfirmationDialog.razor fiel ao protótipo. -->
                 <button class="dash-card-action dash-card-action-danger" title="Excluir" @onclick="() => ViewModel.DeleteCommand.Execute(null)" @onclick:stopPropagation="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
                     Excluir
