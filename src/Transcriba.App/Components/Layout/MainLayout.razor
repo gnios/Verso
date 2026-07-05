@@ -1,0 +1,57 @@
+@*
+    Shell principal do app (T56): grid `sidebar (260px) | content`, replicando a estrutura
+    `.app`/`.sidebar`/`.content` do protótipo (transcriba-v2-icons-transcriptions.html).
+
+    Este componente é agora o RootComponent do BlazorWebView (ver MainWindow.xaml) — o antigo
+    Shell.razor (placeholder do bootstrap T52-T54, que a T55 usou para provar o mecanismo de
+    StateHasChanged via NavigationService.PropertyChanged) foi removido: essa é a "abordagem
+    mais simples que funciona" mencionada na T56, já que não há mais motivo para um componente
+    raiz intermediário quando o MainLayout já observa o NavigationService diretamente.
+
+    As telas reais (Dashboard, Upload, Editor, etc.) ainda não existem em Razor — o placeholder
+    abaixo será substituído pelas Fases 19-24 (T60-T67), que renderizarão o
+    NavigationService.CurrentViewModel de acordo com o CurrentScreen.
+*@
+@implements IDisposable
+@inject NavigationService NavigationService
+
+<div class="app">
+    <Sidebar />
+    <main class="content">
+        <section class="screen active">
+            <div class="screen-header">
+                <h1 class="screen-title">Transcriba</h1>
+            </div>
+            <p>Tela: @NavigationService.CurrentScreen</p>
+        </section>
+    </main>
+    <!-- modais (NewPageModal/ModelDownloadModal) na Fase 18 -->
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        NavigationService.PropertyChanged += OnNavigationServiceChanged;
+
+        // Equivalente ao que `MainWindowViewModel` fazia na versão Avalonia (garante que
+        // exista um ViewModel de tela resolvido assim que a shell é montada).
+        if (NavigationService.CurrentViewModel is null)
+        {
+            NavigationService.NavigateTo(ScreenKey.Dashboard);
+        }
+    }
+
+    private void OnNavigationServiceChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(Services.NavigationService.CurrentScreen)
+            or nameof(Services.NavigationService.CurrentViewModel))
+        {
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public void Dispose()
+    {
+        NavigationService.PropertyChanged -= OnNavigationServiceChanged;
+    }
+}
