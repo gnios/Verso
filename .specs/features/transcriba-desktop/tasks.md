@@ -1737,13 +1737,14 @@ T60, T61 → T68
 **Tools**: MCP: NONE / Skill: NONE
 
 **Done when**:
-- [ ] Alterações persistem via `SettingsService`
-- [ ] Fidelidade visual com `.settings-*` do protótipo
+- [x] Alterações persistem via `SettingsService`
+- [x] Fidelidade visual com `.settings-*` do protótipo
 
 **Tests**: none (View) — `SettingsViewModel` já testado
 **Gate**: build
 
 **Commit**: `feat(app): implementa Settings em Razor`
+**Status**: ✅ Concluída (`Settings.razor` recebe `SettingsViewModel` via `[Parameter]` — e não `@inject` — porque o ViewModel é `Transient` e a instância viva é a resolvida por `NavigationService.CurrentViewModel`, mesmo padrão esperado para as demais páginas; campos de perfil chamam `SaveProfileCommand` no `@onchange`, os demais campos (idioma/locutores/transcrição ao vivo/dispositivo) alteram propriedades do ViewModel diretamente e reaproveitam os `partial void OnXxxChanged` já existentes para persistir; o toggle de tema reaproveita o `ThemeService` singleton (mesmo usado pelo `Sidebar.razor`) em vez de duplicar lógica no `SettingsViewModel`. Não validado visualmente na janela WPF real — `MainLayout.razor` é propriedade de outro agente nesta rodada (integração centralizada depois); validação feita por build limpo + inspeção de código/CSS, com todas as classes `.settings-*`/`.toggle`/`.screen-*` conferidas 1:1 contra o protótipo)
 
 ---
 
