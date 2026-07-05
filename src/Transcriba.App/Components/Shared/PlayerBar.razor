@@ -1,0 +1,99 @@
+@*
+    Barra de reprodução fixa no rodapé do editor (T63), reaproveitando `PlayerBarViewModel`
+    (play/pause, seek, volume, velocidade) — fiel às classes `.player-*` do protótipo
+    (transcriba-v2-icons-transcriptions.html, seção `#screen-editor` > `.player-bar`).
+
+    Recebido via `[Parameter]` porque a instância viva é a de `EditorViewModel.PlayerBar`
+    (não uma instância Transient separada via `@inject`).
+*@
+@implements IDisposable
+
+<div class="player-bar">
+    <button type="button" class="player-btn player-btn-main" title="@(ViewModel.IsPlaying ? "Pausar" : "Reproduzir")" @onclick="() => ViewModel.TogglePlayCommand.Execute(null)">
+        @if (ViewModel.IsPlaying)
+        {
+            <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
+        }
+        else
+        {
+            <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21" /></svg>
+        }
+    </button>
+    <div class="player-progress">
+        <span class="player-time">@ViewModel.CurrentTimeDisplay</span>
+        <div class="player-bar-track">
+            <div class="player-bar-fill" style="width:@(ViewModel.ProgressPercent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))%"></div>
+            <input type="range" class="player-bar-seek" min="0" max="100" step="0.01"
+                   value="@ViewModel.ProgressPercent"
+                   @oninput="OnSeekInput" />
+        </div>
+        <span class="player-time">@ViewModel.TotalTimeDisplay</span>
+    </div>
+    <button type="button" class="player-speed" @onclick="() => ViewModel.CycleSpeedCommand.Execute(null)">@ViewModel.SpeedLabel</button>
+    <div class="player-volume">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /></svg>
+        <input type="range" min="0" max="100" value="@ViewModel.Volume" @oninput="OnVolumeInput" />
+    </div>
+</div>
+
+<style>
+    .player-bar-track { position: relative; }
+    .player-bar-seek {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        margin: 0;
+        opacity: 0;
+        cursor: pointer;
+    }
+</style>
+
+@code {
+    [Parameter, EditorRequired]
+    public PlayerBarViewModel ViewModel { get; set; } = null!;
+
+    private PlayerBarViewModel? _subscribed;
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_subscribed, ViewModel))
+        {
+            return;
+        }
+
+        Unsubscribe();
+        _subscribed = ViewModel;
+        ViewModel.PropertyChanged += OnViewModelChanged;
+    }
+
+    private void OnSeekInput(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var percent))
+        {
+            ViewModel.SeekCommand.Execute(percent / 100.0);
+        }
+    }
+
+    private void OnVolumeInput(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var volume))
+        {
+            ViewModel.Volume = volume;
+        }
+    }
+
+    private void OnViewModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) =>
+        InvokeAsync(StateHasChanged);
+
+    private void Unsubscribe()
+    {
+        if (_subscribed is null)
+        {
+            return;
+        }
+
+        _subscribed.PropertyChanged -= OnViewModelChanged;
+    }
+
+    public void Dispose() => Unsubscribe();
+}
