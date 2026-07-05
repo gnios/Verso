@@ -1,0 +1,28 @@
+@*
+    Grid reutilizável de seleção de ícone (`.icon-picker-grid`/`.icon-picker-item` do protótipo
+    transcriba-v2-icons-transcriptions.html), data-bound a um IconPickerViewModel (T58).
+
+    O componente renderiza só o grid em si, sem chrome de popup: no protótipo, o modal "Nova
+    pesquisa/transcrição" (NewPageModal, T58) mostra o grid inline dentro do `.modal`. Um uso
+    futuro como popup posicionado (ex.: trocar o ícone de uma página já existente, análogo ao
+    `.icon-popup`/`toggleEditorIconPicker()` do protótipo) só precisa envolver este mesmo
+    componente num contêiner `.icon-popup` com a lógica de abrir/fechar — sem duplicar o grid.
+
+    Cliques nos itens são tratados aqui mesmo (RelayCommand do IconPickerItemViewModel), então o
+    Blazor já re-renderiza este componente sozinho após cada clique; não é necessário assinar
+    PropertyChanged manualmente para refletir a seleção.
+*@
+<div class="icon-picker-grid">
+    @foreach (var item in ViewModel.Items)
+    {
+        <div class="icon-picker-item @(item.IsSelected ? "selected" : "") @(item.IsNoIconOption ? "none-icon" : "")"
+             @onclick="() => item.SelectCommand.Execute(null)">
+            @item.DisplayText
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public IconPickerViewModel ViewModel { get; set; } = null!;
+}

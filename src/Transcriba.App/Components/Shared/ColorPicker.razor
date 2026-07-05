@@ -1,0 +1,20 @@
+@*
+    Grid reutilizável de seleção de cor (`.color-picker-grid`/`.color-picker-item` do protótipo),
+    data-bound a um ColorPickerViewModel (T58). Mesma filosofia do IconPicker.razor: só o grid,
+    sem chrome de popup — reutilizável tanto inline (NewPageModal) quanto dentro de um popup
+    posicionado no futuro.
+*@
+<div class="color-picker-grid">
+    @foreach (var item in ViewModel.Items)
+    {
+        <div class="color-picker-item @(item.IsSelected ? "selected" : "")"
+             style="background:@item.Hex"
+             title="@item.Name"
+             @onclick="() => item.SelectCommand.Execute(null)"></div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public ColorPickerViewModel ViewModel { get; set; } = null!;
+}

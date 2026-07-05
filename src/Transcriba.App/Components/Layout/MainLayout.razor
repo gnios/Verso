@@ -12,6 +12,7 @@
     abaixo será substituído pelas Fases 19-24 (T60-T67), que renderizarão o
     NavigationService.CurrentViewModel de acordo com o CurrentScreen.
 *@
+@using Transcriba.App.Components.Shared
 @implements IDisposable
 @inject NavigationService NavigationService
 @inject ThemeService ThemeService
@@ -29,6 +30,7 @@
         </section>
     </main>
     <!-- modais (NewPageModal/ModelDownloadModal) na Fase 18 -->
+    <NewPageModal />
 </div>
 
 @code {
