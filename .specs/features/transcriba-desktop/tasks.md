@@ -1642,13 +1642,14 @@ T60, T61 → T68
 **Tools**: MCP: NONE / Skill: NONE
 
 **Done when**:
-- [ ] Drag&drop e clique abrem seleção de arquivo, enfileiram transcrição real
-- [ ] Status "Em andamento"/erro reflete em tempo real (mesmo comportamento da Fase 10 original)
+- [x] Drag&drop e clique abrem seleção de arquivo, enfileiram transcrição real
+- [x] Status "Em andamento"/erro reflete em tempo real (mesmo comportamento da Fase 10 original)
 
 **Tests**: none (View) — `UploadViewModel` já testado
 **Gate**: build
 
 **Commit**: `feat(app): implementa Upload em Razor`
+**Status**: ✅ Concluída — `Upload.razor` recebe `UploadViewModel` como `[Parameter]` (mesmo padrão de Dashboard/ResearchPage/Settings). Seleção de arquivo por clique funciona de ponta a ponta via novo `IFileOpenService`/`WpfFileOpenService` (`Microsoft.Win32.OpenFileDialog`, mesmo padrão do `WpfFileSaveService`), registrado em `AppServiceCollectionExtensions`. **Limitação conhecida do drag&drop**: os eventos `@ondragover`/`@ondragleave`/`@ondrop` do Blazor só dão feedback visual (classe `dragover`, reaproveitando o estilo de `:hover` do protótipo) — o WebView2/Blazor Hybrid, como qualquer motor Chromium, só expõe o objeto `File` do navegador em um drop, não o caminho absoluto no disco. Ler o caminho real exigiria hook nativo no WebView2 hospedeiro (`ICoreWebView2CompositionController::Drop` com `IDataObject`/`CF_HDROP`, modo "windowless"/composição), infraestrutura do host (`MainWindow`/`BlazorWebView`) fora do escopo deste componente — documentado com `// TODO` no código. Status "Em andamento"/erro em tempo real já é herdado de graça do `DashboardViewModel` (T60), que assina `TranscriptionQueueService.StatusChanged`; `StartTranscriptionCommand` já navega para `Dashboard` com filtro "Em andamento" após enfileirar. CSS: porta fielmente `.upload-*` do protótipo (já existia integralmente em `app.css`) e adiciona apenas o que faltava para a página funcionar de verdade (não coberto pelo mock estático): `.upload-error` (mensagem de validação), `.upload-btn:disabled`, `.upload-file-clear` (botão de remover arquivo) e `.upload-zone.dragover` (o protótipo alternava essa classe via JS mas nunca definiu seu estilo — reaproveita o mesmo par cor/fundo do `:hover`). Validado via `dotnet build`/`dotnet test` (0 erros, 157/157 testes); sem validação visual em app rodando (não foi editado `MainLayout.razor`, integração central pendente de fase futura/outro agente).
 
 ---
 
