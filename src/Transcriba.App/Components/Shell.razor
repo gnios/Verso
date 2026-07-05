@@ -1,0 +1,39 @@
+@*
+    Placeholder do bootstrap Blazor Hybrid (T52-T54), agora observando o NavigationService
+    (T55) para provar que NavigateTo dispara StateHasChanged no componente raiz. Este
+    componente e seu mecanismo de observação são substituídos pelo MainLayout.razor real
+    (sidebar + navegação) na T56 — ver .specs/features/transcriba-desktop/tasks.md.
+*@
+@implements IDisposable
+@inject NavigationService NavigationService
+
+<div class="app">
+    <div style="padding:40px;">
+        <h1 class="screen-title">Transcriba</h1>
+        <p class="screen-subtitle">Bootstrap Blazor Hybrid OK — @Message</p>
+        <p class="screen-subtitle">Tela atual: @NavigationService.CurrentScreen</p>
+    </div>
+</div>
+
+@code {
+    private string Message => $"WebView2 carregado às {DateTime.Now:HH:mm:ss}";
+
+    protected override void OnInitialized()
+    {
+        NavigationService.PropertyChanged += OnNavigationServiceChanged;
+    }
+
+    private void OnNavigationServiceChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(Services.NavigationService.CurrentScreen)
+            or nameof(Services.NavigationService.CurrentViewModel))
+        {
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public void Dispose()
+    {
+        NavigationService.PropertyChanged -= OnNavigationServiceChanged;
+    }
+}

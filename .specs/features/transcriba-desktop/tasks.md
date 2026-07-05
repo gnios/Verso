@@ -1349,3 +1349,415 @@ Nenhuma violação — todas as tasks que criam camadas com tipo de teste exigid
 - **Reuses = Token saver** — sempre referenciar `transcrever.cs`/protótipo em vez de reescrever do zero.
 - **Um commit por task** — mensagens seguindo semantic commit em pt-br (`feat(...)`, `fix(...)`, `chore(...)`), conforme convenção do usuário.
 - **15 fases** — acima do limiar de 3 fases; o orquestrador deve oferecer (não impor) sub-agentes por fase antes de iniciar o Execute.
+
+---
+
+## Migração para Blazor Hybrid (AD-005)
+
+> **Contexto**: a implementação das Fases 1–15 acima (Avalonia) foi concluída e depois **descontinuada** por causa de um crash fatal e não determinístico do runtime (`Internal CLR error 0x80131506`, ver `.specs/STATE.md` AD-005). As Fases 1–5 (`Transcriba.Core`: dados, motor de transcrição, serviços de aplicação, playback) **permanecem válidas e intactas** — nenhuma task abaixo as reabre. As Fases 6–15 (camada `Transcriba.App`) são **substituídas** pelas fases T51–T68 abaixo: WPF host + `BlazorWebView`, Razor components no lugar de `.axaml`, CSS herdado quase verbatim do protótipo `transcriba-v2-icons-transcriptions.html`. ViewModels (`CommunityToolkit.Mvvm`) já escritos para o Avalonia são reaproveitados sempre que possível — a maior parte do trabalho é troca de `.axaml`/`Views.axaml.cs` por `.razor`, não reescrita de lógica de estado/comando.
+
+### Execution Plan (revisado)
+
+```
+Phase 16: Bootstrap Blazor Hybrid (Sequential)
+T51 → T52 → T53 → T54
+
+Phase 17: Shell / Navegação / Tema (depende da Fase 16)
+T54 → T55 → T56 → T57
+
+Phase 18: Pickers e Modais compartilhados (depende da Fase 17)
+T57 → T58 → T59
+
+Phase 19: Dashboard (depende da Fase 17)
+T56 → T60
+
+Phase 20: Pesquisa (depende da Fase 17)
+T56 → T61
+
+Phase 21: Upload (depende da Fase 18)
+T58 → T62
+
+Phase 22: Playback + Editor (depende das Fases 18, 21)
+T58 ──┬→ T63 → T64 → T65
+T62 ──┘
+
+Phase 23: Gravação mockada (depende da Fase 17)
+T56 → T66
+
+Phase 24: Configurações (depende da Fase 17)
+T56 → T67
+
+Phase 25: Exclusão / Confirmação (depende das Fases 19, 20)
+T60, T61 → T68
+```
+
+**Sub-agent delegation**: 10 fases novas (16–25), acima do limiar de 3 — o orquestrador deve oferecer um worker por fase (sequencial, respeitando as dependências acima) antes de iniciar a Execute desta seção. Fases 19/20/23/24 são independentes entre si (podem rodar em paralelo depois da Fase 17); Fase 22 depende de 18 e 21; Fase 25 depende de 19 e 20.
+
+### Task Breakdown (T51–T68)
+
+---
+
+### T51: Reconfigurar Transcriba.App para WPF + BlazorWebView
+
+**What**: Trocar o SDK do projeto para `Microsoft.NET.Sdk.Razor`, `TargetFramework` para `net10.0-windows10.0.17763.0`, remover todas as referências `Avalonia*`/`AvaloniaUI.DiagnosticsSupport` e as mitigações de crash específicas do Avalonia (`ConcurrentGarbageCollection`, `TieredPGO`, `TieredCompilation` — não são mais necessárias, mas documentar no commit por que foram removidas). Adicionar `Microsoft.AspNetCore.Components.WebView.Wpf`. Deletar `App.axaml`/`App.axaml.cs`, `ViewLocator.cs`, `Styles/TranscribaTheme.axaml`, `Views/*.axaml*` (serão recriados como Razor nas próximas tasks).
+**Where**: `src/Transcriba.App/Transcriba.App.csproj`, remoção dos arquivos `.axaml*` listados
+**Depends on**: None (Core intacto)
+**Reuses**: N/A
+
+**Tools**: MCP: NONE / Skill: NONE
+
+**Done when**:
+- [x] `dotnet restore` resolve sem conflito
+- [x] Nenhum pacote `Avalonia*` referenciado
+- [x] `dotnet build Transcriba.sln` falha apenas pelos arquivos `.cs` que ainda referenciam tipos Avalonia (esperado — corrigidos nas próximas tasks), não por erro de restore/SDK
+
+**Tests**: none
+**Gate**: build (parcial, esperado falhar até T52)
+
+**Commit**: `chore(app): migra Transcriba.App de Avalonia para WPF + BlazorWebView (AD-005)`
+**Status**: ✅ Concluída (inclui correção de `UiThread`/`RecordingViewModel` para `System.Windows.Threading.Dispatcher` e novos `WpfConfirmationService`/`WpfFileSaveService`/`WpfThemeApplicator` no lugar dos `Avalonia*Service`; `Transcriba.Tests` teve o TFM alinhado para `net10.0-windows10.0.17763.0` por depender de `Transcriba.App`)
+
+---
+
+### T52: Bootstrap WPF + Generic Host + BlazorWebView
+
+**What**: `App.xaml`/`App.xaml.cs` (WPF, `Application`) + `MainWindow.xaml` com `<blazor:BlazorWebView HostPage="wwwroot/index.html">` e `RootComponent` apontando para o shell Razor (`Components/App.razor`/`Components/Routes.razor` ou componente raiz único, ver T55). `Program.cs` mantém o `Microsoft.Extensions.Hosting.Host` (DI, `IDbContextFactory`, `TranscriptionQueueService` como hosted service) — só troca `BuildAvaloniaApp().StartWithClassicDesktopLifetime` por `System.Windows.Application.Run` com a `MainWindow` resolvida via DI. `serviceCollection.AddWpfBlazorWebView()` registrado no mesmo `IServiceCollection` do Host.
+**Where**: `src/Transcriba.App/App.xaml`, `src/Transcriba.App/App.xaml.cs`, `src/Transcriba.App/MainWindow.xaml`, `src/Transcriba.App/MainWindow.xaml.cs`, `src/Transcriba.App/Program.cs`
+**Depends on**: T51
+**Reuses**: `Program.cs` (Generic Host/DI já existente), `AppServiceCollectionExtensions.cs`
+
+**Tools**: MCP: NONE / Skill: NONE
+
+**Done when**:
+- [x] App inicia exibindo uma janela WPF com o `BlazorWebView` carregado (mesmo que só uma página em branco/"Hello" nesta task)
+- [x] `IServiceProvider` do Generic Host é o mesmo container usado pelo `BlazorWebView` (sem dois containers DI divergentes)
+- [x] `dotnet build Transcriba.sln` passa
+
+**Tests**: none
+**Gate**: build
+
+**Commit**: `feat(app): bootstrap WPF host com BlazorWebView e Generic Host`
+**Status**: ✅ Concluída — armadilha encontrada e corrigida: `Program.cs` criava `new App()` e chamava `Run()` sem chamar `InitializeComponent()` (método gerado a partir do `App.xaml`), que é quem aplica a propriedade `StartupUri` à instância; sem essa chamada o loop de mensagens do WPF ficava de pé (processo vivo) mas nenhuma janela era criada. `<StartupObject>Transcriba.App.Program</StartupObject>` e `<RootNamespace>Transcriba.App</RootNamespace>` adicionados ao `.csproj` (o segundo é um workaround documentado pela Microsoft para Blazor+WPF, dotnet/maui#5861)
+
+---
+
+### T53: Portar CSS/HTML base do protótipo
+
+**What**: Copiar o `<style>` global do protótipo (`transcriba-v2-icons-transcriptions.html`, incluindo variáveis `:root`/`html.dark`, reset, tipografia) para `wwwroot/css/app.css`; `wwwroot/index.html` referenciando esse CSS + `_framework/blazor.webview.js`; `_Imports.razor` na raiz do projeto com os `@using` padrão (`Microsoft.AspNetCore.Components.Web`, namespaces do app).
+**Where**: `src/Transcriba.App/wwwroot/index.html`, `src/Transcriba.App/wwwroot/css/app.css`, `src/Transcriba.App/_Imports.razor`
+**Depends on**: T51
+**Reuses**: `transcriba-v2-icons-transcriptions.html` (bloco `<style>`)
+
+**Tools**: MCP: NONE / Skill: NONE
+
+**Done when**:
+- [x] CSS portado sem alteração de valores (cores/espaçamentos idênticos ao protótipo)
+- [x] Variáveis de tema claro/escuro (`:root`, `html.dark`) presentes
+- [x] `dotnet build Transcriba.sln` passa
+
+**Tests**: none
+**Gate**: build
+
+**Commit**: `feat(app): porta CSS global do protótipo para wwwroot`
+**Status**: ✅ Concluída — armadilha encontrada e corrigida: `<script src="_framework/blazor.webview.js" autostart="false">` travava a tela em "Carregando…" para sempre (nenhum `Blazor.start()` manual era chamado); removido o atributo `autostart="false"` para voltar ao autostart padrão
+
+---
+
+### T54: Smoke test — validar ausência do crash 0x80131506
+
+**What**: Rodar `dotnet run --project src/Transcriba.App` repetidamente (mín. 10x, incluindo interação básica: abrir/fechar janela, redimensionar) e documentar o resultado (sem exceção `0x80131506`) como evidência no `validation.md`/Handoff. Este é o gate de decisão: se o crash reaparecer aqui, a stack Blazor Hybrid também falha e a decisão AD-005 precisa ser revisitada antes de continuar.
+**Where**: N/A (validação manual, documentada em `.specs/features/transcriba-desktop/validation.md`)
+**Depends on**: T52, T53
+
+**Tools**: MCP: NONE / Skill: NONE
+
+**Done when**:
+- [x] Execuções consecutivas sem o crash `0x80131506` (ver evidência no `validation.md`)
+- [x] Resultado documentado (data, nº de execuções, ambiente)
+
+**Tests**: none (manual)
+**Gate**: manual
+
+**Commit**: `chore(app): documenta smoke test de estabilidade do bootstrap Blazor Hybrid`
+**Status**: ✅ Concluída — ver `.specs/features/transcriba-desktop/validation.md`
+
+---
+
+### T55: Portar NavigationService para Blazor
+
+**What**: Adaptar `NavigationService` para expor o estado de navegação (`CurrentScreen`) de um jeito consumível por Razor components (ex.: `INotifyPropertyChanged`/evento `StateChanged`, componente raiz re-renderiza via `StateHasChanged`). Manter a mesma API pública (`NavigateTo(ScreenKey, object?)`).
+**Where**: `src/Transcriba.App/Services/NavigationService.cs`
+**Depends on**: T54
+**Reuses**: `NavigationService.cs` existente (lógica de troca de tela)
+
+**Tools**: MCP: NONE / Skill: NONE
+
+**Done when**:
+- [x] `NavigateTo` dispara re-render do componente raiz para a tela correta
+- [x] Teste unitário do `NavigationService` (transições de estado) continua/passa
+
+**Tests**: unit
+**Gate**: quick
+
+**Commit**: `feat(app): adapta NavigationService para Razor components`
+**Status**: ✅ Concluída — `NavigationService` já era `ObservableObject` (CommunityToolkit.Mvvm), então `[ObservableProperty]` já dispara `PropertyChanged` automaticamente; nenhuma mudança de API foi necessária, só documentação do padrão de consumo. `Shell.razor` (placeholder raiz atual) passou a se inscrever em `PropertyChanged` e chamar `StateHasChanged()`, provando o mecanismo fim a fim antes de ser substituído pelo `MainLayout.razor` real na T56. `dotnet test tests/Transcriba.Tests` — 157/157 passando.
+
+---
+
+### T56: Criar shell (MainLayout.razor + Sidebar.razor)
+
+**What**: `MainLayout.razor` replicando o grid `sidebar (260px) | content` do protótipo; `Sidebar.razor` reaproveitando `SidebarViewModel` (pesquisas, tags, busca decorativa do topo, botão de tema, item "Nova pesquisa/transcrição"). Overlay de modais (`NewPageModal`, `ModelDownloadModal`) posicionado no layout raiz.
+**Where**: `src/Transcriba.App/Components/Layout/MainLayout.razor`, `src/Transcriba.App/Components/Layout/Sidebar.razor`
+**Depends on**: T55
+**Reuses**: `SidebarViewModel.cs`, `SidebarResearchItemViewModel.cs`, CSS classes `.sidebar*` já portadas (T53)
+
+**Tools**: MCP: NONE / Skill: NONE
+
+**Done when**:
+- [ ] Sidebar renderiza pesquisas/tags a partir do `SidebarViewModel` real (dados do SQLite)
+- [ ] Clique em item de navegação chama `NavigationService.NavigateTo`
+- [ ] Fidelidade visual: classes CSS idênticas às do protótipo (`.sidebar-item`, `.sidebar-trans-item`, etc.)
+
+**Tests**: none (View) — `SidebarViewModel` já teve testes unitários na Fase 6 original, não repetir
+**Gate**: build
+
+**Commit**: `feat(app): implementa shell (MainLayout + Sidebar) em Razor`
+
+---
+
+### T57: Portar ThemeService para alternância de tema via CSS class
+
+**What**: Adaptar `ThemeService`/`IThemeApplicator` para alternar a classe `dark` no elemento raiz do documento (equivalente a `html.dark` do protótipo) via `IJSRuntime` (`document.documentElement.classList.toggle`). Persistência de preferência inalterada.
+**Where**: `src/Transcriba.App/Services/ThemeService.cs`, novo `BlazorThemeApplicator : IThemeApplicator`
+**Depends on**: T56
+
+**Tools**: MCP: NONE / Skill: NONE
+
+**Done when**:
+- [ ] Alternar tema no botão da sidebar troca `light`/`dark` visualmente (variáveis CSS do protótipo)
+- [ ] Preferência persiste entre reinicializações (reaproveita `SettingsService`)
+
+**Tests**: none (wrapper de interop)
+**Gate**: build
+
+**Commit**: `feat(app): implementa alternância de tema via JS interop`
+
+---
+
+### T58: Portar pickers e modal de nova pesquisa/transcrição
+
+**What**: `IconPicker.razor`, `ColorPicker.razor` (componentes reutilizáveis, popup posicionado), `NewPageModal.razor` reaproveitando `IconPickerViewModel`/`ColorPickerViewModel`/`NewPageModalViewModel`.
+**Where**: `src/Transcriba.App/Components/Shared/IconPicker.razor`, `.../ColorPicker.razor`, `.../NewPageModal.razor`
+**Depends on**: T57
+**Reuses**: `IconPickerViewModel.cs`, `ColorPickerViewModel.cs`, `NewPageModalViewModel.cs`
+
+**Tools**: MCP: NONE / Skill: NONE
+
+**Done when**:
+- [ ] Popup de ícone/cor abre/fecha ao clicar, fecha ao clicar fora (JS interop mínimo para "click outside" se necessário)
+- [ ] Criar pesquisa/transcrição pelo modal persiste no banco (via `ResearchService`)
+
+**Tests**: none (View) — ViewModels já testados
+**Gate**: build
+
+**Commit**: `feat(app): implementa IconPicker/ColorPicker/NewPageModal em Razor`
+
+---
+
+### T59: Portar modal de download de modelo
+
+**What**: `ModelDownloadModal.razor` reaproveitando `ModelDownloadModalViewModel`/`IModelDownloadNotifier`.
+**Where**: `src/Transcriba.App/Components/Shared/ModelDownloadModal.razor`
+**Depends on**: T58
+**Reuses**: `ModelDownloadModalViewModel.cs`, `ModelDownloadNotificationService.cs`
+
+**Tools**: MCP: NONE / Skill: NONE
+
+**Done when**:
+- [ ] Modal aparece automaticamente quando `TranscriptionQueueService` inicia download de modelo GGML
+- [ ] Barra de progresso reflete progresso real do download
+
+**Tests**: none (View)
+**Gate**: build
+
+**Commit**: `feat(app): implementa ModelDownloadModal em Razor`
+
+---
+
+### T60: Portar Dashboard
+
+**What**: `Dashboard.razor` + `TranscriptionCard.razor` reaproveitando `DashboardViewModel`/`TranscriptionCardViewModel` (filtros de status/tag, busca funcional, grid de cards, badge de status, botão retry, menu de exclusão).
+**Where**: `src/Transcriba.App/Components/Pages/Dashboard.razor`, `.../TranscriptionCard.razor`
+**Depends on**: T56
+**Reuses**: `DashboardViewModel.cs`, `TranscriptionCardViewModel.cs`, `LibraryService.cs`
+
+**Tools**: MCP: NONE / Skill: NONE
+
+**Done when**:
+- [ ] Busca/filtros funcionam sobre dados reais (mesmo comportamento validado na Fase 7 original)
+- [ ] Fidelidade visual com `.dash-*`/`.tag-*`/`.status-*` do protótipo
+
+**Tests**: none (View) — `DashboardViewModel` já testado
+**Gate**: build
+
+**Commit**: `feat(app): implementa Dashboard em Razor`
+
+---
+
+### T61: Portar Página de Pesquisa
+
+**What**: `ResearchPage.razor` reaproveitando `ResearchPageViewModel` (header com ícone/cor/descrição, seções de transcrições, botão de adicionar).
+**Where**: `src/Transcriba.App/Components/Pages/ResearchPage.razor`
+**Depends on**: T56
+**Reuses**: `ResearchPageViewModel.cs`, `ResearchService.cs`
+
+**Tools**: MCP: NONE / Skill: NONE
+
+**Done when**:
+- [ ] Navegação sidebar → página de pesquisa carrega dados reais
+- [ ] Fidelidade visual com `.research-*` do protótipo
+
+**Tests**: none (View)
+**Gate**: build
+
+**Commit**: `feat(app): implementa ResearchPage em Razor`
+
+---
+
+### T62: Portar Upload
+
+**What**: `Upload.razor` reaproveitando `UploadViewModel` (zona de drag&drop + seleção por clique via file dialog nativo, formulário de qualidade/idioma/locutores, status em tempo real da fila). Drag&drop nativo do navegador exige JS interop pontual (`ondragover`/`ondrop` já suportados nativamente por eventos Blazor — sem JS extra necessário na maioria dos casos; documentar se algum caso exigir).
+**Where**: `src/Transcriba.App/Components/Pages/Upload.razor`
+**Depends on**: T58
+**Reuses**: `UploadViewModel.cs`, `TranscriptionQueueService`, `MediaStorageService`
+
+**Tools**: MCP: NONE / Skill: NONE
+
+**Done when**:
+- [ ] Drag&drop e clique abrem seleção de arquivo, enfileiram transcrição real
+- [ ] Status "Em andamento"/erro reflete em tempo real (mesmo comportamento da Fase 10 original)
+
+**Tests**: none (View) — `UploadViewModel` já testado
+**Gate**: build
+
+**Commit**: `feat(app): implementa Upload em Razor`
+
+---
+
+### T63: Portar PlayerBar
+
+**What**: `PlayerBar.razor` reaproveitando `PlayerBarViewModel`/`IMediaPlaybackService` (play/pause/seek/volume/velocidade, barra de progresso clicável).
+**Where**: `src/Transcriba.App/Components/Shared/PlayerBar.razor`
+**Depends on**: T58, T62
+**Reuses**: `PlayerBarViewModel.cs`, `IMediaPlaybackService.cs`
+
+**Tools**: MCP: NONE / Skill: NONE
+
+**Done when**:
+- [ ] Playback de áudio real funciona (play/pause/seek/volume/velocidade)
+- [ ] Fidelidade visual com `.player-*` do protótipo
+
+**Tests**: none (View)
+**Gate**: build
+
+**Commit**: `feat(app): implementa PlayerBar em Razor`
+
+---
+
+### T64: Portar SegmentItem e SpeakerDropdown
+
+**What**: `SegmentItem.razor` (texto editável, split no cursor, badge de locutor, destaque `active-seg`) + `SpeakerDropdown.razor` reaproveitando `SegmentEditingService`/`SpeakerDropdownViewModel`.
+**Where**: `src/Transcriba.App/Components/Shared/SegmentItem.razor`, `.../SpeakerDropdown.razor`
+**Depends on**: T63
+**Reuses**: `SegmentEditingService.cs`, `SpeakerDropdownViewModel.cs`
+
+**Tools**: MCP: NONE / Skill: NONE
+
+**Done when**:
+- [ ] Split/merge/atribuição de locutor funcionam exatamente como no protótipo (mesma semântica validada na Fase 11 original)
+- [ ] `active-seg` sincroniza com a posição de playback (via evento do `PlayerBar`)
+
+**Tests**: none (View) — `SegmentEditingService` já testado
+**Gate**: build
+
+**Commit**: `feat(app): implementa SegmentItem e SpeakerDropdown em Razor`
+
+---
+
+### T65: Portar Editor (integração final)
+
+**What**: `Editor.razor` reaproveitando `EditorViewModel`, integrando breadcrumb, header (ícone/título editável via `IconPicker`), tags, toolbar (dividir/mesclar/locutor/exportar), lista de `SegmentItem`, `PlayerBar` fixo no rodapé.
+**Where**: `src/Transcriba.App/Components/Pages/Editor.razor`
+**Depends on**: T64
+**Reuses**: `EditorViewModel.cs`, `ExportService.cs`
+
+**Tools**: MCP: NONE / Skill: NONE
+
+**Done when**:
+- [ ] Fluxo completo (upload → editor) funciona ponta a ponta com transcrição real
+- [ ] Exportação TXT/SRT/VTT funciona pelo botão "Exportar"
+- [ ] Fidelidade visual com `.editor-*`/`.seg*` do protótipo
+
+**Tests**: none (View) — `EditorViewModel`/`ExportService` já testados
+**Gate**: full (regressão do pipeline completo)
+
+**Commit**: `feat(app): implementa Editor em Razor (integração completa)`
+
+---
+
+### T66: Portar tela de Gravação mockada
+
+**What**: `Recording.razor` reaproveitando `RecordingViewModel` (timer, forma de onda simulada, frases "ao vivo" mockadas, fluxo play/pause/stop → navega para editor). Waveform via `<canvas>` + JS interop pontual isolado em `wwwroot/js/waveform.js` (única exceção documentada de JS residual, ver Risks do design.md).
+**Where**: `src/Transcriba.App/Components/Pages/Recording.razor`, `src/Transcriba.App/wwwroot/js/waveform.js`
+**Depends on**: T56
+**Reuses**: `RecordingViewModel.cs`
+
+**Tools**: MCP: NONE / Skill: NONE
+
+**Done when**:
+- [ ] Fluxo mockado idêntico ao protótipo (timer, forma de onda animada, transição para editor)
+- [ ] Fidelidade visual com `.rec-*` do protótipo
+
+**Tests**: none (View) — `RecordingViewModel` já testado
+**Gate**: build
+
+**Commit**: `feat(app): implementa Recording em Razor`
+
+---
+
+### T67: Portar Configurações
+
+**What**: `Settings.razor` reaproveitando `SettingsViewModel` (perfil, idioma padrão, identificar locutores, transcrição ao vivo inerte, dispositivo de execução, tema).
+**Where**: `src/Transcriba.App/Components/Pages/Settings.razor`
+**Depends on**: T56
+**Reuses**: `SettingsViewModel.cs`, `SettingsService.cs`
+
+**Tools**: MCP: NONE / Skill: NONE
+
+**Done when**:
+- [ ] Alterações persistem via `SettingsService`
+- [ ] Fidelidade visual com `.settings-*` do protótipo
+
+**Tests**: none (View) — `SettingsViewModel` já testado
+**Gate**: build
+
+**Commit**: `feat(app): implementa Settings em Razor`
+
+---
+
+### T68: Portar confirmação de exclusão (Dashboard + Pesquisa)
+
+**What**: `ConfirmationDialog.razor` reaproveitando `IConfirmationService` (nova implementação Blazor no lugar de `AvaloniaConfirmationService`); wiring dos menus de contexto de exclusão em `Dashboard.razor`/`ResearchPage.razor`.
+**Where**: `src/Transcriba.App/Components/Shared/ConfirmationDialog.razor`, novo `BlazorConfirmationService : IConfirmationService`
+**Depends on**: T60, T61
+**Reuses**: `IConfirmationService.cs`, `LibraryService.cs`, `ResearchService.cs`
+
+**Tools**: MCP: NONE / Skill: NONE
+
+**Done when**:
+- [ ] Excluir transcrição/pesquisa pede confirmação e remove do banco (mesmo comportamento das Fases 7/8 originais)
+
+**Tests**: none (View)
+**Gate**: full (regressão de exclusão)
+
+**Commit**: `feat(app): implementa confirmação de exclusão em Razor`
