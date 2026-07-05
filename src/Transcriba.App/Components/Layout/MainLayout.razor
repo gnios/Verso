@@ -14,6 +14,9 @@
 *@
 @implements IDisposable
 @inject NavigationService NavigationService
+@inject ThemeService ThemeService
+@inject BlazorThemeApplicator ThemeApplicator
+@inject IJSRuntime JS
 
 <div class="app">
     <Sidebar />
@@ -29,7 +32,7 @@
 </div>
 
 @code {
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         NavigationService.PropertyChanged += OnNavigationServiceChanged;
 
@@ -38,6 +41,20 @@
         if (NavigationService.CurrentViewModel is null)
         {
             NavigationService.NavigateTo(ScreenKey.Dashboard);
+        }
+
+        // Lê a preferência de tema persistida (SettingsService) e aplica via
+        // BlazorThemeApplicator (T57). Como o IJSRuntime deste componente só é anexado no
+        // primeiro OnAfterRenderAsync, uma chamada de Apply() feita aqui fica pendente e é
+        // disparada assim que AttachJsRuntime rodar (ver BlazorThemeApplicator).
+        await ThemeService.InitializeAsync();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            ThemeApplicator.AttachJsRuntime(JS);
         }
     }
 

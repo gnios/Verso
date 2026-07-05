@@ -1535,13 +1535,14 @@ T60, T61 → T68
 **Tools**: MCP: NONE / Skill: NONE
 
 **Done when**:
-- [ ] Alternar tema no botão da sidebar troca `light`/`dark` visualmente (variáveis CSS do protótipo)
-- [ ] Preferência persiste entre reinicializações (reaproveita `SettingsService`)
+- [x] Alternar tema no botão da sidebar troca `light`/`dark` visualmente (variáveis CSS do protótipo)
+- [x] Preferência persiste entre reinicializações (reaproveita `SettingsService`)
 
 **Tests**: none (wrapper de interop)
 **Gate**: build
 
 **Commit**: `feat(app): implementa alternância de tema via JS interop`
+**Status**: ✅ Concluída — `WpfThemeApplicator` (placeholder da T51-T54) foi removido e substituído por `BlazorThemeApplicator`, registrado em `AppServiceCollectionExtensions.cs` (como singleton concreto + `IThemeApplicator`). Como `IJSRuntime` só existe no escopo de renderização do BlazorWebView (não é resolvível no construtor de um singleton do Host), `MainLayout.razor` injeta seu próprio `IJSRuntime` e o repassa via `AttachJsRuntime` em `OnAfterRender(firstRender: true)`; chamadas a `Apply()` feitas antes disso (ex.: `ThemeService.InitializeAsync()` rodando em `OnInitializedAsync`, lendo a preferência do `SettingsService`) ficam pendentes e são aplicadas assim que o runtime é anexado. O toggle em si (`document.documentElement.classList.toggle('dark', isDark)`) fica isolado em `window.transcribaInterop.setDarkTheme` (`wwwroot/index.html`), já que não há equivalente em C#/Blazor puro para alterar a classe do elemento `<html>` do documento hospedeiro. `dotnet test tests/Transcriba.Tests` — 157/157 passando (build 0 erros). Verificação visual do toggle de tema em runtime não foi possível de forma repetível nesta sessão (ver observação na T56 sobre execuções manuais do app) — recomenda-se validação manual pelo usuário.
 
 ---
 
