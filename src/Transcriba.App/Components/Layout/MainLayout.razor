@@ -24,7 +24,7 @@
     <Sidebar />
     <main class="content">
         @* Integração central: cada tela real observa o NavigationService.CurrentViewModel do tipo
-           correspondente. Editor (Fase 22/T63-T65) ainda cai no placeholder genérico abaixo. *@
+           correspondente. *@
         @if (NavigationService.CurrentScreen == ScreenKey.Dashboard && NavigationService.CurrentViewModel is DashboardViewModel dashboardVm)
         {
             <Dashboard ViewModel="dashboardVm" />
@@ -44,6 +44,10 @@
         else if (NavigationService.CurrentScreen == ScreenKey.Settings && NavigationService.CurrentViewModel is SettingsViewModel settingsVm)
         {
             <Settings ViewModel="settingsVm" />
+        }
+        else if (NavigationService.CurrentScreen == ScreenKey.Editor && NavigationService.CurrentViewModel is EditorViewModel editorVm)
+        {
+            <Editor ViewModel="editorVm" />
         }
         else
         {
