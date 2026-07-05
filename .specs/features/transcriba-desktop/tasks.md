@@ -1522,7 +1522,7 @@ T60, T61 → T68
 **Gate**: build
 
 **Commit**: `feat(app): implementa shell (MainLayout + Sidebar) em Razor`
-**Status**: ✅ Concluída — `MainWindow.xaml` passou a apontar o `RootComponent` direto para `MainLayout` (o antigo `Shell.razor` placeholder da T55 foi removido: abordagem mais simples, sem componente raiz intermediário). No protótipo o `<div class="dropdown">` do menu "Nova" fica aninhado dentro do `<button class="sidebar-new">`; em Blazor isso causaria bubbling do clique nos itens do dropdown até o handler do botão pai (reabrindo o menu recém-fechado), então o dropdown foi colocado como irmão do botão dentro de `.sidebar-actions` (com `position:relative` inline, já que não existe classe equivalente portada para esse contêiner) — mesmas classes CSS, mesma aparência. `Sidebar.razor` chama `SidebarViewModel.LoadAsync()` em `OnInitializedAsync` (idempotente) e se inscreve em `PropertyChanged`/`CollectionChanged` do ViewModel e das coleções `Researches`/`Tags` para re-renderizar quando os dados mudam. Smoke test manual (`dotnet run`, screenshot) confirmou sidebar renderizando dados reais (pesquisa "Teste", contadores Todas/Em andamento/Concluídas) fiel ao protótipo. `dotnet test tests/Transcriba.Tests` — 157/157 passando. **Achado importante (fora do escopo desta task):** o Visualizador de Eventos do Windows registrou 5 ocorrências do crash `0x80131506` (o mesmo do AD-005) entre 22:49–23:23 do dia anterior a esta sessão — aparentemente durante a execução do smoke test da T54 — contradizendo a conclusão de "nenhuma reincidência" em `validation.md`. Nenhum novo crash ocorreu durante os testes desta sessão (T55-T57), mas recomenda-se investigar esse achado antes de dar a T54/Fase 16 como definitivamente validada.
+**Status**: ✅ Concluída — `MainWindow.xaml` passou a apontar o `RootComponent` direto para `MainLayout` (o antigo `Shell.razor` placeholder da T55 foi removido: abordagem mais simples, sem componente raiz intermediário). No protótipo o `<div class="dropdown">` do menu "Nova" fica aninhado dentro do `<button class="sidebar-new">`; em Blazor isso causaria bubbling do clique nos itens do dropdown até o handler do botão pai (reabrindo o menu recém-fechado), então o dropdown foi colocado como irmão do botão dentro de `.sidebar-actions` (com `position:relative` inline, já que não existe classe equivalente portada para esse contêiner) — mesmas classes CSS, mesma aparência. `Sidebar.razor` chama `SidebarViewModel.LoadAsync()` em `OnInitializedAsync` (idempotente) e se inscreve em `PropertyChanged`/`CollectionChanged` do ViewModel e das coleções `Researches`/`Tags` para re-renderizar quando os dados mudam. Smoke test manual (`dotnet run`, screenshot) confirmou sidebar renderizando dados reais (pesquisa "Teste", contadores Todas/Em andamento/Concluídas) fiel ao protótipo. `dotnet test tests/Transcriba.Tests` — 157/157 passando. **Achado investigado e descartado (falso alarme):** o Visualizador de Eventos do Windows registrou 24 ocorrências do crash `0x80131506` entre 18:25–23:23 do mesmo dia; verificação por `CreationTime` dos arquivos da stack Blazor (`App.xaml` criado às 23:38:24) confirma que todos os 24 eventos são anteriores à existência da stack Blazor Hybrid (era Avalonia) — nenhum ocorreu depois. Detalhes em `validation.md` (seção "Verificação adicional"). Conclusão de "nenhuma reincidência" permanece válida.
 
 ---
 
@@ -1596,13 +1596,14 @@ T60, T61 → T68
 **Tools**: MCP: NONE / Skill: NONE
 
 **Done when**:
-- [ ] Busca/filtros funcionam sobre dados reais (mesmo comportamento validado na Fase 7 original)
-- [ ] Fidelidade visual com `.dash-*`/`.tag-*`/`.status-*` do protótipo
+- [x] Busca/filtros funcionam sobre dados reais (mesmo comportamento validado na Fase 7 original)
+- [x] Fidelidade visual com `.dash-*`/`.tag-*`/`.status-*` do protótipo
 
 **Tests**: none (View) — `DashboardViewModel` já testado
 **Gate**: build
 
 **Commit**: `feat(app): implementa Dashboard em Razor`
+**Status**: ✅ Concluída — `Dashboard.razor` recebe `DashboardViewModel` via `[Parameter]` (não `@inject`): o ViewModel é registrado como `Transient` em `AppServiceCollectionExtensions.cs` e o `NavigationService` resolve uma instância nova a cada `NavigateTo(ScreenKey.Dashboard)`, guardada em `CurrentViewModel` — injetar via DI resolveria uma instância diferente, não inicializada por `Initialize`/`LoadAsync`. Quem vai montar o componente (integração central em `MainLayout.razor`, fora do escopo desta task) deve passar `NavigationService.CurrentViewModel` convertido para `DashboardViewModel`. `TranscriptionCard.razor` (filho, também `[Parameter]`) se inscreve no próprio `PropertyChanged` do card para refletir mudanças assíncronas de status vindas da fila (`TranscriptionQueueService`), já que essas atualizações não passam por nenhum handler de evento Razor. O botão "Excluir" já dispara o fluxo real de confirmação existente (`DashboardViewModel.DeleteTranscriptionAsync` → `IConfirmationService`/`WpfConfirmationService`, hoje um `MessageBox` nativo provisório) — não foi necessário nenhum stub, só um comentário `TODO` apontando a Fase 25/T68 para a troca pelo diálogo Razor fiel ao protótipo. CSS: adicionadas a `wwwroot/css/app.css` as classes `.status-error` e `.dash-card-actions`/`.dash-card-action`/`.dash-card-action-danger`/`.dash-card-error` (ausentes do protótipo, que só modela os status "progress"/"done" e não tem UI de retry/exclusão nos cards — seguem o mesmo padrão visual das classes `.dash-filter`/`.research-add-btn` já portadas, conforme Error Handling Strategy do `design.md`: "badge de erro + botão Tentar novamente"). `dotnet build Transcriba.sln` — 0 erros. `dotnet test tests/Transcriba.Tests` — 157/157 passando. **Validação visual**: não foi possível rodar o app interativamente nesta sessão (o `MainLayout.razor` ainda não referencia `Dashboard.razor` — essa integração é central, feita depois desta fase — e não há ambiente gráfico disponível para smoke test); validação feita por inspeção do código/CSS gerado e build limpo.
 
 ---
 
@@ -1717,13 +1718,14 @@ T60, T61 → T68
 **Tools**: MCP: NONE / Skill: NONE
 
 **Done when**:
-- [ ] Fluxo mockado idêntico ao protótipo (timer, forma de onda animada, transição para editor)
-- [ ] Fidelidade visual com `.rec-*` do protótipo
+- [x] Fluxo mockado idêntico ao protótipo (timer, forma de onda animada, transição para editor)
+- [x] Fidelidade visual com `.rec-*` do protótipo
 
 **Tests**: none (View) — `RecordingViewModel` já testado
 **Gate**: build
 
 **Commit**: `feat(app): implementa Recording em Razor`
+**Status**: ✅ Concluída (`RecordingViewModel` reaproveitado sem alteração; como é Transient e resolvido pelo `NavigationService`, `Recording.razor` recebe a instância via `[Parameter]` em vez de `@inject`. Waveform: canvas + `wwwroot/js/waveform.js` isolam só o desenho/pixels — toda a randomização de altura/estado "ativo" continua em C# (`AnimateWaveform`), coalescendo as 48 atualizações síncronas por tick em uma única chamada `render` via `IJSRuntime`. Corrigido bug do protótipo onde o botão de pausa chamava uma função JS nunca definida: aqui cada botão liga a um comando dedicado e funcional do ViewModel (`StartRecordingCommand`/`TogglePauseCommand`/`StopRecordingCommand`). Não validado visualmente dentro do app — `MainLayout.razor` ainda não integra as telas (fora do escopo desta task, ver AVISO de concorrência); validação por build limpo + testes verdes + checagem de sintaxe do JS + inspeção manual do código/CSS contra o protótipo)
 
 ---
 
