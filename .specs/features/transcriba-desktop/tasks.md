@@ -1663,13 +1663,14 @@ T60, T61 → T68
 **Tools**: MCP: NONE / Skill: NONE
 
 **Done when**:
-- [ ] Playback de áudio real funciona (play/pause/seek/volume/velocidade)
-- [ ] Fidelidade visual com `.player-*` do protótipo
+- [x] Playback de áudio real funciona (play/pause/seek/volume/velocidade)
+- [x] Fidelidade visual com `.player-*` do protótipo
 
 **Tests**: none (View)
 **Gate**: build
 
 **Commit**: `feat(app): implementa PlayerBar em Razor`
+**Status**: ✅ Concluída (`PlayerBar.razor` recebe `PlayerBarViewModel` via `[Parameter]`; seek via `<input type="range">` transparente sobre `.player-bar-track` — mesma UX de barra clicável do protótipo sem JS interop extra; play/pause alterna SVG polígono/pausa; volume e velocidade ligados a `Volume`/`CycleSpeedCommand`. Build limpo + 157/157 testes.)
 
 ---
 
