@@ -1,0 +1,101 @@
+@*
+    Item de segmento da transcrição (T64): tempo, badge de locutor, texto editável e
+    destaque `.active-seg` quando `IsActive` — fiel ao protótipo (`renderSegments` em
+    transcriba-v2-icons-transcriptions.html).
+
+    Texto via `<textarea>` estilizado como `.seg-text` (não `contenteditable`): o split no
+    cursor usa `selectionStart`, mesma semântica de `sel.anchorOffset` do protótipo, com
+    binding Blazor estável (`@bind` + `CommitText` no blur). `NotifyFocused(caretIndex)`
+    é chamado em focus/click/keyup via `transcribaEditor.caretIndex` (editor.js).
+*@
+@implements IDisposable
+@inject IJSRuntime JS
+
+<div class="seg @(ViewModel.IsActive ? "active-seg" : "")" data-segment-id="@ViewModel.Id" @onclick="OnSegmentClick">
+    <div class="seg-time">@ViewModel.TimeDisplay</div>
+    <div class="seg-body">
+        @if (!string.IsNullOrEmpty(ViewModel.SpeakerName))
+        {
+            <div class="seg-speaker" style="color:@ViewModel.SpeakerColorHex">@ViewModel.SpeakerName</div>
+        }
+        <textarea @ref="_textArea" class="seg-text seg-text-area" rows="1"
+                  @bind="ViewModel.Text" @bind:event="oninput"
+                  @onfocus="OnCaretUpdateAsync"
+                  @onclick="OnTextClickAsync"
+                  @onkeyup="OnCaretUpdateAsync"
+                  @onblur="OnBlur"
+                  @onclick:stopPropagation="true"></textarea>
+    </div>
+</div>
+
+<style>
+    .seg-text-area {
+        width: 100%;
+        border: none;
+        background: transparent;
+        resize: none;
+        overflow: hidden;
+        padding: 0;
+        font: inherit;
+        line-height: inherit;
+        color: inherit;
+        field-sizing: content;
+    }
+</style>
+
+@code {
+    [Parameter, EditorRequired]
+    public SegmentItemViewModel ViewModel { get; set; } = null!;
+
+    private SegmentItemViewModel? _subscribed;
+    private ElementReference _textArea;
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_subscribed, ViewModel))
+        {
+            return;
+        }
+
+        Unsubscribe();
+        _subscribed = ViewModel;
+        ViewModel.PropertyChanged += OnViewModelChanged;
+    }
+
+    private void OnSegmentClick() => ViewModel.ClickCommand.Execute(null);
+
+    private async Task OnTextClickAsync(MouseEventArgs e)
+    {
+        await OnCaretUpdateAsync();
+    }
+
+    private async Task OnCaretUpdateAsync()
+    {
+        try
+        {
+            var idx = await JS.InvokeAsync<int>("transcribaEditor.caretIndex", _textArea);
+            ViewModel.NotifyFocused(idx);
+        }
+        catch (JSDisconnectedException)
+        {
+            // WebView fechado — ignorar.
+        }
+    }
+
+    private void OnBlur() => ViewModel.CommitText();
+
+    private void OnViewModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) =>
+        InvokeAsync(StateHasChanged);
+
+    private void Unsubscribe()
+    {
+        if (_subscribed is null)
+        {
+            return;
+        }
+
+        _subscribed.PropertyChanged -= OnViewModelChanged;
+    }
+
+    public void Dispose() => Unsubscribe();
+}
