@@ -13,6 +13,7 @@
     NavigationService.CurrentViewModel de acordo com o CurrentScreen.
 *@
 @using Transcriba.App.Components.Shared
+@using Transcriba.App.Components.Pages
 @implements IDisposable
 @inject NavigationService NavigationService
 @inject ThemeService ThemeService
@@ -22,14 +23,35 @@
 <div class="app">
     <Sidebar />
     <main class="content">
-        <section class="screen active">
-            <div class="screen-header">
-                <h1 class="screen-title">Transcriba</h1>
-            </div>
-            <p>Tela: @NavigationService.CurrentScreen</p>
-        </section>
+        @* Integração central pós-Fases 19/20/23/24 (T60/T61/T66/T67): cada tela real observa o
+           NavigationService.CurrentViewModel do tipo correspondente. Upload (Fase 21/T62) e
+           Editor (Fase 22/T63-T65) ainda caem no placeholder genérico abaixo até serem portados. *@
+        @if (NavigationService.CurrentScreen == ScreenKey.Dashboard && NavigationService.CurrentViewModel is DashboardViewModel dashboardVm)
+        {
+            <Dashboard ViewModel="dashboardVm" />
+        }
+        else if (NavigationService.CurrentScreen == ScreenKey.Research && NavigationService.CurrentViewModel is ResearchPageViewModel researchVm)
+        {
+            <ResearchPage ViewModel="researchVm" />
+        }
+        else if (NavigationService.CurrentScreen == ScreenKey.Recording && NavigationService.CurrentViewModel is RecordingViewModel recordingVm)
+        {
+            <Recording ViewModel="recordingVm" />
+        }
+        else if (NavigationService.CurrentScreen == ScreenKey.Settings && NavigationService.CurrentViewModel is SettingsViewModel settingsVm)
+        {
+            <Settings ViewModel="settingsVm" />
+        }
+        else
+        {
+            <section class="screen active">
+                <div class="screen-header">
+                    <h1 class="screen-title">Transcriba</h1>
+                </div>
+                <p>Tela "@NavigationService.CurrentScreen" ainda não portada para Razor (Fases 21/22 em andamento).</p>
+            </section>
+        }
     </main>
-    <!-- modais (NewPageModal/ModelDownloadModal) na Fase 18 -->
     <NewPageModal />
     <ModelDownloadModal />
 </div>

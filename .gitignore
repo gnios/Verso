@@ -8,6 +8,9 @@ obj/
 # Modelos Whisper (binários grandes, baixados sob demanda)
 models/
 
+# Memory dumps de crash (diagnóstico do "Internal CLR error", ~GBs cada)
+.crash-dumps/
+
 # Python
 __pycache__/
 *.pyc
@@ -21,3 +24,8 @@ transcricao-output.txt
 # OS
 Thumbs.db
 .DS_Store
+
+# Logs/PIDs de smoke test manual do Transcriba.App (dotnet run/Start-Process)
+app_stdout.log
+app_stderr.log
+app_pid.csv
