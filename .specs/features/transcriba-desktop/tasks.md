@@ -1621,13 +1621,14 @@ T60, T61 → T68
 **Tools**: MCP: NONE / Skill: NONE
 
 **Done when**:
-- [ ] Navegação sidebar → página de pesquisa carrega dados reais
-- [ ] Fidelidade visual com `.research-*` do protótipo
+- [x] Navegação sidebar → página de pesquisa carrega dados reais
+- [x] Fidelidade visual com `.research-*` do protótipo
 
 **Tests**: none (View)
 **Gate**: build
 
 **Commit**: `feat(app): implementa ResearchPage em Razor`
+**Status**: ✅ Concluída — `ResearchPage.razor` recebe `ResearchPageViewModel` como `[Parameter]` (não `@inject`), já que o ViewModel é Transient e é resolvido/inicializado pelo `NavigationService` a cada navegação; mesmo padrão adotado pelo `Dashboard.razor` (T60). Header (`page-header`) usa `var(--{ColorName}-light)` como fundo do ícone, replicando `col.light` de `PAGE_COLORS` do protótipo sem precisar de constante nova. Lista reaproveita `.research-item*` fielmente; como o protótipo (mock) só trata os status "progress"/"done", o status "Erro" (existente no modelo de dados real) foi tratado com estilo inline reaproveitando as variáveis `--red`/`--red-light` já usadas por outras badges, sem introduzir classe nova no CSS compartilhado. Botão "Adicionar" já está conectado a `AddTranscriptionCommand`, que hoje navega direto para `Upload` (o `NewPageModal` da Fase 18 não é o fluxo usado por este comando). Validado via `dotnet build`/`dotnet test` (0 erros, 157/157 testes); sem validação visual em app rodando (não foi editado `MainLayout.razor`, que ainda não roteia para as páginas — integração central pendente de fase futura).
 
 ---
 
