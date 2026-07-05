@@ -1514,14 +1514,15 @@ T60, T61 → T68
 **Tools**: MCP: NONE / Skill: NONE
 
 **Done when**:
-- [ ] Sidebar renderiza pesquisas/tags a partir do `SidebarViewModel` real (dados do SQLite)
-- [ ] Clique em item de navegação chama `NavigationService.NavigateTo`
-- [ ] Fidelidade visual: classes CSS idênticas às do protótipo (`.sidebar-item`, `.sidebar-trans-item`, etc.)
+- [x] Sidebar renderiza pesquisas/tags a partir do `SidebarViewModel` real (dados do SQLite)
+- [x] Clique em item de navegação chama `NavigationService.NavigateTo`
+- [x] Fidelidade visual: classes CSS idênticas às do protótipo (`.sidebar-item`, `.sidebar-trans-item`, etc.)
 
 **Tests**: none (View) — `SidebarViewModel` já teve testes unitários na Fase 6 original, não repetir
 **Gate**: build
 
 **Commit**: `feat(app): implementa shell (MainLayout + Sidebar) em Razor`
+**Status**: ✅ Concluída — `MainWindow.xaml` passou a apontar o `RootComponent` direto para `MainLayout` (o antigo `Shell.razor` placeholder da T55 foi removido: abordagem mais simples, sem componente raiz intermediário). No protótipo o `<div class="dropdown">` do menu "Nova" fica aninhado dentro do `<button class="sidebar-new">`; em Blazor isso causaria bubbling do clique nos itens do dropdown até o handler do botão pai (reabrindo o menu recém-fechado), então o dropdown foi colocado como irmão do botão dentro de `.sidebar-actions` (com `position:relative` inline, já que não existe classe equivalente portada para esse contêiner) — mesmas classes CSS, mesma aparência. `Sidebar.razor` chama `SidebarViewModel.LoadAsync()` em `OnInitializedAsync` (idempotente) e se inscreve em `PropertyChanged`/`CollectionChanged` do ViewModel e das coleções `Researches`/`Tags` para re-renderizar quando os dados mudam. Smoke test manual (`dotnet run`, screenshot) confirmou sidebar renderizando dados reais (pesquisa "Teste", contadores Todas/Em andamento/Concluídas) fiel ao protótipo. `dotnet test tests/Transcriba.Tests` — 157/157 passando. **Achado importante (fora do escopo desta task):** o Visualizador de Eventos do Windows registrou 5 ocorrências do crash `0x80131506` (o mesmo do AD-005) entre 22:49–23:23 do dia anterior a esta sessão — aparentemente durante a execução do smoke test da T54 — contradizendo a conclusão de "nenhuma reincidência" em `validation.md`. Nenhum novo crash ocorreu durante os testes desta sessão (T55-T57), mas recomenda-se investigar esse achado antes de dar a T54/Fase 16 como definitivamente validada.
 
 ---
 
