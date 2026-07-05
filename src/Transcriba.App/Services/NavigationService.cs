@@ -2,9 +2,20 @@ using System;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.Extensions.DependencyInjection;
 using Transcriba.App.ViewModels;
+using Transcriba.Core.Media;
 
 namespace Transcriba.App.Services;
 
+/// <summary>
+/// Estado de navegação da shell, consumido por componentes Razor (T55).
+/// Como esta classe já é um <see cref="ObservableObject"/> (CommunityToolkit.Mvvm), as
+/// propriedades marcadas com <c>[ObservableProperty]</c> disparam <c>PropertyChanged</c>
+/// automaticamente a cada troca de tela — um componente Razor raiz só precisa se inscrever
+/// nesse evento e chamar <c>StateHasChanged()</c> (ver <c>Components/Layout/MainLayout.razor</c>)
+/// para re-renderizar a área de conteúdo com a tela/ViewModel atual. A API pública
+/// (<see cref="NavigateTo"/>, <see cref="CurrentScreen"/>) permanece inalterada em relação
+/// à versão Avalonia.
+/// </summary>
 public partial class NavigationService : ObservableObject
 {
     private readonly IServiceProvider _services;
@@ -25,6 +36,18 @@ public partial class NavigationService : ObservableObject
 
     public void NavigateTo(ScreenKey key, object? parameter = null)
     {
+        if (CurrentScreen == ScreenKey.Editor && key != ScreenKey.Editor)
+        {
+            try
+            {
+                _services.GetService<IMediaPlaybackService>()?.UnloadAsync().GetAwaiter().GetResult();
+            }
+            catch (Exception)
+            {
+                // O serviço de playback pode estar indisponível fora do app desktop (ex.: testes).
+            }
+        }
+
         CurrentScreen = key;
         NavigationParameter = parameter;
         var viewModel = ResolveViewModel(key);
