@@ -35,4 +35,23 @@ public class SpeakerService(IDbContextFactory<TranscribaDbContext> dbContextFact
         await context.SaveChangesAsync();
         return speaker;
     }
+
+    public async Task RenameSpeakerAsync(Guid speakerId, string newName)
+    {
+        var name = newName?.Trim() ?? "";
+        if (string.IsNullOrEmpty(name))
+        {
+            return;
+        }
+
+        await using var context = await dbContextFactory.CreateDbContextAsync();
+        var updated = await context.Speakers
+            .Where(s => s.Id == speakerId)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(s => s.Name, name));
+
+        if (updated == 0)
+        {
+            throw new InvalidOperationException($"Locutor {speakerId} não encontrado.");
+        }
+    }
 }

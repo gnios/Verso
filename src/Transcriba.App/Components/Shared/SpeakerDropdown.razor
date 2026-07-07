@@ -1,21 +1,36 @@
 @*
-    Dropdown de atribuição de locutor ao segmento ativo (T64), reaproveitando
-    `SpeakerDropdownViewModel` — fiel ao `#speaker-dropdown` do protótipo
-    (transcriba-v2-icons-transcriptions.html).
-
-    Posicionado como filho relativo do botão "Locutor" na toolbar do editor
-    (`.speaker-dropdown` comRepositioned via CSS existente).
+    Dropdown de atribuição/renomeação de locutor (T64), reaproveitando
+    `SpeakerDropdownViewModel`. Agora cada locutor existente pode ser renomeado
+    inline (lápis → input → Enter salva / Esc cancela), além de selecionado.
 *@
+@using Transcriba.App.ViewModels
 @implements IDisposable
 
-<div class="speaker-dropdown @(ViewModel.IsOpen ? "open" : "")">
+<div class="speaker-dropdown @(ViewModel.IsOpen ? "open" : "")" @onclick:stopPropagation="true">
     <div class="speaker-dropdown-title">Selecionar locutor</div>
     @foreach (var speaker in ViewModel.Speakers)
     {
-        <div class="speaker-option @(speaker.IsActive ? "active" : "")"
-             @onclick="() => speaker.SelectCommand.Execute(null)">
-            <span class="sp-dot" style="background:@speaker.ColorHex"></span>
-            @speaker.Name
+        var captured = speaker;
+        <div class="speaker-option @(captured.IsActive ? "active" : "")">
+            @if (captured.IsEditing)
+            {
+                <span class="sp-dot" style="background:@captured.ColorHex"></span>
+                <input type="text" class="speaker-rename-input" value="@_renameText"
+                       @oninput="OnRenameInput"
+                       @onkeydown="(e) => OnRenameKeyDown(e, captured)"
+                       @onclick:stopPropagation="true" @ref="_renameInput" />
+            }
+            else
+            {
+                <div class="speaker-option-main" @onclick="() => captured.SelectCommand.Execute(null)">
+                    <span class="sp-dot" style="background:@captured.ColorHex"></span>
+                    <span class="speaker-option-name">@captured.Name</span>
+                </div>
+                <button type="button" class="speaker-option-edit" title="Renomear locutor"
+                        @onclick="() => StartRename(captured)" @onclick:stopPropagation="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                </button>
+            }
         </div>
     }
     <div class="speaker-divider"></div>
@@ -31,6 +46,9 @@
     public SpeakerDropdownViewModel ViewModel { get; set; } = null!;
 
     private SpeakerDropdownViewModel? _subscribed;
+    private string _renameText = "";
+    private ElementReference _renameInput;
+    private bool _shouldFocusRename;
 
     protected override void OnParametersSet()
     {
@@ -73,6 +91,43 @@
         if (e.Key == "Enter" && ViewModel.CanAssign)
         {
             await ViewModel.AddNewSpeakerCommand.ExecuteAsync(null);
+        }
+    }
+
+    private void StartRename(SpeakerOptionViewModel option)
+    {
+        foreach (var s in ViewModel.Speakers)
+        {
+            s.IsEditing = false;
+        }
+
+        option.IsEditing = true;
+        _renameText = option.Name;
+        _shouldFocusRename = true;
+    }
+
+    private void OnRenameInput(ChangeEventArgs e) => _renameText = e.Value?.ToString() ?? "";
+
+    private async Task OnRenameKeyDown(KeyboardEventArgs e, SpeakerOptionViewModel option)
+    {
+        if (e.Key == "Escape")
+        {
+            option.IsEditing = false;
+            return;
+        }
+
+        if (e.Key == "Enter")
+        {
+            await ViewModel.RenameSpeakerCommand.ExecuteAsync((option, _renameText));
+        }
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (_shouldFocusRename)
+        {
+            _shouldFocusRename = false;
+            _ = _renameInput.FocusAsync();
         }
     }
 

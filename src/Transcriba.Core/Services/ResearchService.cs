@@ -62,4 +62,26 @@ public class ResearchService(IDbContextFactory<TranscribaDbContext> dbContextFac
         context.ResearchPages.Remove(page);
         await context.SaveChangesAsync();
     }
+
+    public async Task AssignTranscriptionToResearchAsync(Guid transcriptionId, int? researchPageId)
+    {
+        await using var context = await dbContextFactory.CreateDbContextAsync();
+        var transcription = await context.Transcriptions.FindAsync(transcriptionId);
+        if (transcription is null)
+        {
+            throw new InvalidOperationException($"Transcrição {transcriptionId} não encontrada.");
+        }
+
+        if (researchPageId is int id)
+        {
+            var exists = await context.ResearchPages.AnyAsync(r => r.Id == id);
+            if (!exists)
+            {
+                throw new InvalidOperationException($"Pesquisa {id} não encontrada.");
+            }
+        }
+
+        transcription.ResearchPageId = researchPageId;
+        await context.SaveChangesAsync();
+    }
 }

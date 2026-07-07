@@ -40,6 +40,15 @@
             }
         </div>
     </div>
+    @if (ViewModel.ShowProgress)
+    {
+        <div class="dash-card-progress-wrap">
+            <div class="dash-card-progress">
+                <div class="dash-card-progress-fill @(ViewModel.IsProgressIndeterminate ? "indeterminate" : "")" style="@(ViewModel.IsProgressIndeterminate ? "" : $"width:{ViewModel.ProgressWidth}%")"></div>
+            </div>
+            <div class="dash-card-progress-label">@ViewModel.ProgressLabel</div>
+        </div>
+    }
     @if (ViewModel.IsError && !string.IsNullOrWhiteSpace(ViewModel.ErrorMessage))
     {
         <div class="dash-card-error">@ViewModel.ErrorMessage</div>

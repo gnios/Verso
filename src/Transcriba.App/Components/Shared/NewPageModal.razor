@@ -1,38 +1,36 @@
 @*
-    Modal "Nova pesquisa/tese" / "Nova transcrição avulsa" (T58), reaproveitando
-    NewPageModalViewModel (que já persiste no banco via ResearchService/LibraryService — ver
-    ConfirmCommand) e os componentes IconPicker/ColorPicker. Estrutura fiel ao `#modal-new-page`
-    do protótipo (transcriba-v2-icons-transcriptions.html): `.modal-overlay` > `.modal` com título,
-    grid de ícone, grid de cor, preview, campo de título e (só no modo transcrição) campo de tags.
+    Modal "Nova pesquisa / tese" (T58), reaproveitando NewPageModalViewModel.
 
-    Decisão: no protótipo os grids de ícone/cor ficam sempre visíveis dentro do modal (não são
-    popups clicáveis) — por isso não há JS interop de "click outside" aqui; o componente
-    IconPicker/ColorPicker foi desenhado para suportar esse uso como popup no futuro (ex.: editor
-    de página), mas não é necessário neste modal. O grid de cor só aparece no modo pesquisa: o
-    protótipo sempre o mostra, mas o modelo de dados real não tem cor para transcrições avulsas
-    (LibraryService.CreateStandaloneAsync não recebe cor) — NewPageModalViewModel.PreviewColorName
-    já força "blue" nesse modo, então esconder o grid evita sugerir uma opção sem efeito.
+    A criação de transcrição avulsa (com arquivo, tags, ícone e nome) foi migrada para a
+    tela Upload (Upload.razor/UploadViewModel), que agora oferece as mesmas opções que
+    este modal oferecia no modo transcrição. Este modal atende apenas a criação de
+    pesquisas, então o seletor de modo, o campo de tags e o seletor de arquivo foram
+    removidos (clean cutover) — sobram ícone, cor, preview e título, fiel às classes
+    `.modal-overlay`/`.modal`/`.icon-picker-*`/`.color-picker-*`/`.icon-preview` do
+    protótipo (transcriba-v2-icons-transcriptions.html).
 
-    Cor do preview: em vez das flags IsBlue/IsGreen/... (herdadas da versão Avalonia, úteis para
-    triggers de Style em XAML), usamos aqui a interpolação direta `var(--{nome}-light)` sobre as
-    custom properties já existentes no app.css — mesmo espírito do `tag-@@research.ColorName` já
-    usado em Sidebar.razor, mais simples em Razor do que manter uma flag booleana por cor.
+    Cor do preview: em vez das flags IsBlue/IsGreen/... (herdadas da versão Avalonia,
+    úteis para triggers de Style em XAML), usamos aqui a interpolação direta
+    `var(--{nome}-light)` sobre as custom properties já existentes no app.css — mesmo
+    espírito do `tag-@@research.ColorName` já usado em Sidebar.razor.
 *@
 @implements IDisposable
 @inject NewPageModalViewModel ViewModel
 
 <div class="modal-overlay @(ViewModel.IsOpen ? "open" : "")">
-    <div class="modal">
+    <div class="modal modal-new-page">
         <div class="modal-title">@ViewModel.ModalTitle</div>
+
+        @if (!string.IsNullOrWhiteSpace(ViewModel.ValidationError))
+        {
+            <div class="upload-error">@ViewModel.ValidationError</div>
+        }
 
         <div class="icon-picker-label">Ícone</div>
         <IconPicker ViewModel="ViewModel.IconPicker" />
 
-        @if (ViewModel.IsResearchMode)
-        {
-            <div class="color-picker-label">Cor</div>
-            <ColorPicker ViewModel="ViewModel.ColorPicker" />
-        }
+        <div class="color-picker-label">Cor</div>
+        <ColorPicker ViewModel="ViewModel.ColorPicker" />
 
         <div class="icon-preview">
             <div class="icon-preview-emoji" style="background:var(--@(ViewModel.PreviewColorName)-light)">@ViewModel.PreviewIcon</div>
@@ -45,18 +43,9 @@
                    placeholder="Ex.: Mobilidade Urbana — Tese 2025" @onkeydown="OnTitleKeyDown" />
         </div>
 
-        @if (ViewModel.IsTranscriptionMode)
-        {
-            <div class="modal-field">
-                <label>Tags (vírgula)</label>
-                <input type="text" value="@ViewModel.TagsText" @oninput="OnTagsInput"
-                       placeholder="entrevista, campo, piloto" />
-            </div>
-        }
-
         <div class="modal-actions">
             <button class="modal-cancel" @onclick="() => ViewModel.CancelCommand.Execute(null)">Cancelar</button>
-            <button class="modal-confirm" @onclick="async () => await ViewModel.ConfirmCommand.ExecuteAsync(null)">Criar</button>
+            <button class="modal-confirm" disabled="@(!ViewModel.CanConfirm)" @onclick="async () => await ViewModel.ConfirmCommand.ExecuteAsync(null)">@ViewModel.ConfirmButtonLabel</button>
         </div>
     </div>
 </div>
@@ -70,12 +59,9 @@
     private void OnTitleInput(ChangeEventArgs e) =>
         ViewModel.Title = e.Value?.ToString() ?? "";
 
-    private void OnTagsInput(ChangeEventArgs e) =>
-        ViewModel.TagsText = e.Value?.ToString() ?? "";
-
     private async Task OnTitleKeyDown(KeyboardEventArgs e)
     {
-        if (e.Key == "Enter")
+        if (e.Key == "Enter" && ViewModel.CanConfirm)
         {
             await ViewModel.ConfirmCommand.ExecuteAsync(null);
         }

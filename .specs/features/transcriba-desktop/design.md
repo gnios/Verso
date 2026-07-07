@@ -7,11 +7,15 @@
 
 ## Architecture Overview
 
-App desktop Avalonia (MVVM) com Generic Host (`Microsoft.Extensions.Hosting`) para DI e serviços de background. A UI nunca chama o motor de transcrição diretamente: ela enfileira um job na `TranscriptionQueueService`, que processa em background reaproveitando quase 1:1 a lógica do `transcrever.cs` (download de modelo GGML, carga/resample de áudio via NAudio/ffmpeg, VAD por silêncio, transcrição paralela com Whisper.net). Persistência via EF Core + SQLite. Reprodução de mídia via LibVLC em modo **somente áudio** (sem `VideoView`), evitando os problemas conhecidos de "airspace" do LibVLC em Avalonia — o player do protótipo nunca exibe vídeo, só controla áudio.
+> **Nota de revisão (AD-005)**: a implementação anterior em Avalonia foi concluída (50/50 tasks) mas sofria de um crash fatal e não determinístico do runtime Windows (`Internal CLR error 0x80131506`, ver `.specs/STATE.md`). A stack de apresentação foi trocada para **Blazor Hybrid** (WPF host + `BlazorWebView`/WebView2). `Transcriba.Core` (motor de transcrição, dados, mídia, serviços de domínio) é 100% reaproveitado sem alteração — apenas `Transcriba.App` é reescrito. As seções abaixo foram atualizadas para refletir a nova stack; o restante do design (Code Reuse Analysis, Data Models, Error Handling, Tech Decisions) permanece válido.
+
+App desktop **WPF** hospedando um `BlazorWebView` (WebView2/Chromium) com Generic Host (`Microsoft.Extensions.Hosting`) para DI e serviços de background — mesmo padrão de hosting da tentativa anterior, só a superfície de UI muda. A UI (Razor components, HTML/CSS herdado quase verbatim do protótipo) nunca chama o motor de transcrição diretamente: ela enfileira um job na `TranscriptionQueueService`, que processa em background reaproveitando quase 1:1 a lógica do `transcrever.cs` (download de modelo GGML, carga/resample de áudio via NAudio/ffmpeg, VAD por silêncio, transcrição paralela com Whisper.net). Persistência via EF Core + SQLite. Reprodução de mídia via LibVLC em modo **somente áudio** (sem `VideoView`) — decisão original (AD-002) que continua válida independente da UI, já que o player do protótipo nunca exibe vídeo, só controla áudio; a nova stack elimina a preocupação original de "airspace" (não há mais controles Avalonia nativos sobrepostos), mas manter o playback só-áudio ainda simplifica o componente e é fiel ao protótipo.
+
+Componentes de UI stateful (ViewModels com `CommunityToolkit.Mvvm`, `ObservableObject`/`RelayCommand`) continuam existindo e são registrados no mesmo `IServiceCollection` usado pelo `BlazorWebView`, permitindo reaproveitar a lógica de estado/comando já escrita nos ViewModels Avalonia (a maior parte do porte é troca de `.axaml` por `.razor`, não reescrita de lógica). Interações que hoje são JS puro no protótipo (drag&drop de upload, canvas da waveform, popups de ícone/cor) são portadas para Razor + JS interop pontual (`IJSRuntime`) apenas onde não há equivalente direto em C#/Blazor (ex.: desenho de canvas).
 
 ```mermaid
 graph TD
-    UI[Avalonia Views/ViewModels - MVVM] --> NAV[NavigationService]
+    UI[Razor Components / ViewModels - MVVM] --> NAV[NavigationService]
     UI --> LIB[LibraryService]
     UI --> RES[ResearchService]
     UI --> UP[UploadViewModel]
@@ -34,7 +38,22 @@ graph TD
     SET --> DB
     Q --> DB
     MS --> FS[(%AppData%\Transcriba\media)]
+
+    HOST[MainWindow.xaml - WPF] --> BWV[BlazorWebView - WebView2/Chromium]
+    BWV --> UI
 ```
+
+### Estrutura de projeto revisada
+
+| Antes (Avalonia) | Depois (Blazor Hybrid) |
+| --- | --- |
+| `Transcriba.App` (`Avalonia`, `Avalonia.Desktop`, `Avalonia.Themes.Fluent`) | `Transcriba.App` (`Microsoft.NET.Sdk.Razor`, `net10.0-windows10.0.17763.0`, `Microsoft.AspNetCore.Components.WebView.Wpf`) |
+| `App.axaml` / `App.axaml.cs` | `App.xaml` / `App.xaml.cs` (WPF) — bootstrap do `Host` idêntico, troca só o `AppBuilder` Avalonia por `Application` WPF |
+| `MainWindow.axaml` (shell + sidebar) | `MainWindow.xaml` hospedando `<blazor:BlazorWebView HostPage="wwwroot/index.html">` com `RootComponent` apontando pro shell Razor (`App.razor`/`MainLayout.razor`) |
+| `Views/*.axaml` + `ViewModels/*.cs` | `Components/Pages/*.razor` (ou `Components/*.razor`) reaproveitando o CSS global do protótipo (`wwwroot/app.css`, portado quase verbatim); `ViewModels/*.cs` mantidos como estão sempre que possível |
+| `NavigationService` (troca `ContentArea`) | `NavigationService` equivalente via estado C# observável consumido pelos Razor components (ou roteamento Blazor simples, ver Design decisions abaixo) |
+| Estilos QSS/Avalonia customizados por controle | CSS do protótipo direto em `wwwroot/`, sem tradução de linguagem de estilo |
+| `Transcriba.Core` | **inalterado** |
 
 ---
 
@@ -67,13 +86,13 @@ graph TD
 
 ## Components
 
-### Transcriba.App (projeto Avalonia — apresentação)
+### Transcriba.App (projeto WPF + Blazor Hybrid — apresentação)
 
-- **Purpose**: Views (.axaml) + ViewModels (MVVM, CommunityToolkit.Mvvm) + navegação da shell.
+- **Purpose**: `MainWindow.xaml` (host WPF mínimo com `BlazorWebView`) + Razor components (`Components/Pages/*.razor`) + ViewModels (MVVM, CommunityToolkit.Mvvm) + navegação da shell. CSS herdado do protótipo em `wwwroot/`.
 - **Location**: `src/Transcriba.App/`
-- **Principais ViewModels/Views**: `MainWindowViewModel` (shell/sidebar), `DashboardViewModel`, `ResearchPageViewModel`, `UploadViewModel`, `RecordingViewModel` (mockado), `EditorViewModel`, `SettingsViewModel`, `NewPageModalViewModel`, `IconPickerViewModel`, `ColorPickerViewModel`, `SpeakerDropdownViewModel`.
-- **Dependencies**: `Transcriba.Core` (serviços de aplicação), `NavigationService`.
-- **Reuses**: N/A (camada nova).
+- **Principais ViewModels/Components**: `MainWindowViewModel`/`MainLayout.razor` (shell/sidebar), `DashboardViewModel`/`Dashboard.razor`, `ResearchPageViewModel`/`ResearchPage.razor`, `UploadViewModel`/`Upload.razor`, `RecordingViewModel`/`Recording.razor` (mockado), `EditorViewModel`/`Editor.razor`, `SettingsViewModel`/`Settings.razor`, `NewPageModalViewModel`/`NewPageModal.razor`, `IconPickerViewModel`/`IconPicker.razor`, `ColorPickerViewModel`/`ColorPicker.razor`, `SpeakerDropdownViewModel`/`SpeakerDropdown.razor`.
+- **Dependencies**: `Transcriba.Core` (serviços de aplicação), `NavigationService`, `Microsoft.AspNetCore.Components.WebView.Wpf`.
+- **Reuses**: ViewModels (lógica de estado/comando) reaproveitados quase 1:1 da implementação Avalonia descontinuada; CSS do protótipo `transcriba-v2-icons-transcriptions.html` reaproveitado quase verbatim.
 
 ### NavigationService
 
@@ -287,6 +306,8 @@ public class UserSettings
 | Paralelismo interno de `CalcularLimitesParalelos` assume uso exclusivo da CPU/GPU da máquina | `transcrever.cs:543-558` | Rodar 2+ jobs simultâneos da fila sobrecarregaria os núcleos | Fila processa 1 job por vez por padrão (ver TranscriptionQueueService) |
 | `DbContext` do EF Core não é thread-safe | novo código | Uso simultâneo do contexto por UI thread + worker de background pode corromper estado | Usar `IDbContextFactory<TranscribaDbContext>` e criar um `DbContext` por operação/escopo, nunca compartilhar instância entre threads |
 | LibVLC exige binários nativos (`VideoLAN.LibVLC.Windows`) empacotados com o app | novo código | Sem os binários, playback falha silenciosamente | Referenciar o pacote NuGet como dependência do `Transcriba.App`/publish, documentar no README |
+| `BlazorWebView` requer o runtime WebView2 instalado (já vem pré-instalado no Windows 10 1803+/11, mas pode faltar em imagens mínimas/Server) | novo código (AD-005) | App não inicia se o WebView2 Runtime não estiver presente | Detectar ausência no startup e mostrar mensagem clara com link do instalador Evergreen; documentar no README como pré-requisito |
+| Comunicação entre Razor components e lógica de canvas (waveform) exige JS interop pontual (`IJSRuntime`) | novo código (AD-005) | Superfície pequena de JS residual, diferente do padrão 100% C# do restante do app | Isolar JS interop em um único módulo (`wwwroot/js/waveform.js`) com contrato mínimo, documentado como exceção deliberada |
 | `GarantirFfmpeg` pode exigir prompt de elevação/UAC do winget em algumas máquinas | `transcrever.cs:394-419` | Instalação automática pode falhar silenciosamente em ambientes restritos | Mesma mensagem de fallback manual do POC, exibida como erro claro na UI (não apenas console) |
 | Nenhuma cobertura de testes automatizados existe hoje (nem para `transcrever.cs`, nem para o protótipo) | N/A | Risco de regressão ao portar lógica | Tasks de Execute incluem testes unitários para `SilenceSplitter`, `SegmentEditingService` e `AgruparPartes`/`ChunkPlanner` (lógica pura, fácil de testar sem I/O) |
 

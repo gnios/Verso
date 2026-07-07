@@ -6,7 +6,7 @@ namespace Transcriba.Tests.Engine;
 public class ChunkPlannerTests
 {
     [Fact]
-    public void GroupParts_WhenTrechosLessOrEqualMaxPartes_ReturnsUnchanged()
+    public void GroupParts_WhenTrechosLessOrEqualMaxPartes_ReturnsOnePartPerTrechoWithSingleSpan()
     {
         var trechos = new List<(double OffsetSec, float[] Samples)>
         {
@@ -17,14 +17,17 @@ public class ChunkPlannerTests
         var result = ChunkPlanner.GroupParts(trechos, maxPartes: 3);
 
         Assert.Equal(2, result.Count);
-        Assert.Equal(0, result[0].OffsetSec);
-        Assert.Equal(1.5, result[1].OffsetSec);
+        Assert.Equal(0, result[0].Chunks[0].OriginalOffsetSec);
+        Assert.Equal(1.5, result[1].Chunks[0].OriginalOffsetSec);
         Assert.Equal([1f, 2f], result[0].Samples);
         Assert.Equal([3f, 4f, 5f], result[1].Samples);
+        // Cada parte tem um único ChunkSpan começando em 0 dentro da parte.
+        Assert.Single(result[0].Chunks);
+        Assert.Equal(0, result[0].Chunks[0].StartInPartSec);
     }
 
     [Fact]
-    public void GroupParts_WhenTrechosExceedMaxPartes_GroupsRespectingOffsets()
+    public void GroupParts_WhenTrechosExceedMaxPartes_GroupsRespectingOffsetsAndRecordsSpans()
     {
         var trechos = new List<(double OffsetSec, float[] Samples)>
         {
@@ -39,35 +42,67 @@ public class ChunkPlannerTests
         var result = ChunkPlanner.GroupParts(trechos, maxPartes: 2);
 
         Assert.Equal(2, result.Count);
-        Assert.Equal(0, result[0].OffsetSec);
-        Assert.True(result[1].OffsetSec >= 2.0);
+        Assert.Equal(0, result[0].Chunks[0].OriginalOffsetSec);
+        Assert.True(result[1].Chunks[0].OriginalOffsetSec >= 2.0);
         Assert.Equal(3000, result[0].Samples.Length);
         Assert.Equal(3000, result[1].Samples.Length);
+        // A primeira parte agrupa 3 trechos → 3 ChunkSpans, contíguos dentro da parte.
+        Assert.Equal(3, result[0].Chunks.Count);
+        Assert.Equal(0, result[0].Chunks[0].StartInPartSec);
+        Assert.Equal(1000 / (double)AudioLoader.SampleRate, result[0].Chunks[0].DurationSec);
+        Assert.Equal(1000 / (double)AudioLoader.SampleRate, result[0].Chunks[1].StartInPartSec);
     }
 
     [Fact]
-    public void CalculateParallelLimits_ForCuda_ProducesParallelismAtMostTwo()
+    public void MapToRealTime_WithSilenceGaps_MapsToOriginalOffsetNotPartOffset()
     {
-        var (_, paralelismo, _) = ChunkPlanner.CalculateParallelLimits(ExecutionDevice.Cuda);
+        // Trechos com silêncio entre eles (offsets 0, 5, 10, 15; cada trecho 1s de áudio).
+        // Sem o mapeamento, um segmento do whisper no 2º trecho da parte (tempo 1.5s
+        // dentro da parte) mapearia para partOffset(0) + 1.5 = 1.5s — errado, deveria ser
+        // 5.0 + (1.5 - 1.0) = 5.5s (offset original do 2º trecho + tempo dentro dele).
+        var trechos = new List<(double OffsetSec, float[] Samples)>
+        {
+            (0, new float[AudioLoader.SampleRate]),     // 1s @ 16kHz
+            (5, new float[AudioLoader.SampleRate]),
+            (10, new float[AudioLoader.SampleRate]),
+            (15, new float[AudioLoader.SampleRate]),
+        };
 
-        Assert.InRange(paralelismo, 1, 2);
+        var result = ChunkPlanner.GroupParts(trechos, maxPartes: 2);
+        var part0 = result[0]; // trechos 0 e 5 → spans [ChunkSpan(0,0,1), ChunkSpan(5,1,1)]
+
+        // 0.5s cai no 1º trecho (0..1 dentro da parte) → 0 + 0.5 = 0.5
+        Assert.Equal(0.5, ChunkPlanner.MapToRealTime(0.5, part0.Chunks), precision: 6);
+        // 1.5s cai no 2º trecho (1..2 dentro da parte, offset original 5) → 5 + 0.5 = 5.5
+        Assert.Equal(5.5, ChunkPlanner.MapToRealTime(1.5, part0.Chunks), precision: 6);
     }
 
     [Fact]
-    public void CalculateParallelLimits_ForVulkan_ProducesParallelismAtMostTwo()
+    public void MapToRealTime_BeyondLastChunk_UsesLastChunkOffset()
     {
-        var (_, paralelismo, _) = ChunkPlanner.CalculateParallelLimits(ExecutionDevice.Vulkan);
+        var chunks = new[]
+        {
+            new ChunkSpan(0, 0, 1),
+            new ChunkSpan(5, 1, 1),
+        };
 
-        Assert.InRange(paralelismo, 1, 2);
+        // 2.5s está além do último trecho (1..2) → usa o último: 5 + (2.5 - 1) = 6.5
+        Assert.Equal(6.5, ChunkPlanner.MapToRealTime(2.5, chunks), precision: 6);
     }
 
-    [Fact]
-    public void CalculateParallelLimits_ForCpu_UsesAllProcessorThreads()
+    // O whisper.net/whisper.cpp não é seguro para decodificação nativa concorrente
+    // (ver sandrohanea/whisper.net#341); por isso o paralelismo é sempre 1,
+    // independente do dispositivo, e cada decodificação usa todos os núcleos.
+    [Theory]
+    [InlineData(ExecutionDevice.Cpu)]
+    [InlineData(ExecutionDevice.Cuda)]
+    [InlineData(ExecutionDevice.Vulkan)]
+    [InlineData(ExecutionDevice.Auto)]
+    public void CalculateParallelLimits_AlwaysSerializesNativeDecoding(ExecutionDevice device)
     {
-        var (maxPartes, paralelismo, threadsPorJob) = ChunkPlanner.CalculateParallelLimits(ExecutionDevice.Cpu);
+        var (_, paralelismo, threadsPorJob) = ChunkPlanner.CalculateParallelLimits(device);
 
-        Assert.Equal(Environment.ProcessorCount, maxPartes);
-        Assert.Equal(Environment.ProcessorCount, paralelismo);
-        Assert.Equal(1, threadsPorJob);
+        Assert.Equal(1, paralelismo);
+        Assert.Equal(Environment.ProcessorCount, threadsPorJob);
     }
 }

@@ -216,6 +216,87 @@ public class LibraryServiceTests
         }
     }
 
+    [Fact]
+    public async Task UpdateTranscriptionTagsAsync_ReplacesExistingTagsWithNewSet()
+    {
+        var (provider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();
+        try
+        {
+            var factory = TestDbHelper.GetFactory(provider);
+            var transcriptionId = Guid.NewGuid();
+
+            await using (var ctx = await factory.CreateDbContextAsync())
+            {
+                ctx.Transcriptions.Add(new Transcription
+                {
+                    Id = transcriptionId,
+                    Title = "Tags mutáveis",
+                    Status = TranscriptionStatus.Done,
+                    CreatedAt = DateTime.UtcNow,
+                    Tags =
+                    [
+                        new Tag { Name = "antiga", ColorName = "blue" },
+                        new Tag { Name = "descartada", ColorName = "green" }
+                    ]
+                });
+                await ctx.SaveChangesAsync();
+            }
+
+            var service = new LibraryService(factory);
+            await service.UpdateTranscriptionTagsAsync(transcriptionId, ["nova", "reutilizada", "  descartada  "]);
+
+            var detail = await service.GetTranscriptionDetailAsync(transcriptionId);
+            Assert.NotNull(detail);
+            var tagNames = detail!.Tags.Select(t => t.Name).Order().ToList();
+            Assert.Equal(["descartada", "nova", "reutilizada"], tagNames);
+
+            // A tag "antiga" foi removida desta transcrição, mas a linha global de Tag
+            // permanece (Tags são globais/únicas por nome — apenas a associação é trocada).
+            await using var ctx2 = await factory.CreateDbContextAsync();
+            var stillHasAntigaRow = await ctx2.Tags.AnyAsync(t => t.Name == "antiga");
+            Assert.True(stillHasAntigaRow);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task UpdateTranscriptionTagsAsync_WithEmptySet_ClearsAllTags()
+    {
+        var (provider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();
+        try
+        {
+            var factory = TestDbHelper.GetFactory(provider);
+            var transcriptionId = Guid.NewGuid();
+
+            await using (var ctx = await factory.CreateDbContextAsync())
+            {
+                ctx.Transcriptions.Add(new Transcription
+                {
+                    Id = transcriptionId,
+                    Title = "Sem tags",
+                    Status = TranscriptionStatus.Done,
+                    CreatedAt = DateTime.UtcNow,
+                    Tags = [new Tag { Name = "remover", ColorName = "blue" }]
+                });
+                await ctx.SaveChangesAsync();
+            }
+
+            var service = new LibraryService(factory);
+            await service.UpdateTranscriptionTagsAsync(transcriptionId, []);
+
+            var detail = await service.GetTranscriptionDetailAsync(transcriptionId);
+            Assert.NotNull(detail);
+            Assert.Empty(detail!.Tags);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
     private static async Task<int> SeedSampleTranscriptionsAsync(IDbContextFactory<TranscribaDbContext> factory)
     {
         await using var ctx = await factory.CreateDbContextAsync();

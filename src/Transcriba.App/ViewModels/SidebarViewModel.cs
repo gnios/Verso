@@ -120,14 +120,21 @@ public partial class SidebarViewModel : ViewModelBase
     private void NewResearch()
     {
         IsNewMenuOpen = false;
-        _newPageModal.Open(NewPageMode.Research);
+        _newPageModal.Open();
     }
 
     [RelayCommand]
     private void NewTranscription()
     {
         IsNewMenuOpen = false;
-        _newPageModal.Open(NewPageMode.Transcription);
+        _navigation.NavigateTo(ScreenKey.Upload);
+    }
+
+    [RelayCommand]
+    private void ImportFile()
+    {
+        IsNewMenuOpen = false;
+        _navigation.NavigateTo(ScreenKey.Upload);
     }
 
     [RelayCommand]

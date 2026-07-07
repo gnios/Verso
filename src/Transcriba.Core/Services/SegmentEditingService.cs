@@ -42,16 +42,26 @@ public class SegmentEditingService
             return null;
         }
 
+        // Divide o intervalo de tempo [start,end] proporcionalmente ao caret, para que as
+        // duas metades fiquem sincronizadas com o áudio. Antes ambas herdavam o intervalo
+        // completo do segmento original — sobrepostos, o destaque por playback (que pega o
+        // último segmento com StartSeconds <= posição) sempre caía na segunda metade, e a
+        // atribuição de locutor (que usa o segmento ativo de playback) bugava.
+        var duration = segment.EndSeconds - segment.StartSeconds;
+        var splitFraction = text.Length > 0 ? (double)caretIndex / text.Length : 0.5;
+        var splitPoint = segment.StartSeconds + duration * splitFraction;
+
         var beforeSegment = CloneSegment(segment);
         beforeSegment.Text = before;
+        beforeSegment.EndSeconds = splitPoint;
 
         var afterSegment = CloneSegment(segment);
         afterSegment.Id = Guid.NewGuid();
         afterSegment.Text = after;
+        afterSegment.StartSeconds = splitPoint;
 
         return (beforeSegment, afterSegment);
     }
-
     public Segment? MergeWithPrevious(IReadOnlyList<Segment> segments, Segment active)
     {
         var ordered = segments.OrderBy(s => s.SortOrder).ToList();
@@ -64,6 +74,10 @@ public class SegmentEditingService
 
         var previous = ordered[index - 1];
         previous.Text = $"{previous.Text} {active.Text}".Trim();
+        // Estende o intervalo do segmento anterior até o fim do segmento mesclado, para
+        // que o resultado cubra todo o áudio [previous.Start, active.End] — antes o fim
+        // permanecia em previous.End, deixando a segunda metade do áudio sem sincronia.
+        previous.EndSeconds = active.EndSeconds;
         return previous;
     }
 

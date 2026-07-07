@@ -61,8 +61,10 @@
         <div>
             @foreach (var research in ViewModel.Researches)
             {
-                <div class="sidebar-item" @onclick="() => research.ToggleExpandCommand.Execute(null)">
-                    <svg class="chevron @(research.IsExpanded ? "expanded" : "")" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6" /></svg>
+                <div class="sidebar-item" @onclick="() => research.NavigateCommand.Execute(null)" title="@research.Title">
+                    <span class="chevron-toggle" @onclick="() => research.ToggleExpandCommand.Execute(null)" @onclick:stopPropagation="true">
+                        <svg class="chevron @(research.IsExpanded ? "expanded" : "")" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6" /></svg>
+                    </span>
                     <span class="page-icon" style="color:@research.ColorHex">@research.Icon</span>
                     @research.Title
                     <span class="badge">@research.TranscriptionCount</span>

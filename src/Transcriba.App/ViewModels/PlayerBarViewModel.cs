@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Transcriba.App.Services;
 using Transcriba.Core.Media;
 
 namespace Transcriba.App.ViewModels;
@@ -56,9 +57,7 @@ public partial class PlayerBarViewModel : ViewModelBase
     {
         if (string.IsNullOrWhiteSpace(mediaPath))
         {
-            TotalTimeDisplay = "00:00";
-            CurrentTimeDisplay = "00:00";
-            ProgressPercent = 0;
+            await UnloadAsync();
             return;
         }
 
@@ -66,6 +65,15 @@ public partial class PlayerBarViewModel : ViewModelBase
         UpdateDurationDisplay();
         UpdateProgress(0);
         CurrentTimeDisplay = "00:00";
+        IsPlaying = false;
+    }
+
+    public async Task UnloadAsync()
+    {
+        await _playback.UnloadAsync();
+        TotalTimeDisplay = "00:00";
+        CurrentTimeDisplay = "00:00";
+        ProgressPercent = 0;
         IsPlaying = false;
     }
 
@@ -123,24 +131,28 @@ public partial class PlayerBarViewModel : ViewModelBase
         IsPlaying = false;
     }
 
-    private void OnPlaybackPositionChanged(object? sender, TimeSpan position)
-    {
-        var duration = _playback.Duration;
-        var percent = duration > TimeSpan.Zero ? position.TotalSeconds / duration.TotalSeconds : 0;
-        UpdateProgress(percent);
-        UpdateCurrentTimeDisplay(position);
-        PositionChanged?.Invoke(this, position);
-
-        if (!_playback.IsPlaying)
+    private void OnPlaybackPositionChanged(object? sender, TimeSpan position) =>
+        // O serviço de playback dispara este evento a partir do timer de posição (thread pool),
+        // não da UI. Repassar direto derruba o app com "The calling thread cannot access this
+        // object because a different thread owns it" ao atualizar Bindings/Commands do Avalonia.
+        UiThread.Invoke(() =>
         {
-            IsPlaying = false;
-        }
+            var duration = _playback.Duration;
+            var percent = duration > TimeSpan.Zero ? position.TotalSeconds / duration.TotalSeconds : 0;
+            UpdateProgress(percent);
+            UpdateCurrentTimeDisplay(position);
+            PositionChanged?.Invoke(this, position);
 
-        if (duration > TimeSpan.Zero && position >= duration)
-        {
-            IsPlaying = false;
-        }
-    }
+            if (!_playback.IsPlaying)
+            {
+                IsPlaying = false;
+            }
+
+            if (duration > TimeSpan.Zero && position >= duration)
+            {
+                IsPlaying = false;
+            }
+        });
 
     private void UpdateDurationDisplay()
     {

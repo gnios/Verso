@@ -18,6 +18,13 @@ internal sealed class FakeMediaPlaybackService : IMediaPlaybackService
         return Task.CompletedTask;
     }
 
+    public Task UnloadAsync()
+    {
+        LoadedPath = null;
+        IsPlaying = false;
+        return Task.CompletedTask;
+    }
+
     public string? LoadedPath { get; private set; }
 
     public void Play() => IsPlaying = true;

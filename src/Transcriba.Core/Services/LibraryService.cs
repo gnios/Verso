@@ -63,7 +63,9 @@ public class LibraryService(IDbContextFactory<TranscribaDbContext> dbContextFact
         string language,
         ModelQuality quality,
         SpeakerMode speakerMode,
-        int? researchPageId)
+        int? researchPageId,
+        string? icon = null,
+        IEnumerable<string>? tagNames = null)
     {
         await using var context = await dbContextFactory.CreateDbContextAsync();
 
@@ -71,7 +73,7 @@ public class LibraryService(IDbContextFactory<TranscribaDbContext> dbContextFact
         {
             Id = id,
             Title = title,
-            Icon = "📝",
+            Icon = icon ?? "📝",
             Status = TranscriptionStatus.InProgress,
             MediaFilePath = mediaFilePath,
             Language = language,
@@ -81,6 +83,7 @@ public class LibraryService(IDbContextFactory<TranscribaDbContext> dbContextFact
             CreatedAt = DateTime.UtcNow,
         };
 
+        await ApplyTagsAsync(context, transcription, tagNames);
         context.Transcriptions.Add(transcription);
         await context.SaveChangesAsync();
         return transcription;
@@ -133,6 +136,23 @@ public class LibraryService(IDbContextFactory<TranscribaDbContext> dbContextFact
         }
     }
 
+    public async Task UpdateTranscriptionTagsAsync(Guid id, IEnumerable<string> tagNames)
+    {
+        await using var context = await dbContextFactory.CreateDbContextAsync();
+        var transcription = await context.Transcriptions
+            .Include(t => t.Tags)
+            .FirstOrDefaultAsync(t => t.Id == id);
+
+        if (transcription is null)
+        {
+            throw new InvalidOperationException($"Transcrição {id} não encontrada.");
+        }
+
+        transcription.Tags.Clear();
+        await ApplyTagsAsync(context, transcription, tagNames);
+        await context.SaveChangesAsync();
+    }
+
     public async Task UpdateSegmentTextAsync(Guid segmentId, string text)
     {
         await using var context = await dbContextFactory.CreateDbContextAsync();
@@ -150,6 +170,7 @@ public class LibraryService(IDbContextFactory<TranscribaDbContext> dbContextFact
         Guid transcriptionId,
         Guid segmentId,
         string beforeText,
+        double beforeEndSeconds,
         Segment afterSegment)
     {
         await using var context = await dbContextFactory.CreateDbContextAsync();
@@ -160,8 +181,8 @@ public class LibraryService(IDbContextFactory<TranscribaDbContext> dbContextFact
         {
             throw new InvalidOperationException($"Segmento {segmentId} não encontrado.");
         }
-
         segment.Text = beforeText;
+        segment.EndSeconds = beforeEndSeconds;
         var insertOrder = segment.SortOrder + 1;
 
         var toShift = await context.Segments
@@ -191,6 +212,7 @@ public class LibraryService(IDbContextFactory<TranscribaDbContext> dbContextFact
         Guid transcriptionId,
         Guid previousSegmentId,
         string mergedText,
+        double mergedEndSeconds,
         Guid removeSegmentId)
     {
         await using var context = await dbContextFactory.CreateDbContextAsync();
@@ -203,9 +225,9 @@ public class LibraryService(IDbContextFactory<TranscribaDbContext> dbContextFact
         {
             throw new InvalidOperationException("Segmentos para mesclagem não encontrados.");
         }
-
         var removedOrder = remove.SortOrder;
         previous.Text = mergedText;
+        previous.EndSeconds = mergedEndSeconds;
         context.Segments.Remove(remove);
 
         var toShift = await context.Segments
@@ -281,6 +303,22 @@ public class LibraryService(IDbContextFactory<TranscribaDbContext> dbContextFact
             CreatedAt = DateTime.UtcNow,
         };
 
+        await ApplyTagsAsync(context, transcription, tagNames);
+        context.Transcriptions.Add(transcription);
+        await context.SaveChangesAsync();
+        return transcription;
+    }
+
+    private static async Task ApplyTagsAsync(
+        TranscribaDbContext context,
+        Transcription transcription,
+        IEnumerable<string>? tagNames)
+    {
+        if (tagNames is null)
+        {
+            return;
+        }
+
         foreach (var tagName in tagNames
                      .Select(t => t.Trim())
                      .Where(t => !string.IsNullOrEmpty(t))
@@ -299,10 +337,6 @@ public class LibraryService(IDbContextFactory<TranscribaDbContext> dbContextFact
 
             transcription.Tags.Add(tag);
         }
-
-        context.Transcriptions.Add(transcription);
-        await context.SaveChangesAsync();
-        return transcription;
     }
 
     private static IQueryable<Transcription> ApplyFilter(IQueryable<Transcription> query, LibraryFilter filter)

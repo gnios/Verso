@@ -109,4 +109,102 @@ public class ResearchServiceTests
             TestDbHelper.Cleanup(directory);
         }
     }
+    [Fact]
+    public async Task AssignTranscriptionToResearchAsync_LinksTranscriptionToResearch()
+    {
+        var (provider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();
+        try
+        {
+            var factory = TestDbHelper.GetFactory(provider);
+            var service = new ResearchService(factory);
+            var page = await service.CreateAsync("Pesquisa alvo", "🔬", "green");
+
+            var transcriptionId = Guid.NewGuid();
+            await using (var ctx = await factory.CreateDbContextAsync())
+            {
+                ctx.Transcriptions.Add(new Transcription
+                {
+                    Id = transcriptionId,
+                    Title = "Solta",
+                    Status = TranscriptionStatus.Done
+                });
+                await ctx.SaveChangesAsync();
+            }
+
+            await service.AssignTranscriptionToResearchAsync(transcriptionId, page.Id);
+
+            await using var readCtx = await factory.CreateDbContextAsync();
+            var transcription = await readCtx.Transcriptions.SingleAsync(t => t.Id == transcriptionId);
+            Assert.Equal(page.Id, transcription.ResearchPageId);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task AssignTranscriptionToResearchAsync_WithNullId_UnlinksTranscription()
+    {
+        var (provider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();
+        try
+        {
+            var factory = TestDbHelper.GetFactory(provider);
+            var service = new ResearchService(factory);
+            var page = await service.CreateAsync("Pesquisa origem", "📚", "blue");
+
+            var transcriptionId = Guid.NewGuid();
+            await using (var ctx = await factory.CreateDbContextAsync())
+            {
+                ctx.Transcriptions.Add(new Transcription
+                {
+                    Id = transcriptionId,
+                    Title = "Vinculada",
+                    Status = TranscriptionStatus.Done,
+                    ResearchPageId = page.Id
+                });
+                await ctx.SaveChangesAsync();
+            }
+
+            await service.AssignTranscriptionToResearchAsync(transcriptionId, null);
+
+            await using var readCtx = await factory.CreateDbContextAsync();
+            var transcription = await readCtx.Transcriptions.SingleAsync(t => t.Id == transcriptionId);
+            Assert.Null(transcription.ResearchPageId);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task AssignTranscriptionToResearchAsync_WithUnknownResearch_Throws()
+    {
+        var (provider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();
+        try
+        {
+            var factory = TestDbHelper.GetFactory(provider);
+            var service = new ResearchService(factory);
+            var transcriptionId = Guid.NewGuid();
+            await using (var ctx = await factory.CreateDbContextAsync())
+            {
+                ctx.Transcriptions.Add(new Transcription
+                {
+                    Id = transcriptionId,
+                    Title = "X",
+                    Status = TranscriptionStatus.Done
+                });
+                await ctx.SaveChangesAsync();
+            }
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                service.AssignTranscriptionToResearchAsync(transcriptionId, 9999));
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
 }

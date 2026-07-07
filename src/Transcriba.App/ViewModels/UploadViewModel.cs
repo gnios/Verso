@@ -9,6 +9,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Transcriba.App.Services;
+using Transcriba.Core.Catalogs;
 using Transcriba.Core.Data.Entities;
 using Transcriba.Core.Engine;
 using Transcriba.Core.Services;
@@ -24,6 +25,9 @@ public partial class UploadViewModel : ViewModelBase
     private readonly TranscriptionQueueService _queueService;
 
     public ObservableCollection<ResearchOptionViewModel> ResearchOptions { get; } = [];
+
+    public IconPickerViewModel IconPicker { get; } = new();
+
 
     public IReadOnlyList<LanguageOptionViewModel> LanguageOptions { get; } =
     [
@@ -83,9 +87,15 @@ public partial class UploadViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isStarting;
 
-    public bool HasSelectedFile => !string.IsNullOrWhiteSpace(SelectedFilePath);
+    [ObservableProperty]
+    private string _title = "";
 
-    public bool CanStart => HasSelectedFile && !IsStarting;
+    [ObservableProperty]
+    private string _tagsText = "";
+
+
+    public bool HasSelectedFile => !string.IsNullOrWhiteSpace(SelectedFilePath);
+    public bool CanStart => HasSelectedFile && !IsStarting && !string.IsNullOrWhiteSpace(Title);
 
     public string SupportedFormatsLabel => UploadMediaFormats.DisplayList;
 
@@ -105,6 +115,15 @@ public partial class UploadViewModel : ViewModelBase
 
     public void Initialize(NavigationParameter? parameter)
     {
+        ClearSelectedFile();
+        ValidationError = null;
+        IsDragOver = false;
+        IsStarting = false;
+        Title = "";
+        TagsText = "";
+        IconPicker.UseTranscriptionIcons = true;
+        IconPicker.AllowNoIcon = false;
+        IconPicker.SelectedIcon = IconCatalog.TransIcons[0];
         _ = LoadFormAsync(parameter?.ResearchId);
     }
 
@@ -129,11 +148,23 @@ public partial class UploadViewModel : ViewModelBase
         SelectedFilePath = path;
         SelectedFileName = Path.GetFileName(path);
         SelectedFileSize = FormatFileSize(new FileInfo(path).Length);
+        if (string.IsNullOrWhiteSpace(Title))
+        {
+            Title = Path.GetFileNameWithoutExtension(path);
+        }
         NotifyStartState();
         return true;
     }
 
     public void ClearDragOver() => IsDragOver = false;
+
+    [RelayCommand]
+    private void ClearFile()
+    {
+        ValidationError = null;
+        ClearSelectedFile();
+        NotifyStartState();
+    }
 
     partial void OnSelectedFilePathChanged(string? value) => NotifyStartState();
 
@@ -166,7 +197,7 @@ public partial class UploadViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(CanStart))]
     private async Task StartTranscriptionAsync()
     {
-        if (string.IsNullOrWhiteSpace(SelectedFilePath))
+        if (string.IsNullOrWhiteSpace(SelectedFilePath) || string.IsNullOrWhiteSpace(Title))
         {
             return;
         }
@@ -176,7 +207,6 @@ public partial class UploadViewModel : ViewModelBase
         {
             var transcriptionId = Guid.NewGuid();
             var mediaPath = await _mediaStorage.CopyToAppDataAsync(SelectedFilePath, transcriptionId);
-            var title = Path.GetFileNameWithoutExtension(SelectedFilePath);
 
             using var scope = _scopeFactory.CreateScope();
             var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
@@ -185,12 +215,14 @@ public partial class UploadViewModel : ViewModelBase
 
             await libraryService.CreateForUploadAsync(
                 transcriptionId,
-                title,
+                Title.Trim(),
                 mediaPath,
                 Language,
                 Quality,
                 SpeakerMode,
-                SelectedResearch?.Id);
+                SelectedResearch?.Id,
+                IconPicker.SelectedIcon,
+                ParseTags(TagsText));
 
             _queueService.Enqueue(new TranscriptionJobRequest(
                 transcriptionId,
@@ -210,6 +242,8 @@ public partial class UploadViewModel : ViewModelBase
             IsStarting = false;
         }
     }
+
+    partial void OnTitleChanged(string value) => NotifyStartState();
 
     private async Task LoadFormAsync(int? preselectedResearchId)
     {
@@ -261,6 +295,8 @@ public partial class UploadViewModel : ViewModelBase
         var size = bytes / (1024d * 1024d);
         return size.ToString("0.#", CultureInfo.GetCultureInfo("pt-BR")) + " MB";
     }
+    private static string[] ParseTags(string tagsText) =>
+        tagsText.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 }
 
 public sealed record LanguageOptionViewModel(string Code, string Label)

@@ -15,6 +15,7 @@ public sealed class DefaultWhisperFactoryLoader : IWhisperFactoryLoader
 public interface IWhisperFactoryCache : IDisposable
 {
     WhisperFactory GetOrCreate(string modelPath);
+    void Invalidate(string? modelPath = null);
     int LoadCount { get; }
 }
 
@@ -37,13 +38,44 @@ public sealed class WhisperFactoryCache : IWhisperFactoryCache
         lock (_lock)
         {
             if (_modelPath == modelPath)
+            {
                 return _factory!;
+            }
 
             _factory?.Dispose();
-            _factory = _loader.Load(modelPath);
-            _modelPath = modelPath;
-            LoadCount++;
-            return _factory;
+            _factory = null;
+            _modelPath = null;
+
+            try
+            {
+                _factory = _loader.Load(modelPath);
+                _modelPath = modelPath;
+                LoadCount++;
+                return _factory;
+            }
+            catch
+            {
+                _factory?.Dispose();
+                _factory = null;
+                _modelPath = null;
+                throw;
+            }
+        }
+    }
+
+    public void Invalidate(string? modelPath = null)
+    {
+        lock (_lock)
+        {
+            if (modelPath is not null &&
+                !string.Equals(_modelPath, modelPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            _factory?.Dispose();
+            _factory = null;
+            _modelPath = null;
         }
     }
 

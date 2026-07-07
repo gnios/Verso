@@ -32,8 +32,10 @@ public class WhisperTranscriptionEngineTests : IDisposable
     }
 
     [Fact]
-    public async Task TranscribeAsync_CalledTwiceWithSameModel_ReusesWhisperFactory()
+    public async Task TranscribeAsync_CalledTwice_ReloadsFactoryPerJob()
     {
+        // Mitigação do crash 0x80131506: a fábrica é invalidada ao fim de cada job,
+        // forçando recarga na próxima transcrição (lifetime nativo isolado por job).
         var wavPath = CreateTempWav(seconds: 1, frequencyHz: 440);
         var modelEnsurer = new NoOpModelEnsurer();
         var factoryCache = new CountingWhisperFactoryCache();
@@ -48,8 +50,12 @@ public class WhisperTranscriptionEngineTests : IDisposable
         await engine.TranscribeAsync(request, progress: null, CancellationToken.None);
         await engine.TranscribeAsync(request with { TranscriptionId = Guid.NewGuid() }, progress: null, CancellationToken.None);
 
-        Assert.Equal(1, factoryCache.LoadCount);
-        Assert.Equal(1, engine.FactoryLoadCount);
+        // Cada job recarrega a fábrica (Invalidate ao fim de cada job). Trade-off:
+        // recarregar o modelo a cada transcrição é mais lento, mas isola o lifetime
+        // nativo do WhisperFactory por job — evita acumular centenas de ciclos de
+        // create/dispose de processor na mesma fábrica, que corrompia a heap.
+        Assert.Equal(2, factoryCache.LoadCount);
+        Assert.Equal(2, engine.FactoryLoadCount);
     }
 
     [Fact]
@@ -58,10 +64,19 @@ public class WhisperTranscriptionEngineTests : IDisposable
         var wavPath = CreateTempWav(seconds: 3, frequencyHz: 440);
         var modelEnsurer = new NoOpModelEnsurer();
         var factoryCache = new CountingWhisperFactoryCache();
-        var processorFactory = new DelayingWhisperProcessorFactory(TimeSpan.FromSeconds(2));
+        var processorFactory = new StubWhisperProcessorFactory(
+        [
+            new WhisperSegmentResult(TimeSpan.Zero, TimeSpan.FromSeconds(1), "segmento"),
+        ]);
 
         using var engine = CreateEngine(modelEnsurer, factoryCache, processorFactory);
-        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
+        // Token pré-cancelado: o engine honra o cancelamento no checkpoint entre etapas
+        // (ThrowIfCancellationRequested após EnsureModelAsync), antes de qualquer
+        // decodificação nativa. O cancelamento mid-decode foi intencionalmente removido
+        // — rasgar o enumerável nativo no meio de whisper_full_with_state era o gatilho
+        // de corrupção de heap (ver WhisperProcessorAdapter.ProcessAsync).
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             engine.TranscribeAsync(CreateRequest(wavPath), progress: null, cts.Token));
@@ -101,6 +116,8 @@ public class WhisperTranscriptionEngineTests : IDisposable
             modelEnsurer,
             factoryCache,
             processorFactory,
+            logger: null,
+            mediaPlayback: null,
             _modelsDirectory);
 
     private TranscriptionJobRequest CreateRequest(string wavPath) =>
@@ -141,23 +158,30 @@ public class WhisperTranscriptionEngineTests : IDisposable
         }
     }
 
+    // Modela o cache real: GetOrCreate retorna o factory cacheado se o path não mudou
+    // nem foi invalidado; caso contrário "carrega" (LoadCount++) e cacheia. Invalidate
+    // descarta o cache atual, forçando recarga na próxima GetOrCreate.
     private sealed class CountingWhisperFactoryCache : IWhisperFactoryCache
     {
-        private readonly HashSet<string> _loadedPaths = new(StringComparer.OrdinalIgnoreCase);
+        private string? _currentPath;
 
         public int LoadCount { get; private set; }
 
         public WhisperFactory GetOrCreate(string modelPath)
         {
-            if (_loadedPaths.Add(modelPath))
-                LoadCount++;
+            if (_currentPath == modelPath)
+                return null!;
 
+            LoadCount++;
+            _currentPath = modelPath;
             return null!;
         }
 
         public void Dispose()
         {
         }
+
+        public void Invalidate(string? modelPath = null) => _currentPath = null;
     }
 
     private sealed class CountingWhisperFactoryLoader : IWhisperFactoryLoader
@@ -189,25 +213,6 @@ public class WhisperTranscriptionEngineTests : IDisposable
             cancellationToken.ThrowIfCancellationRequested();
             foreach (var segment in segments)
                 yield return segment;
-        }
-    }
-
-    private sealed class DelayingWhisperProcessorFactory(TimeSpan delay) : IWhisperProcessorFactory
-    {
-        public IWhisperProcessor CreateProcessor(string modelPath, string language, int threads) =>
-            new DelayingWhisperProcessor(delay);
-    }
-
-    private sealed class DelayingWhisperProcessor(TimeSpan delay) : IWhisperProcessor
-    {
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-
-        public async IAsyncEnumerable<WhisperSegmentResult> ProcessAsync(
-            float[] samples,
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
-        {
-            await Task.Delay(delay, cancellationToken);
-            yield return new WhisperSegmentResult(TimeSpan.Zero, TimeSpan.FromSeconds(1), "late");
         }
     }
 }

@@ -52,17 +52,22 @@
                     <span>@ViewModel.MetaDuration</span>
                     <span class="editor-meta-dot"></span>
                     <span>@ViewModel.MetaSpeakerCount</span>
+                    <span class="editor-meta-dot"></span>
+                    <ResearchCombobox Options="ViewModel.ResearchOptions" SelectedId="ViewModel.SelectedResearchId" OnSelected="OnResearchSelected" />
                 </div>
 
-                @if (ViewModel.Tags.Count > 0)
-                {
-                    <div class="editor-tags">
-                        @foreach (var tag in ViewModel.Tags)
-                        {
-                            <span class="tag tag-sm tag-@tag.ColorName">@tag.Name</span>
-                        }
+                <div class="editor-tags editor-tags-editable">
+                    @foreach (var tag in ViewModel.Tags)
+                    {
+                        <span class="tag tag-sm tag-@tag.ColorName">
+                            @tag.Name
+                            <button type="button" class="tag-remove" title="Remover tag" @onclick="() => ViewModel.RemoveTagCommand.ExecuteAsync(tag)" @onclick:stopPropagation="true">×</button>
+                        </span>
+                    }
+                    <div class="tag-add">
+                        <input type="text" class="tag-add-input" placeholder="Adicionar tag…" value="@ViewModel.NewTagInput" @oninput="OnTagInput" @onkeydown="OnTagKeyDown" />
                     </div>
-                }
+                </div>
 
                 @if (ViewModel.IsInProgress || ViewModel.IsError)
                 {
@@ -71,23 +76,6 @@
                 else if (ViewModel.HasSegments)
                 {
                     <div class="editor-toolbar">
-                        <button type="button" @onclick="async () => await ViewModel.SplitSegmentCommand.ExecuteAsync(null)">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5" /><path d="M8 3H3v5" /><path d="M12 22v-8" /><path d="M21 3l-9 9" /><path d="M3 3l9 9" /></svg>
-                            Dividir
-                        </button>
-                        <button type="button" @onclick="async () => await ViewModel.MergeSegmentCommand.ExecuteAsync(null)">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6v6" /><path d="M16 6v6" /><path d="M2 12h20" /></svg>
-                            Mesclar
-                        </button>
-                        <div class="sep"></div>
-                        <div style="position:relative;display:inline-flex">
-                            <button type="button" @onclick="() => ViewModel.ToggleSpeakerDropdownCommand.Execute(null)">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-                                Locutor
-                            </button>
-                            <SpeakerDropdown ViewModel="ViewModel.SpeakerDropdown" />
-                        </div>
-                        <div class="sep"></div>
                         <button type="button" disabled="@(!ViewModel.CanExport)" @onclick="() => ViewModel.ExportCommand.Execute(null)">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
                             Exportar
@@ -206,6 +194,20 @@
             await ViewModel.CommitTitleCommand.ExecuteAsync(null);
         }
     }
+
+    private void OnTagInput(ChangeEventArgs e) =>
+        ViewModel.NewTagInput = e.Value?.ToString() ?? "";
+
+    private async Task OnTagKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await ViewModel.AddTagCommand.ExecuteAsync(null);
+        }
+    }
+
+    private async Task OnResearchSelected(int? researchId) =>
+        await ViewModel.ChangeResearchCommand.ExecuteAsync(researchId);
 
     private void OnExportOverlayClick() =>
         ViewModel.CloseExportDialogCommand.Execute(null);

@@ -24,6 +24,17 @@ public sealed class TranscriptionStatusChangedEventArgs(Guid transcriptionId, Tr
     public string? ErrorMessage { get; init; }
 }
 
+public sealed class TranscriptionProgressEventArgs(Guid transcriptionId, string stage, int? partIndex, int? totalParts) : EventArgs
+{
+    public Guid TranscriptionId { get; } = transcriptionId;
+    public string Stage { get; } = stage;
+    public int? PartIndex { get; } = partIndex;
+    public int? TotalParts { get; } = totalParts;
+    public int? Percent => PartIndex is int i && TotalParts is int t && t > 0
+        ? (int)Math.Round(i * 100.0 / t)
+        : null;
+}
+
 public enum TranscriptionStatusChanged
 {
     Queued,
