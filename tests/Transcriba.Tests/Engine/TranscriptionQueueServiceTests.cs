@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Transcriba.Core.Data;
 using Transcriba.Core.Data.Entities;
 using Transcriba.Core.Engine;
@@ -86,7 +87,10 @@ public class TranscriptionQueueServiceTests
                 await context.SaveChangesAsync();
             }
 
-            var queue = new TranscriptionQueueService(factory, new SuccessTranscriptionEngine());
+            var queue = new TranscriptionQueueService(
+                factory,
+                new SuccessTranscriptionEngine(),
+                NullLogger<TranscriptionQueueService>.Instance);
             await queue.StartAsync(CancellationToken.None);
             await Task.Delay(300);
             await queue.StopAsync(CancellationToken.None);
@@ -101,6 +105,25 @@ public class TranscriptionQueueServiceTests
         {
             CleanupDb(dbPath);
         }
+    }
+
+    [Fact]
+    public async Task Enqueue_ForwardsEngineProgressViaProgressChangedEvent()
+    {
+        var engine = new ProgressReportingEngine();
+        await using var fixture = await QueueFixture.CreateAsync(engine);
+        var transcriptionId = await fixture.SeedTranscriptionAsync();
+
+        var received = new List<TranscriptionProgressEventArgs>();
+        fixture.Queue.ProgressChanged += (_, e) => received.Add(e);
+
+        fixture.Queue.Enqueue(fixture.CreateRequest(transcriptionId));
+        await fixture.WaitForStatusAsync(transcriptionId, TranscriptionStatus.Done);
+
+        Assert.Contains(received, e => e.Stage == "loading");
+        Assert.Contains(received, e => e.Stage == "transcribing" && e.PartIndex == 1 && e.TotalParts == 3);
+        Assert.Contains(received, e => e.Percent == 67);
+        Assert.All(received, e => Assert.Equal(transcriptionId, e.TranscriptionId));
     }
 
     private static string CreateTempDbPath() =>
@@ -129,7 +152,10 @@ public class TranscriptionQueueServiceTests
             await DbBootstrapper.MigrateAsync(provider);
 
             var factory = provider.GetRequiredService<IDbContextFactory<TranscribaDbContext>>();
-            var queue = new TranscriptionQueueService(factory, engine);
+            var queue = new TranscriptionQueueService(
+                factory,
+                engine,
+                NullLogger<TranscriptionQueueService>.Instance);
             await queue.StartAsync(CancellationToken.None);
             await queue.StartupCompleted;
 
@@ -246,6 +272,24 @@ public class TranscriptionQueueServiceTests
             {
                 Interlocked.Decrement(ref _running);
             }
+        }
+    }
+
+    private sealed class ProgressReportingEngine : ITranscriptionEngine
+    {
+        public async Task<TranscriptionResult> TranscribeAsync(
+            TranscriptionJobRequest request,
+            IProgress<EngineProgress>? progress,
+            CancellationToken cancellationToken)
+        {
+            progress?.Report(new EngineProgress("loading"));
+            await Task.Yield();
+            progress?.Report(new EngineProgress("transcribing", 1, 3));
+            await Task.Yield();
+            progress?.Report(new EngineProgress("transcribing", 2, 3));
+            await Task.Yield();
+            progress?.Report(new EngineProgress("done", 3, 3));
+            return new TranscriptionResult([new TranscriptionSegmentResult(0, 1, "ok")]);
         }
     }
 }

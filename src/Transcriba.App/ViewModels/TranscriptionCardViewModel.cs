@@ -53,14 +53,18 @@ public partial class TranscriptionCardViewModel : ViewModelBase
 
 
     [ObservableProperty]
-
+    [NotifyCanExecuteChangedFor(nameof(RetryCommand))]
     private TranscriptionStatus _status;
 
-
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RetryCommand))]
+    private string? _errorMessage;
 
     [ObservableProperty]
+    private int? _progressPercent;
 
-    private string? _errorMessage;
+    [ObservableProperty]
+    private string _progressStage = "";
 
 
 
@@ -79,14 +83,25 @@ public partial class TranscriptionCardViewModel : ViewModelBase
 
 
     public bool IsInProgress => Status == TranscriptionStatus.InProgress;
-
     public bool IsDone => Status == TranscriptionStatus.Done;
-
     public bool IsError => Status == TranscriptionStatus.Error;
 
     public bool CanRetry => IsError && _retryHandler is not null;
-
     public bool CanDelete => _deleteHandler is not null;
+
+    public bool ShowProgress => IsInProgress;
+    public bool IsProgressIndeterminate => IsInProgress && ProgressPercent is null;
+    public int ProgressWidth => ProgressPercent ?? 0;
+    public string ProgressLabel => ProgressStage switch
+    {
+        "loading" => "Carregando modelo…",
+        "preparing" => "Preparando áudio…",
+        "transcribing" => ProgressPercent is int p ? $"Transcrevendo… {p}%" : "Transcrevendo…",
+        "done" => "Concluído",
+        _ => "Em andamento…"
+    };
+    partial void OnProgressPercentChanged(int? value) => OnPropertyChanged(nameof(ProgressLabel));
+    partial void OnProgressStageChanged(string value) => OnPropertyChanged(nameof(ProgressLabel));
 
 
 
@@ -143,7 +158,9 @@ public partial class TranscriptionCardViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsError));
 
         OnPropertyChanged(nameof(CanRetry));
-
+        OnPropertyChanged(nameof(ShowProgress));
+        OnPropertyChanged(nameof(IsProgressIndeterminate));
+        OnPropertyChanged(nameof(ProgressLabel));
     }
 
 
@@ -183,14 +200,7 @@ public partial class TranscriptionCardViewModel : ViewModelBase
 
 
     [RelayCommand(CanExecute = nameof(CanDelete))]
-
     private void Delete() => _deleteHandler?.Invoke(Id);
-
-
-
-    internal void NotifyRetryAvailability() => RetryCommand.NotifyCanExecuteChanged();
-
-
 
     private static string FormatDurationDisplay(double seconds)
 

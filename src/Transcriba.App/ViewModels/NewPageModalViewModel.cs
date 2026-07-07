@@ -10,6 +10,12 @@ using Transcriba.Core.Services;
 
 namespace Transcriba.App.ViewModels;
 
+/// <summary>
+/// Modal "Nova pesquisa / tese". A criação de transcrição avulsa (com arquivo, tags, ícone)
+/// foi migrada para a tela <see cref="UploadViewModel"/>/<c>Upload.razor</c> — este modal
+/// agora atende apenas a criação de pesquisas, então o modo (<see cref="NewPageMode"/>) e
+/// todo o fluxo de seleção de arquivo/tags foram removidos (clean cutover).
+/// </summary>
 public partial class NewPageModalViewModel : ViewModelBase
 {
     private readonly IServiceScopeFactory _scopeFactory;
@@ -23,29 +29,26 @@ public partial class NewPageModalViewModel : ViewModelBase
     private bool _isOpen;
 
     [ObservableProperty]
-    private NewPageMode _mode = NewPageMode.Research;
-
-    [ObservableProperty]
     private string _title = "";
 
     [ObservableProperty]
-    private string _tagsText = "";
+    private string? _validationError;
 
-    public bool IsResearchMode => Mode == NewPageMode.Research;
-    public bool IsTranscriptionMode => Mode == NewPageMode.Transcription;
+    [ObservableProperty]
+    private bool _isConfirming;
 
-    public string ModalTitle =>
-        Mode == NewPageMode.Research ? "Nova pesquisa / tese" : "Nova transcrição avulsa";
+    public bool CanConfirm => !string.IsNullOrWhiteSpace(Title) && !IsConfirming;
+
+    public string ModalTitle => "Nova pesquisa / tese";
+
+    public string ConfirmButtonLabel => IsConfirming ? "Criando…" : "Criar";
 
     public string PreviewTitle =>
-        string.IsNullOrWhiteSpace(Title)
-            ? Mode == NewPageMode.Research ? "Nova pesquisa" : "Nova transcrição avulsa"
-            : Title;
+        string.IsNullOrWhiteSpace(Title) ? "Nova pesquisa" : Title;
 
     public string PreviewIcon => IconPicker.SelectedIcon ?? "📝";
 
-    public string PreviewColorName =>
-        Mode == NewPageMode.Research ? ColorPicker.SelectedColorName : "blue";
+    public string PreviewColorName => ColorPicker.SelectedColorName;
 
     public bool IsBlue => PreviewColorName == "blue";
     public bool IsGreen => PreviewColorName == "green";
@@ -69,28 +72,31 @@ public partial class NewPageModalViewModel : ViewModelBase
         ColorPicker.PropertyChanged += OnPickerPropertyChanged;
     }
 
-    public void Open(NewPageMode mode)
+    public void Open()
     {
-        Mode = mode;
         Title = "";
-        TagsText = "";
-        IconPicker.UseTranscriptionIcons = mode == NewPageMode.Transcription;
+        ValidationError = null;
+        IsConfirming = false;
+        IconPicker.UseTranscriptionIcons = false;
         IconPicker.AllowNoIcon = false;
-        IconPicker.SelectedIcon = mode == NewPageMode.Transcription
-            ? IconCatalog.TransIcons[0]
-            : IconCatalog.PageIcons[0];
+        IconPicker.SelectedIcon = IconCatalog.PageIcons[0];
         ColorPicker.SelectedColorName = ColorCatalog.PageColors[0].Name;
+
         IsOpen = true;
         NotifyPreviewProperties();
+        NotifyConfirmState();
         OnPropertyChanged(nameof(ModalTitle));
-        OnPropertyChanged(nameof(IsResearchMode));
-        OnPropertyChanged(nameof(IsTranscriptionMode));
+        OnPropertyChanged(nameof(ConfirmButtonLabel));
     }
 
     [RelayCommand]
-    private void Cancel() => IsOpen = false;
+    private void Cancel()
+    {
+        IsOpen = false;
+        ValidationError = null;
+    }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanConfirm))]
     private async Task ConfirmAsync()
     {
         if (string.IsNullOrWhiteSpace(Title))
@@ -98,45 +104,39 @@ public partial class NewPageModalViewModel : ViewModelBase
             return;
         }
 
-        using var scope = _scopeFactory.CreateScope();
+        IsConfirming = true;
+        NotifyConfirmState();
 
-        if (Mode == NewPageMode.Research)
+        try
         {
+            using var scope = _scopeFactory.CreateScope();
             var researchService = scope.ServiceProvider.GetRequiredService<ResearchService>();
             await researchService.CreateAsync(
                 Title.Trim(),
                 IconPicker.SelectedIcon ?? IconCatalog.PageIcons[0],
                 ColorPicker.SelectedColorName);
-        }
-        else
-        {
-            var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
-            var transcription = await libraryService.CreateStandaloneAsync(
-                Title.Trim(),
-                IconPicker.SelectedIcon,
-                ParseTags(TagsText));
 
             IsOpen = false;
             await _services.GetRequiredService<SidebarViewModel>().LoadAsync();
-            _navigation.NavigateTo(
-                ScreenKey.Editor,
-                new NavigationParameter(TranscriptionId: transcription.Id));
-            return;
+            _navigation.NavigateTo(ScreenKey.Dashboard);
         }
-
-        IsOpen = false;
-        await _services.GetRequiredService<SidebarViewModel>().LoadAsync();
-        _navigation.NavigateTo(ScreenKey.Dashboard);
+        finally
+        {
+            IsConfirming = false;
+            NotifyConfirmState();
+        }
     }
 
-    partial void OnTitleChanged(string value) => NotifyPreviewProperties();
-
-    partial void OnModeChanged(NewPageMode value)
+    partial void OnTitleChanged(string value)
     {
-        OnPropertyChanged(nameof(ModalTitle));
-        OnPropertyChanged(nameof(IsResearchMode));
-        OnPropertyChanged(nameof(IsTranscriptionMode));
         NotifyPreviewProperties();
+        NotifyConfirmState();
+    }
+
+    partial void OnIsConfirmingChanged(bool value)
+    {
+        NotifyConfirmState();
+        OnPropertyChanged(nameof(ConfirmButtonLabel));
     }
 
     private void OnPickerPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -163,6 +163,9 @@ public partial class NewPageModalViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsTeal));
     }
 
-    private static string[] ParseTags(string tagsText) =>
-        tagsText.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    private void NotifyConfirmState()
+    {
+        OnPropertyChanged(nameof(CanConfirm));
+        ConfirmCommand.NotifyCanExecuteChanged();
+    }
 }

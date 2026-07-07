@@ -25,7 +25,11 @@ public class MediaStorageService
         var fileName = Path.GetFileName(sourcePath);
         var destinationPath = Path.Combine(destinationDirectory, fileName);
 
-        await using var sourceStream = File.OpenRead(sourcePath);
+        await using var sourceStream = new FileStream(
+            sourcePath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.ReadWrite);
         await using var destinationStream = File.Create(destinationPath);
         await sourceStream.CopyToAsync(destinationStream);
 

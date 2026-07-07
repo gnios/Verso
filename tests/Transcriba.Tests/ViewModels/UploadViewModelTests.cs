@@ -1,4 +1,5 @@
 using System;
+using Microsoft.EntityFrameworkCore;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -174,6 +175,50 @@ public class UploadViewModelTests
             Assert.Equal(SpeakerMode.Off, transcription.SpeakerMode);
             Assert.False(string.IsNullOrWhiteSpace(transcription.MediaFilePath));
             Assert.True(File.Exists(transcription.MediaFilePath));
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task TrySelectFile_AutoFillsTitleFromFileName()
+    {
+        var (provider, directory, mediaPath, _) = await CreateUploadProviderAsync();
+        try
+        {
+            var upload = await CreateUploadAsync(provider);
+
+            Assert.True(upload.TrySelectFile(mediaPath));
+            Assert.Equal("entrevista", upload.Title);
+            Assert.True(upload.CanStart);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task StartTranscription_PersistsIconAndTagsAndCustomTitle()
+    {
+        var (provider, directory, mediaPath, _) = await CreateUploadProviderAsync();
+        try
+        {
+            var upload = await CreateUploadAsync(provider);
+            upload.TrySelectFile(mediaPath);
+            upload.Title = "Entrevista piloto";
+            upload.TagsText = "campo, piloto";
+            upload.IconPicker.SelectedIcon = "🎙️";
+
+            await upload.StartTranscriptionCommand.ExecuteAsync(null);
+
+            await using var ctx = await TestDbHelper.GetFactory(provider).CreateDbContextAsync();
+            var transcription = Assert.Single(await ctx.Transcriptions.Include(t => t.Tags).ToListAsync());
+            Assert.Equal("Entrevista piloto", transcription.Title);
+            Assert.Equal("🎙️", transcription.Icon);
+            Assert.Equal(2, transcription.Tags.Count);
         }
         finally
         {

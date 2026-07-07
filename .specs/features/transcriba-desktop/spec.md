@@ -6,7 +6,7 @@ Hoje existe apenas (1) um protótipo estático em HTML/CSS/JS (`transcriba-v2-ic
 
 ## Goals
 
-- [ ] Entregar um aplicativo desktop em C# (Avalonia) que replica fielmente todas as telas, fluxos e interações visuais do protótipo `transcriba-v2-icons-transcriptions.html`.
+- [ ] Entregar um aplicativo desktop em C# (Blazor Hybrid — WPF + BlazorWebView) que replica fielmente todas as telas, fluxos e interações visuais do protótipo `transcriba-v2-icons-transcriptions.html`.
 - [ ] Integrar o pipeline de transcrição real (baseado em `transcrever.cs`: Whisper.net, VAD por silêncio, paralelismo, download automático de modelo) como motor de back-end por trás do fluxo de upload.
 - [ ] Persistir todos os dados (pesquisas, transcrições, tags, locutores, segmentos) localmente em SQLite, com arquivos de mídia copiados para a pasta de dados do app.
 - [ ] Permitir edição completa do transcript (texto, divisão/mesclagem de segmentos, atribuição manual de locutores, título, ícone) com player de áudio/vídeo sincronizado.
@@ -23,7 +23,7 @@ Explicitamente excluído deste MVP. Documentado para evitar scope creep.
 | Diarização automática por Machine Learning (detecção automática de quem fala) | Decisão do usuário: apenas atribuição manual no MVP; `transcrever.cs` não implementa diarização |
 | Sincronização em nuvem / multiusuário / contas | Fora do escopo; app é local e single-user |
 | Busca funcional no campo de busca da sidebar (topo) | Redundante com a busca funcional do dashboard; mantido apenas visual |
-| Suporte multiplataforma testado (macOS/Linux) | Avalonia permite futuramente, mas o alvo de desenvolvimento e testes deste MVP é Windows (ambiente do usuário) |
+| Suporte multiplataforma (macOS/Linux) | Fora de escopo — stack (WPF + BlazorWebView) é Windows-only por natureza; alvo de desenvolvimento e testes é Windows (ambiente do usuário) |
 
 ---
 
@@ -33,7 +33,7 @@ Toda ambiguidade foi resolvida ou registrada aqui — nada fica sem definição.
 
 | Assunção / decisão | Padrão escolhido | Racional | Confirmado? |
 | --- | --- | --- | --- |
-| Framework de UI | Avalonia UI | Escolha explícita do usuário | y |
+| Framework de UI | Blazor Hybrid (WPF + BlazorWebView) — substitui a tentativa anterior com Avalonia UI, que sofria de crash fatal e não determinístico do runtime (ver AD-005 em `.specs/STATE.md`) | Escolha explícita do usuário | y |
 | Persistência | SQLite (arquivo local único) | Escolha explícita do usuário | y |
 | Armazenamento de mídia | Copiado para `%AppData%\Transcriba\media` | Escolha explícita do usuário | y |
 | Escopo de gravação ao vivo | Apenas UI mockada (sem captura real) | Escolha explícita do usuário | y |

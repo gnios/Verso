@@ -116,6 +116,33 @@ public partial class SpeakerDropdownViewModel : ViewModelBase
         IsOpen = false;
     }
 
+    // Renomear um locutor já existente (qualquer segmento que o use atualiza o display).
+    [RelayCommand]
+    private async Task RenameSpeakerAsync((SpeakerOptionViewModel Option, string NewName) arg)
+    {
+        var (option, newName) = arg;
+        if (option is null)
+        {
+            return;
+        }
+
+        var name = newName?.Trim() ?? "";
+        if (string.IsNullOrEmpty(name))
+        {
+            option.IsEditing = false;
+            return;
+        }
+
+        using var scope = _scopeFactory.CreateScope();
+        var speakerService = scope.ServiceProvider.GetRequiredService<SpeakerService>();
+        await speakerService.RenameSpeakerAsync(option.Id, name);
+
+        option.Name = name;
+        option.IsEditing = false;
+        _editor?.OnSpeakerRenamed(option.Id, name);
+        RefreshActiveIndicator();
+    }
+
     internal void NotifyAssignAvailability()
     {
         OnPropertyChanged(nameof(CanAssign));

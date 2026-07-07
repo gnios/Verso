@@ -63,7 +63,12 @@ public class SegmentEditingServiceTests
         Assert.NotNull(result);
         Assert.Equal("hello", result.Value.Before.Text);
         Assert.Equal("world", result.Value.After.Text);
-        Assert.Equal(segment.StartSeconds, result.Value.After.StartSeconds);
+        // Após o fix de sincronia: as duas metades são contíguas e não sobrepostas
+        // (antes herdavam o intervalo completo do original). O "after" começa onde o
+        // "before" termina, e cobre até o fim original.
+        Assert.Equal(segment.StartSeconds, result.Value.Before.StartSeconds);
+        Assert.Equal(result.Value.Before.EndSeconds, result.Value.After.StartSeconds);
+        Assert.Equal(segment.EndSeconds, result.Value.After.EndSeconds);
         Assert.Equal(segment.SpeakerId, result.Value.After.SpeakerId);
     }
 
@@ -122,5 +127,50 @@ public class SegmentEditingServiceTests
     {
         var segment = CreateSegment(0, "abc   ");
         Assert.Null(_service.SplitAtCaret(segment, 3));
+    }
+
+    [Fact]
+    public void SplitAtCaret_DividesTimeRangeProportionallyToCaretPosition()
+    {
+        // Segmento [10, 20] (10s de duração), texto de 10 chars, caret no meio (5).
+        var segment = new Segment
+        {
+            Id = Guid.NewGuid(),
+            StartSeconds = 10,
+            EndSeconds = 20,
+            Text = "aaaaabbbbb",
+            SortOrder = 0,
+        };
+
+        var result = _service.SplitAtCaret(segment, 5);
+
+        Assert.NotNull(result);
+        var (before, after) = result!.Value;
+        Assert.Equal(10, before.StartSeconds);
+        Assert.Equal(15, before.EndSeconds);
+        Assert.Equal(15, after.StartSeconds);
+        Assert.Equal(20, after.EndSeconds);
+        // Contíguos, sem sobreposição — playback consegue distinguir as duas metades.
+        Assert.Equal(before.EndSeconds, after.StartSeconds);
+    }
+
+    [Fact]
+    public void MergeWithPrevious_ExtendsPreviousEndToActiveEnd()
+    {
+        var firstId = Guid.NewGuid();
+        var secondId = Guid.NewGuid();
+        var segments = new List<Segment>
+        {
+            new() { Id = firstId, StartSeconds = 0, EndSeconds = 5, Text = "primeira", SortOrder = 0 },
+            new() { Id = secondId, StartSeconds = 6, EndSeconds = 12, Text = "segunda", SortOrder = 1 },
+        };
+
+        var merged = _service.MergeWithPrevious(segments, segments[1]);
+
+        Assert.NotNull(merged);
+        Assert.Equal(firstId, merged!.Id);
+        Assert.Equal(0, merged.StartSeconds);
+        // O segmento mesclado deve cobrir até o fim do segundo: [0, 12], não [0, 5].
+        Assert.Equal(12, merged.EndSeconds);
     }
 }

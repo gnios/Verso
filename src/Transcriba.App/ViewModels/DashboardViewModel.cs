@@ -55,6 +55,7 @@ public partial class DashboardViewModel : ViewModelBase
         {
             _queueService = queueService;
             _queueService.StatusChanged += OnQueueStatusChanged;
+            _queueService.ProgressChanged += OnQueueProgressChanged;
         }
     }
 
@@ -130,7 +131,6 @@ public partial class DashboardViewModel : ViewModelBase
         {
             card.Status = TranscriptionStatus.InProgress;
             card.ErrorMessage = null;
-            card.NotifyRetryAvailability();
         }
 
         _queueService.Enqueue(new TranscriptionJobRequest(
@@ -182,7 +182,10 @@ public partial class DashboardViewModel : ViewModelBase
         IsEmpty = Cards.Count == 0;
     }
 
-    private void OnQueueStatusChanged(object? sender, TranscriptionStatusChangedEventArgs e)
+    private void OnQueueStatusChanged(object? sender, TranscriptionStatusChangedEventArgs e) =>
+        UiThread.Invoke(() => ApplyQueueStatusChanged(e));
+
+    private void ApplyQueueStatusChanged(TranscriptionStatusChangedEventArgs e)
     {
         var card = FindCard(e.TranscriptionId);
         if (card is null)
@@ -200,14 +203,39 @@ public partial class DashboardViewModel : ViewModelBase
         if (e.Status == TranscriptionStatusChanged.Error)
         {
             card.ErrorMessage = e.ErrorMessage;
+            ClearProgress(card);
         }
         else if (e.Status == TranscriptionStatusChanged.Done)
         {
             card.ErrorMessage = null;
+            ClearProgress(card);
             _ = LoadAsync();
         }
+        else if (e.Status == TranscriptionStatusChanged.Queued)
+        {
+            ClearProgress(card);
+        }
+    }
 
-        card.NotifyRetryAvailability();
+    private void OnQueueProgressChanged(object? sender, TranscriptionProgressEventArgs e) =>
+        UiThread.Invoke(() => ApplyQueueProgressChanged(e));
+
+    private void ApplyQueueProgressChanged(TranscriptionProgressEventArgs e)
+    {
+        var card = FindCard(e.TranscriptionId);
+        if (card is null)
+        {
+            return;
+        }
+
+        card.ProgressStage = e.Stage;
+        card.ProgressPercent = e.Percent;
+    }
+
+    private static void ClearProgress(TranscriptionCardViewModel card)
+    {
+        card.ProgressPercent = null;
+        card.ProgressStage = "";
     }
 
     private TranscriptionCardViewModel? FindCard(Guid transcriptionId)

@@ -4,9 +4,9 @@ using Transcriba.App;
 using Transcriba.App.Services;
 using Transcriba.App.ViewModels;
 using Transcriba.Core;
-using Transcriba.Core.Engine;
 using Transcriba.Core.Data;
-using Transcriba.Core.Data.Entities;
+using Transcriba.Core.Engine;
+using Transcriba.Tests.Engine;
 using Transcriba.Tests.Services;
 
 namespace Transcriba.Tests.ViewModels;
@@ -21,6 +21,7 @@ public class NewPageModalViewModelTests
         var services = new ServiceCollection();
         services.AddTranscribaDatabase(dbPath);
         services.AddTranscribaEngine();
+        services.AddSingleton<ITranscriptionEngine>(new SuccessTranscriptionEngine());
         services.AddTranscribaServices();
         services.AddTranscribaAppServices();
         var provider = services.BuildServiceProvider();
@@ -38,61 +39,12 @@ public class NewPageModalViewModelTests
             var modal = provider.GetRequiredService<NewPageModalViewModel>();
             var navigation = provider.GetRequiredService<NavigationService>();
 
-            modal.Open(NewPageMode.Research);
+            modal.Open();
             modal.Title = "   ";
             await modal.ConfirmCommand.ExecuteAsync(null);
 
             Assert.True(modal.IsOpen);
             Assert.Equal(ScreenKey.Dashboard, navigation.CurrentScreen);
-        }
-        finally
-        {
-            TestDbHelper.Cleanup(directory);
-        }
-    }
-
-    [Fact]
-    public async Task ConfirmAsync_StandaloneTranscription_NavigatesToEditor()
-    {
-        var (provider, directory) = await CreateProviderAsync();
-        try
-        {
-            var modal = provider.GetRequiredService<NewPageModalViewModel>();
-            var navigation = provider.GetRequiredService<NavigationService>();
-
-            modal.Open(NewPageMode.Transcription);
-            modal.Title = "Entrevista piloto";
-            modal.TagsText = "campo, piloto";
-            await modal.ConfirmCommand.ExecuteAsync(null);
-
-            Assert.False(modal.IsOpen);
-            Assert.Equal(ScreenKey.Editor, navigation.CurrentScreen);
-            var parameter = Assert.IsType<NavigationParameter>(navigation.NavigationParameter);
-            Assert.NotNull(parameter.TranscriptionId);
-        }
-        finally
-        {
-            TestDbHelper.Cleanup(directory);
-        }
-    }
-
-    [Fact]
-    public async Task ConfirmAsync_NewTags_UseBlueDefaultColor()
-    {
-        var (provider, directory) = await CreateProviderAsync();
-        try
-        {
-            var modal = provider.GetRequiredService<NewPageModalViewModel>();
-
-            modal.Open(NewPageMode.Transcription);
-            modal.Title = "Notas de campo";
-            modal.TagsText = "tag-nova-xyz";
-            await modal.ConfirmCommand.ExecuteAsync(null);
-
-            await using var context = await TestDbHelper.GetFactory(provider).CreateDbContextAsync();
-            var tag = await context.Tags.SingleAsync(t => t.Name == "tag-nova-xyz");
-
-            Assert.Equal("blue", tag.ColorName);
         }
         finally
         {
@@ -108,7 +60,7 @@ public class NewPageModalViewModelTests
         {
             var modal = provider.GetRequiredService<NewPageModalViewModel>();
 
-            modal.Open(NewPageMode.Research);
+            modal.Open();
             modal.Title = "Pesquisa cancelada";
             modal.CancelCommand.Execute(null);
 
@@ -133,7 +85,7 @@ public class NewPageModalViewModelTests
             var navigation = provider.GetRequiredService<NavigationService>();
             var sidebar = provider.GetRequiredService<SidebarViewModel>();
 
-            modal.Open(NewPageMode.Research);
+            modal.Open();
             modal.Title = "Mobilidade urbana";
             modal.ColorPicker.SelectedColorName = "green";
             await modal.ConfirmCommand.ExecuteAsync(null);

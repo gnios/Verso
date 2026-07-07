@@ -11,6 +11,7 @@ namespace Transcriba.App.ViewModels;
 
 public partial class SidebarResearchItemViewModel : ViewModelBase
 {
+    private readonly NavigationService _navigation;
     private readonly Action<int>? _deleteHandler;
 
     public int Id { get; }
@@ -30,6 +31,7 @@ public partial class SidebarResearchItemViewModel : ViewModelBase
         NavigationService navigation,
         Action<int>? deleteHandler = null)
     {
+        _navigation = navigation;
         _deleteHandler = deleteHandler;
         Id = research.Id;
         Title = TruncateTitle(research.Title);
@@ -42,6 +44,10 @@ public partial class SidebarResearchItemViewModel : ViewModelBase
             .Select(t => new SidebarTranscriptionItemViewModel(t, navigation))
             .ToList();
     }
+
+    [RelayCommand]
+    private void Navigate() =>
+        _navigation.NavigateTo(ScreenKey.Research, new NavigationParameter(ResearchId: Id));
 
     [RelayCommand]
     private void ToggleExpand() => IsExpanded = !IsExpanded;

@@ -34,6 +34,13 @@ public partial class EditorViewModel : ViewModelBase
 
     public ObservableCollection<SegmentItemViewModel> Segments { get; } = [];
     public ObservableCollection<TranscriptionCardTagViewModel> Tags { get; } = [];
+    public ObservableCollection<ResearchOptionViewModel> ResearchOptions { get; } = [];
+
+    [ObservableProperty]
+    private string _newTagInput = "";
+
+    [ObservableProperty]
+    private int? _selectedResearchId;
     public IconPickerViewModel IconPicker { get; } = new();
     public SpeakerDropdownViewModel SpeakerDropdown { get; }
     public PlayerBarViewModel PlayerBar { get; }
@@ -211,6 +218,84 @@ public partial class EditorViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private async Task AddTagAsync()
+    {
+        var name = NewTagInput?.Trim();
+        if (string.IsNullOrWhiteSpace(name) || _transcriptionId == Guid.Empty)
+        {
+            NewTagInput = "";
+            return;
+        }
+
+        var current = Tags.Select(t => t.Name).ToList();
+        if (current.Any(n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase)))
+        {
+            NewTagInput = "";
+            return;
+        }
+
+        var newSet = current.Append(name).ToList();
+        using var scope = _scopeFactory.CreateScope();
+        var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
+        await libraryService.UpdateTranscriptionTagsAsync(_transcriptionId, newSet);
+
+        Tags.Add(new TranscriptionCardTagViewModel(name, TagColorCatalog.GetColor(name)));
+        NewTagInput = "";
+        await _sidebar.LoadAsync();
+    }
+
+    [RelayCommand]
+    private async Task RemoveTagAsync(TranscriptionCardTagViewModel tag)
+    {
+        if (_transcriptionId == Guid.Empty || tag is null)
+        {
+            return;
+        }
+
+        var newSet = Tags
+            .Where(t => !string.Equals(t.Name, tag.Name, StringComparison.OrdinalIgnoreCase))
+            .Select(t => t.Name)
+            .ToList();
+
+        using var scope = _scopeFactory.CreateScope();
+        var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
+        await libraryService.UpdateTranscriptionTagsAsync(_transcriptionId, newSet);
+
+        Tags.Remove(tag);
+        await _sidebar.LoadAsync();
+    }
+
+    [RelayCommand]
+    private async Task ChangeResearchAsync(int? researchId)
+    {
+        if (_transcriptionId == Guid.Empty)
+        {
+            return;
+        }
+
+        using var scope = _scopeFactory.CreateScope();
+        var researchService = scope.ServiceProvider.GetRequiredService<ResearchService>();
+        await researchService.AssignTranscriptionToResearchAsync(_transcriptionId, researchId);
+
+        SelectedResearchId = researchId;
+        if (researchId is null)
+        {
+            HasResearchBreadcrumb = false;
+            ResearchTitle = "";
+            ResearchId = null;
+        }
+        else
+        {
+            var option = ResearchOptions.FirstOrDefault(o => o.Id == researchId);
+            HasResearchBreadcrumb = true;
+            ResearchTitle = option?.Name ?? "";
+            ResearchId = researchId;
+        }
+
+        await _sidebar.LoadAsync();
+    }
+
+    [RelayCommand]
     private async Task SplitSegmentAsync()
     {
         if (_focusedSegment is null)
@@ -224,6 +309,7 @@ public partial class EditorViewModel : ViewModelBase
             return;
         }
 
+        entity.Text = _focusedSegment.Text;
         var split = _segmentEditing.SplitAtCaret(entity, _focusedCaretIndex);
         if (split is null)
         {
@@ -236,6 +322,7 @@ public partial class EditorViewModel : ViewModelBase
             _transcriptionId,
             entity.Id,
             split.Value.Before.Text,
+            split.Value.Before.EndSeconds,
             split.Value.After);
 
         await ReloadSegmentsAsync();
@@ -250,6 +337,11 @@ public partial class EditorViewModel : ViewModelBase
             return;
         }
 
+        var activeVm = Segments.FirstOrDefault(x => x.Id == active.Id);
+        if (activeVm is not null)
+        {
+            active.Text = activeVm.Text;
+        }
         var merged = _segmentEditing.MergeWithPrevious(_segmentEntities, active);
         if (merged is null)
         {
@@ -262,6 +354,7 @@ public partial class EditorViewModel : ViewModelBase
             _transcriptionId,
             merged.Id,
             merged.Text,
+            active.EndSeconds,
             active.Id);
 
         await ReloadSegmentsAsync();
@@ -272,6 +365,77 @@ public partial class EditorViewModel : ViewModelBase
     {
         _focusedSegment = segment;
         _focusedCaretIndex = caretIndex;
+    }
+
+    // Ações por segmento (hover toolbar no SegmentItem). Diferem dos comandos
+    // parameterless acima (que operam sobre o segmento focado/ativo de playback):
+    // estas recebem o segmento explícito clicado no hover.
+    internal async Task SplitSegmentForAsync(SegmentItemViewModel segment)
+    {
+        var entity = _segmentEntities.FirstOrDefault(s => s.Id == segment.Id);
+        if (entity is null)
+        {
+            return;
+        }
+
+        // Sincroniza o texto do segmento (que pode ter edição não commitada, já que o
+        // clique no Dividir não dispara o blur do textarea) antes de dividir.
+        entity.Text = segment.Text;
+        var split = _segmentEditing.SplitAtCaret(entity, segment.CaretIndex);
+        if (split is null)
+        {
+            return;
+        }
+
+        using var scope = _scopeFactory.CreateScope();
+        var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
+        await libraryService.ApplySegmentSplitAsync(
+            _transcriptionId,
+            entity.Id,
+            split.Value.Before.Text,
+            split.Value.Before.EndSeconds,
+            split.Value.After);
+
+        await ReloadSegmentsAsync();
+    }
+
+    internal async Task MergeSegmentForAsync(SegmentItemViewModel segment)
+    {
+        var entity = _segmentEntities.FirstOrDefault(s => s.Id == segment.Id);
+        if (entity is null)
+        {
+            return;
+        }
+
+        // Sincroniza o texto (edição não commitada, já que Mesclar não dispara blur).
+        entity.Text = segment.Text;
+        var merged = _segmentEditing.MergeWithPrevious(_segmentEntities, entity);
+        if (merged is null)
+        {
+            return;
+        }
+
+        using var scope = _scopeFactory.CreateScope();
+        var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
+        await libraryService.ApplySegmentMergeAsync(
+            _transcriptionId,
+            merged.Id,
+            merged.Text,
+            entity.EndSeconds,
+            entity.Id);
+
+        await ReloadSegmentsAsync();
+        UpdateActiveSegmentHighlight();
+    }
+
+    internal void OpenLocutorFor(SegmentItemViewModel segment)
+    {
+        // Posiciona o playback no início do segmento — ele vira o segmento "ativo" de
+        // playback, que é o alvo do SpeakerDropdown existente (CanAssign/assign usam o
+        // segmento ativo). Assim o dropdown de locutor reaproveitado atribui a este
+        // segmento sem refatorar o SpeakerDropdownViewModel.
+        SetPlaybackPosition(TimeSpan.FromSeconds(segment.StartSeconds), markStarted: true);
+        SpeakerDropdown.IsOpen = true;
     }
 
     internal void OnSegmentTextCommitted(SegmentItemViewModel segment, string text)
@@ -286,9 +450,21 @@ public partial class EditorViewModel : ViewModelBase
     internal void OnSegmentClicked(SegmentItemViewModel segment)
     {
         _focusedSegment = segment;
+        SpeakerDropdown.IsOpen = false;
         SegmentSeekRequested?.Invoke(this, segment.StartSeconds);
         PlayerBar.SeekToTime(TimeSpan.FromSeconds(segment.StartSeconds));
         SetPlaybackPosition(TimeSpan.FromSeconds(segment.StartSeconds), markStarted: true);
+    }
+
+    internal void OnSpeakerRenamed(Guid speakerId, string newName)
+    {
+        foreach (var segment in Segments)
+        {
+            if (segment.SpeakerId == speakerId)
+            {
+                segment.RenameSpeaker(newName);
+            }
+        }
     }
 
     internal async Task AssignSpeakerToActiveSegmentAsync(Guid speakerId)
@@ -372,6 +548,22 @@ public partial class EditorViewModel : ViewModelBase
         await _sidebar.LoadAsync();
     }
 
+    private async Task LoadResearchOptionsAsync(int? selectedId)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var researchService = scope.ServiceProvider.GetRequiredService<ResearchService>();
+        var researches = await researchService.GetAllAsync();
+
+        ResearchOptions.Clear();
+        ResearchOptions.Add(new ResearchOptionViewModel { Id = null, Name = "Nenhuma pesquisa", Icon = "" });
+        foreach (var r in researches)
+        {
+            ResearchOptions.Add(new ResearchOptionViewModel { Id = r.Id, Name = r.Title, Icon = r.Icon });
+        }
+
+        SelectedResearchId = selectedId;
+    }
+
     private async Task LoadAsync()
     {
         if (_transcriptionId == Guid.Empty)
@@ -400,6 +592,8 @@ public partial class EditorViewModel : ViewModelBase
         HasResearchBreadcrumb = transcription.ResearchPage is not null;
         ResearchTitle = transcription.ResearchPage?.Title ?? "";
         ResearchId = transcription.ResearchPageId;
+
+        await LoadResearchOptionsAsync(transcription.ResearchPageId);
 
         MetaDate = transcription.CreatedAt.ToString("d MMM yyyy", CultureInfo.GetCultureInfo("pt-BR"));
         MetaDuration = FormatDurationDisplay(transcription.DurationSeconds);
@@ -441,7 +635,12 @@ public partial class EditorViewModel : ViewModelBase
             NotifyExportAvailability();
         }
 
-        await PlayerBar.LoadAsync(transcription.MediaFilePath);
+        await PlayerBar.UnloadAsync();
+        if (transcription.Status == TranscriptionStatus.Done &&
+            !string.IsNullOrWhiteSpace(transcription.MediaFilePath))
+        {
+            await PlayerBar.LoadAsync(transcription.MediaFilePath);
+        }
     }
 
     private async Task ReloadSegmentsAsync()
@@ -509,10 +708,16 @@ public partial class EditorViewModel : ViewModelBase
         HasResearchBreadcrumb = false;
         ResearchTitle = "";
         ResearchId = null;
+        ResearchOptions.Clear();
+        SelectedResearchId = null;
+        NewTagInput = "";
         NotifyExportAvailability();
     }
 
-    private void OnQueueStatusChanged(object? sender, TranscriptionStatusChangedEventArgs e)
+    private void OnQueueStatusChanged(object? sender, TranscriptionStatusChangedEventArgs e) =>
+        UiThread.Invoke(() => ApplyQueueStatusChanged(e));
+
+    private void ApplyQueueStatusChanged(TranscriptionStatusChangedEventArgs e)
     {
         if (e.TranscriptionId != _transcriptionId)
         {
@@ -531,6 +736,7 @@ public partial class EditorViewModel : ViewModelBase
         Segments.Clear();
         HasSegments = false;
         NotifyExportAvailability();
+        _ = PlayerBar.UnloadAsync();
     }
 
     private static string FormatDurationDisplay(double seconds)

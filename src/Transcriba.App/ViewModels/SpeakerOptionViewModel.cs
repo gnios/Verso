@@ -9,11 +9,17 @@ public partial class SpeakerOptionViewModel : ViewModelBase
     private readonly Action<SpeakerOptionViewModel> _selectHandler;
 
     public Guid Id { get; }
-    public string Name { get; }
+
+    [ObservableProperty]
+    private string _name;
+
     public string ColorHex { get; }
 
     [ObservableProperty]
     private bool _isActive;
+
+    [ObservableProperty]
+    private bool _isEditing;
 
     public SpeakerOptionViewModel(
         Guid id,
@@ -22,7 +28,7 @@ public partial class SpeakerOptionViewModel : ViewModelBase
         Action<SpeakerOptionViewModel> selectHandler)
     {
         Id = id;
-        Name = name;
+        _name = name;
         ColorHex = colorHex;
         _selectHandler = selectHandler;
     }

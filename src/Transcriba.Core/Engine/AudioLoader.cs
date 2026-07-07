@@ -22,14 +22,16 @@ public sealed class AudioLoader
 
         if (ext == ".wav")
         {
-            using var reader = new WaveFileReader(inputPath);
+            using var stream = OpenSharedRead(inputPath);
+            using var reader = new WaveFileReader(stream);
             var resampled = new WdlResamplingSampleProvider(reader.ToSampleProvider(), SampleRate);
             return ReadSamples(resampled);
         }
 
         if (ext == ".mp3")
         {
-            using var reader = new Mp3FileReader(inputPath);
+            using var stream = OpenSharedRead(inputPath);
+            using var reader = new Mp3FileReader(stream);
             var resampled = new WdlResamplingSampleProvider(reader.ToSampleProvider(), SampleRate);
             return ReadSamples(resampled);
         }
@@ -79,6 +81,9 @@ public sealed class AudioLoader
 
         return ConvertPcm16ToFloat(pcmStream.ToArray());
     }
+
+    private static FileStream OpenSharedRead(string inputPath) =>
+        new(inputPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
 
     public static float[] ConvertPcm16ToFloat(ReadOnlySpan<byte> pcmBytes)
     {

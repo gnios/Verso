@@ -184,7 +184,7 @@ public partial class RecordingViewModel : ViewModelBase, IDisposable
             using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
             while (await timer.WaitForNextTickAsync(token))
             {
-                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(ProcessTimerTick);
+                await UiThread.InvokeAsync(ProcessTimerTick);
             }
         }, token);
 
@@ -193,7 +193,7 @@ public partial class RecordingViewModel : ViewModelBase, IDisposable
             using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(4500));
             while (await timer.WaitForNextTickAsync(token))
             {
-                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(ProcessLivePhraseTick);
+                await UiThread.InvokeAsync(ProcessLivePhraseTick);
             }
         }, token);
     }

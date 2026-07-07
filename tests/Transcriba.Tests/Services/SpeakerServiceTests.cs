@@ -62,6 +62,53 @@ public class SpeakerServiceTests
         }
     }
 
+    [Fact]
+    public async Task RenameSpeakerAsync_UpdatesPersistedName()
+    {
+        var (provider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();
+        try
+        {
+            var factory = TestDbHelper.GetFactory(provider);
+            var transcriptionId = await SeedTranscriptionAsync(factory);
+            var service = new Transcriba.Core.Services.SpeakerService(factory);
+            var speaker = await service.CreateSpeakerAsync(transcriptionId, "Ana");
+
+            await service.RenameSpeakerAsync(speaker.Id, "Ana Paula");
+
+            var speakers = await service.GetSpeakersAsync(transcriptionId);
+            Assert.Single(speakers);
+            Assert.Equal("Ana Paula", speakers[0].Name);
+            Assert.Equal(speaker.ColorHex, speakers[0].ColorHex);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task RenameSpeakerAsync_WithEmptyName_LeavesSpeakerUnchanged()
+    {
+        var (provider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();
+        try
+        {
+            var factory = TestDbHelper.GetFactory(provider);
+            var transcriptionId = await SeedTranscriptionAsync(factory);
+            var service = new Transcriba.Core.Services.SpeakerService(factory);
+            var speaker = await service.CreateSpeakerAsync(transcriptionId, "Bruno");
+
+            await service.RenameSpeakerAsync(speaker.Id, "   ");
+
+            var speakers = await service.GetSpeakersAsync(transcriptionId);
+            Assert.Single(speakers);
+            Assert.Equal("Bruno", speakers[0].Name);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
     private static async Task<Guid> SeedTranscriptionAsync(IDbContextFactory<TranscribaDbContext> factory)
     {
         var id = Guid.NewGuid();

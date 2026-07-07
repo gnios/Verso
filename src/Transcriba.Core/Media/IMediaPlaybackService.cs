@@ -4,6 +4,8 @@ public interface IMediaPlaybackService
 {
     Task LoadAsync(string filePath);
 
+    Task UnloadAsync();
+
     void Play();
 
     void Pause();

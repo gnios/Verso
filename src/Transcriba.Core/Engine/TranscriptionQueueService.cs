@@ -3,6 +3,8 @@ using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Transcriba.Core.Catalogs;
 using Transcriba.Core.Data;
 using Transcriba.Core.Data.Entities;
@@ -13,6 +15,7 @@ public sealed class TranscriptionQueueService : BackgroundService
 {
     private readonly IDbContextFactory<TranscribaDbContext> _dbContextFactory;
     private readonly ITranscriptionEngine _engine;
+    private readonly ILogger<TranscriptionQueueService> _logger;
     private readonly Channel<TranscriptionJobRequest> _channel;
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _jobCancellationSources = new();
     private readonly TaskCompletionSource _startupCompleted = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -21,10 +24,12 @@ public sealed class TranscriptionQueueService : BackgroundService
 
     public TranscriptionQueueService(
         IDbContextFactory<TranscribaDbContext> dbContextFactory,
-        ITranscriptionEngine engine)
+        ITranscriptionEngine engine,
+        ILogger<TranscriptionQueueService>? logger = null)
     {
         _dbContextFactory = dbContextFactory;
         _engine = engine;
+        _logger = logger ?? NullLogger<TranscriptionQueueService>.Instance;
         _channel = Channel.CreateUnbounded<TranscriptionJobRequest>(new UnboundedChannelOptions
         {
             SingleReader = true,
@@ -33,6 +38,7 @@ public sealed class TranscriptionQueueService : BackgroundService
     }
 
     public event EventHandler<TranscriptionStatusChangedEventArgs>? StatusChanged;
+    public event EventHandler<TranscriptionProgressEventArgs>? ProgressChanged;
 
     public Guid Enqueue(TranscriptionJobRequest request)
     {
@@ -93,8 +99,8 @@ public sealed class TranscriptionQueueService : BackgroundService
         {
             await UpdateStatusAsync(request.TranscriptionId, TranscriptionStatus.InProgress, null, stoppingToken);
             RaiseStatusChanged(request.TranscriptionId, TranscriptionStatusChanged.InProgress);
-
-            var result = await _engine.TranscribeAsync(request, progress: null, linkedCts.Token);
+            var progress = new Progress<EngineProgress>(e => RaiseProgressChanged(request.TranscriptionId, e.Stage, e.PartIndex, e.TotalParts));
+            var result = await _engine.TranscribeAsync(request, progress, linkedCts.Token);
             await PersistSuccessAsync(request, result, stoppingToken);
 
             RaiseStatusChanged(request.TranscriptionId, TranscriptionStatusChanged.Done);
@@ -106,6 +112,11 @@ public sealed class TranscriptionQueueService : BackgroundService
         }
         catch (Exception ex)
         {
+            _logger.LogError(
+                ex,
+                "Erro ao transcrever {TranscriptionId}: {ErrorMessage}",
+                request.TranscriptionId,
+                ex.Message);
             await UpdateStatusAsync(request.TranscriptionId, TranscriptionStatus.Error, ex.Message, stoppingToken);
             RaiseStatusChanged(request.TranscriptionId, TranscriptionStatusChanged.Error, ex.Message);
         }
@@ -209,6 +220,13 @@ public sealed class TranscriptionQueueService : BackgroundService
         {
             ErrorMessage = errorMessage,
         });
+
+    private void RaiseProgressChanged(
+        Guid transcriptionId,
+        string stage,
+        int? partIndex,
+        int? totalParts) =>
+        ProgressChanged?.Invoke(this, new TranscriptionProgressEventArgs(transcriptionId, stage, partIndex, totalParts));
 }
 
 public static class EngineServiceCollectionExtensions
