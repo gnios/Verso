@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Roda o Transcriba.App com coleta automática de memory dump nativo caso o
+    Roda o Verso.App com coleta automática de memory dump nativo caso o
     "Internal CLR error (0x80131506)" ocorra de novo.
 
 .DESCRIPTION
@@ -33,9 +33,9 @@ $env:DOTNET_CreateDumpVerboseDiagnostics = '1'
 $env:DOTNET_CreateDumpDiagnostics = '1'
 
 Write-Host "Dumps serão salvos em: $dumpDir" -ForegroundColor Cyan
-Write-Host "Rodando Transcriba.App com coleta de dump habilitada..." -ForegroundColor Cyan
+Write-Host "Rodando Verso.App com coleta de dump habilitada..." -ForegroundColor Cyan
 
-Push-Location (Join-Path $repoRoot 'src/Transcriba.App')
+Push-Location (Join-Path $repoRoot 'src/Verso.App')
 try
 {
     dotnet run --no-launch-profile

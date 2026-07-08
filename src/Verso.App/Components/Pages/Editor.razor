@@ -1,0 +1,251 @@
+@*
+    Editor de transcrição — integração completa (T65), reaproveitando `EditorViewModel`:
+    breadcrumb, header (ícone/título editável), tags, toolbar, lista de segmentos,
+    dropdown de locutor, player fixo no rodapé e dialog de exportação.
+
+    Fiel ao `#screen-editor` do protótipo (transcriba-v2-icons-transcriptions.html).
+    ViewModel recebido via `[Parameter]` (Transient resolvido pelo NavigationService).
+*@
+@using Verso.App.Components.Shared
+@implements IDisposable
+@inject IJSRuntime JS
+
+<section class="screen active" style="padding:0;overflow:hidden">
+    <div class="editor-shell">
+        <div class="editor-transcript" @ref="_transcriptScroll">
+            <div class="editor-transcript-inner">
+                <div class="editor-breadcrumb">
+                    <a href="#" @onclick="() => ViewModel.NavigateDashboardCommand.Execute(null)" @onclick:preventDefault="true">Biblioteca</a>
+                    @if (ViewModel.HasResearchBreadcrumb)
+                    {
+                        @: &nbsp;→&nbsp;
+                        <a href="#" @onclick="() => ViewModel.NavigateResearchCommand.Execute(null)" @onclick:preventDefault="true">@ViewModel.ResearchTitle</a>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(ViewModel.Title))
+                    {
+                        @: &nbsp;→&nbsp; @(ViewModel.HasIcon ? ViewModel.Icon + " " : "")@ViewModel.Title
+                    }
+                </div>
+
+                <div class="editor-title-row" style="position:relative">
+                    <div class="editor-page-icon @(ViewModel.HasIcon ? "has-icon" : "")"
+                         title="Clique para trocar ícone"
+                         @onclick="() => ViewModel.ToggleIconPickerCommand.Execute(null)">
+                        @(ViewModel.HasIcon ? ViewModel.Icon : "+")
+                    </div>
+                    <input type="text" class="editor-title-input" value="@ViewModel.Title"
+                           @oninput="OnTitleInput" @onblur="async () => await ViewModel.CommitTitleCommand.ExecuteAsync(null)"
+                           @onkeydown="OnTitleKeyDown" />
+                    <div class="icon-popup @(ViewModel.IsIconPickerOpen ? "open" : "")">
+                        <div class="icon-popup-title">Ícone da transcrição</div>
+                        <IconPicker ViewModel="ViewModel.IconPicker" />
+                        <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:8px">
+                            <button type="button" style="padding:5px 12px;font-size:12px;border-radius:var(--radius);background:var(--surface);border:1px solid var(--border);color:var(--fg-secondary);cursor:pointer"
+                                    @onclick="() => ViewModel.CloseIconPickerCommand.Execute(null)">Feito</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="editor-meta">
+                    <span>@ViewModel.MetaDate</span>
+                    <span class="editor-meta-dot"></span>
+                    <span>@ViewModel.MetaDuration</span>
+                    <span class="editor-meta-dot"></span>
+                    <span>@ViewModel.MetaSpeakerCount</span>
+                    @if (!string.IsNullOrWhiteSpace(ViewModel.MetaProcessingTime))
+                    {
+                        <span class="editor-meta-dot"></span>
+                        <span class="editor-meta-time" title="Tempo que o motor demorou para transcrever">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                            @ViewModel.MetaProcessingTime
+                        </span>
+                    }
+                    <span class="editor-meta-dot"></span>
+                    <ResearchCombobox Options="ViewModel.ResearchOptions" SelectedId="ViewModel.SelectedResearchId" OnSelected="OnResearchSelected" />
+                </div>
+
+                <div class="editor-tags editor-tags-editable">
+                    @foreach (var tag in ViewModel.Tags)
+                    {
+                        <span class="tag tag-sm tag-@tag.ColorName">
+                            @tag.Name
+                            <button type="button" class="tag-remove" title="Remover tag" @onclick="() => ViewModel.RemoveTagCommand.ExecuteAsync(tag)" @onclick:stopPropagation="true">×</button>
+                        </span>
+                    }
+                    <TagCombobox Options="ViewModel.TagOptions" AssignedNames="ViewModel.Tags.Select(t => t.Name).ToList()" OnAddTag="OnAddTagFromCombobox" />
+                </div>
+
+                @if (ViewModel.IsInProgress || ViewModel.IsError)
+                {
+                    <div style="padding:24px 0;color:@(ViewModel.IsError ? "var(--red)" : "var(--muted)")">@ViewModel.StatusMessage</div>
+                }
+                else if (ViewModel.HasSegments)
+                {
+                    <div class="editor-toolbar">
+                        <button type="button" disabled="@(!ViewModel.CanExport)" @onclick="() => ViewModel.ExportCommand.Execute(null)">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+                            Exportar
+                        </button>
+                    </div>
+
+                    <div id="transcript-segments">
+                        @foreach (var segment in ViewModel.Segments)
+                        {
+                            <SegmentItem @key="segment.Id" ViewModel="segment" />
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (ViewModel.HasSegments || ViewModel.IsInProgress)
+        {
+            <PlayerBar ViewModel="ViewModel.PlayerBar" />
+        }
+    </div>
+</section>
+
+<div class="modal-overlay @(ViewModel.IsExportDialogOpen ? "open" : "")" @onclick="OnExportOverlayClick">
+    <div class="modal" @onclick:stopPropagation="true">
+        <div class="modal-title">Exportar transcrição</div>
+        <p class="modal-message">Escolha o formato de exportação:</p>
+        <div class="export-format-list">
+            <button type="button" class="export-format-btn" @onclick="async () => await ViewModel.ExportAsTxtCommand.ExecuteAsync(null)">
+                <strong>TXT</strong>
+                <span>Texto simples</span>
+            </button>
+            <button type="button" class="export-format-btn" @onclick="async () => await ViewModel.ExportAsSrtCommand.ExecuteAsync(null)">
+                <strong>SRT</strong>
+                <span>Legendas SubRip</span>
+            </button>
+            <button type="button" class="export-format-btn" @onclick="async () => await ViewModel.ExportAsVttCommand.ExecuteAsync(null)">
+                <strong>VTT</strong>
+                <span>WebVTT</span>
+            </button>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="modal-cancel" @onclick="() => ViewModel.CloseExportDialogCommand.Execute(null)">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .export-format-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin: 12px 0 4px;
+    }
+
+    .export-format-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        background: var(--bg);
+        text-align: left;
+        cursor: pointer;
+        transition: background .1s, border-color .1s;
+    }
+
+    .export-format-btn:hover {
+        background: var(--surface-hover);
+        border-color: var(--border-dark);
+    }
+
+    .export-format-btn strong {
+        font-size: 14px;
+        color: var(--fg);
+    }
+
+    .export-format-btn span {
+        font-size: 12px;
+        color: var(--muted);
+    }
+</style>
+
+@code {
+    [Parameter, EditorRequired]
+    public EditorViewModel ViewModel { get; set; } = null!;
+
+    private EditorViewModel? _subscribed;
+    private ElementReference _transcriptScroll;
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_subscribed, ViewModel))
+        {
+            return;
+        }
+
+        Unsubscribe();
+        _subscribed = ViewModel;
+        ViewModel.PropertyChanged += OnViewModelChanged;
+        ViewModel.Segments.CollectionChanged += OnSegmentsChanged;
+        ViewModel.Tags.CollectionChanged += OnTagsChanged;
+        ViewModel.ScrollToSegmentRequested += OnScrollToSegmentRequested;
+    }
+
+    private void OnTitleInput(ChangeEventArgs e) =>
+        ViewModel.Title = e.Value?.ToString() ?? "";
+
+    private async Task OnTitleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await ViewModel.CommitTitleCommand.ExecuteAsync(null);
+        }
+    }
+
+    private async Task OnAddTagFromCombobox(string name)
+    {
+        ViewModel.NewTagInput = name;
+        await ViewModel.AddTagCommand.ExecuteAsync(null);
+    }
+
+    private async Task OnResearchSelected(int? researchId) =>
+        await ViewModel.ChangeResearchCommand.ExecuteAsync(researchId);
+
+    private void OnExportOverlayClick() =>
+        ViewModel.CloseExportDialogCommand.Execute(null);
+
+    private async void OnScrollToSegmentRequested(object? sender, SegmentItemViewModel segment)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("versoEditor.scrollToSegmentById", segment.Id.ToString());
+        }
+        catch (JSDisconnectedException)
+        {
+            // WebView fechado — ignorar.
+        }
+    }
+
+    private void OnViewModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) =>
+        InvokeAsync(StateHasChanged);
+
+    private void OnSegmentsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e) =>
+        InvokeAsync(StateHasChanged);
+
+    private void OnTagsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e) =>
+        InvokeAsync(StateHasChanged);
+
+    private void Unsubscribe()
+    {
+        if (_subscribed is null)
+        {
+            return;
+        }
+
+        _subscribed.PropertyChanged -= OnViewModelChanged;
+        _subscribed.Segments.CollectionChanged -= OnSegmentsChanged;
+        _subscribed.Tags.CollectionChanged -= OnTagsChanged;
+        _subscribed.ScrollToSegmentRequested -= OnScrollToSegmentRequested;
+    }
+
+    public void Dispose() => Unsubscribe();
+}

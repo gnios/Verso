@@ -1,0 +1,208 @@
+@*
+    Tela de Configurações (T67) reaproveitando o SettingsViewModel real (perfil, idioma padrão,
+    identificar locutores, transcrição ao vivo inerte, dispositivo de execução) — fiel às classes
+    CSS `.settings-*`/`.toggle`/`.screen-*` do protótipo (transcriba-v2-icons-transcriptions.html).
+
+    ViewModel recebido via [Parameter] (e não @inject) porque SettingsViewModel é Transient
+    (AppServiceCollectionExtensions) e a instância viva é a resolvida pelo NavigationService em
+    NavigationService.CurrentViewModel — mesmo padrão que os demais componentes de página
+    (Dashboard/Upload/Editor) devem seguir quando o MainLayout passar a despachar por tela.
+
+    O toggle de tema reaproveita o ThemeService singleton (mesmo serviço já usado pelo
+    Sidebar.razor para o botão de tema do cabeçalho) em vez de duplicar lógica de persistência
+    no SettingsViewModel — ThemeService.ToggleAsync já persiste via SettingsService.
+*@
+@implements IDisposable
+@inject ThemeService ThemeService
+@using System.ComponentModel
+@using System.Linq
+@using Verso.Core.Data.Entities
+
+<section class="screen active">
+    <div class="screen-header">
+        <h1 class="screen-title">Configurações</h1>
+        <p class="screen-subtitle">Gerencie seu perfil e preferências</p>
+    </div>
+
+    <div class="settings-section">
+        <div class="settings-section-title">Perfil</div>
+        <div class="settings-row">
+            <div>
+                <div class="settings-row-label">Nome</div>
+            </div>
+            <input type="text" value="@ViewModel.Name" @onchange="OnNameChanged" />
+        </div>
+        <div class="settings-row">
+            <div>
+                <div class="settings-row-label">E-mail</div>
+            </div>
+            <input type="email" value="@ViewModel.Email" @onchange="OnEmailChanged" />
+        </div>
+        <div class="settings-row">
+            <div>
+                <div class="settings-row-label">Instituição</div>
+            </div>
+            <input type="text" value="@ViewModel.Institution" @onchange="OnInstitutionChanged" />
+        </div>
+    </div>
+
+    <div class="settings-section">
+        <div class="settings-section-title">Transcrição</div>
+        <div class="settings-row">
+            <div>
+                <div class="settings-row-label">Idioma</div>
+            </div>
+            <select value="@ViewModel.SelectedLanguageOption?.Code" @onchange="OnLanguageChanged">
+                @foreach (var option in ViewModel.LanguageOptions)
+                {
+                    <option value="@option.Code">@option.Label</option>
+                }
+            </select>
+        </div>
+        <div class="settings-row">
+            <div>
+                <div class="settings-row-label">Identificar locutores</div>
+                <div class="settings-row-sub">Detecta vozes e atribui rótulos</div>
+            </div>
+            <div class="toggle @(ViewModel.IdentifySpeakersDefault ? "on" : "")" @onclick="ToggleIdentifySpeakers"></div>
+        </div>
+        <div class="settings-row">
+            <div>
+                <div class="settings-row-label">Transcrição ao vivo</div>
+                <div class="settings-row-sub">Texto em tempo real durante gravação (inerte no MVP)</div>
+            </div>
+            <div class="toggle @(ViewModel.LiveTranscriptionEnabled ? "on" : "")" @onclick="ToggleLiveTranscription"></div>
+        </div>
+        <div class="settings-row">
+            <div>
+                <div class="settings-row-label">Dispositivo de execução</div>
+            </div>
+            <select value="@ViewModel.SelectedDeviceOption?.Value" @onchange="OnDeviceChanged">
+                @foreach (var option in ViewModel.DeviceOptions)
+                {
+                    <option value="@option.Value">@option.Label</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    <div class="settings-section">
+        <div class="settings-section-title">Modelo de transcrição</div>
+        <div class="settings-row">
+            <div>
+                <div class="settings-row-label">Modelo padrão</div>
+            </div>
+            <select value="@ViewModel.SelectedModelOption?.Value" @onchange="OnModelChanged">
+                @foreach (var option in ViewModel.ModelOptions)
+                {
+                    <option value="@option.Value">@option.Label · @option.SizeLabel</option>
+                }
+            </select>
+        </div>
+        @if (ViewModel.RecommendedModelOption is not null)
+        {
+            <div class="settings-recommendation">
+                <div class="settings-recommendation-title">
+                    Recomendado para seu computador
+                    <span class="settings-ram-hint">(@(ViewModel.DetectedRamGb) GB · @(ViewModel.SelectedDeviceOption?.Label))</span>
+                </div>
+                <div class="settings-recommendation-body">
+                    <span class="rec-model">@ViewModel.RecommendedModelOption?.Label · @ViewModel.RecommendedModelOption?.SizeLabel</span>
+                    <span class="settings-recommendation-reason">@ViewModel.ModelRecommendationReason</span>
+                </div>
+                <button type="button" class="settings-recommendation-btn" @onclick="UseRecommended">Usar recomendado</button>
+            </div>
+        }
+    </div>
+
+    <div class="settings-section">
+        <div class="settings-section-title">Aparência</div>
+        <div class="settings-row">
+            <div>
+                <div class="settings-row-label">Tema escuro</div>
+                <div class="settings-row-sub">Alterna entre tema claro e escuro</div>
+            </div>
+            <div class="toggle @(ThemeService.IsDark ? "on" : "")" @onclick="ToggleTheme"></div>
+        </div>
+    </div>
+</section>
+
+@code {
+    [Parameter]
+    public SettingsViewModel ViewModel { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        ViewModel.PropertyChanged += OnObservedChanged;
+        ThemeService.PropertyChanged += OnObservedChanged;
+    }
+
+    private void OnNameChanged(ChangeEventArgs e)
+    {
+        ViewModel.Name = e.Value?.ToString() ?? "";
+        ViewModel.SaveProfileCommand.Execute(null);
+    }
+
+    private void OnEmailChanged(ChangeEventArgs e)
+    {
+        ViewModel.Email = e.Value?.ToString() ?? "";
+        ViewModel.SaveProfileCommand.Execute(null);
+    }
+
+    private void OnInstitutionChanged(ChangeEventArgs e)
+    {
+        ViewModel.Institution = e.Value?.ToString() ?? "";
+        ViewModel.SaveProfileCommand.Execute(null);
+    }
+
+    private void OnLanguageChanged(ChangeEventArgs e)
+    {
+        var code = e.Value?.ToString();
+        var option = ViewModel.LanguageOptions.FirstOrDefault(o => o.Code == code);
+        if (option is not null)
+        {
+            ViewModel.SelectedLanguageOption = option;
+        }
+    }
+
+    private void OnDeviceChanged(ChangeEventArgs e)
+    {
+        if (!Enum.TryParse<ExecutionDevice>(e.Value?.ToString(), out var device))
+        {
+            return;
+        }
+
+        var option = ViewModel.DeviceOptions.FirstOrDefault(o => o.Value == device);
+        if (option is not null)
+        {
+            ViewModel.SelectedDeviceOption = option;
+        }
+    }
+
+    private void OnModelChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<ModelQuality>(e.Value?.ToString(), out var quality))
+        {
+            var option = ViewModel.ModelOptions.FirstOrDefault(o => o.Value == quality);
+            if (option is not null)
+            {
+                ViewModel.SelectedModelOption = option;
+            }
+        }
+    }
+
+    private void UseRecommended() => ViewModel.UseRecommendedModelCommand.Execute(null);
+    private void ToggleIdentifySpeakers() => ViewModel.IdentifySpeakersDefault = !ViewModel.IdentifySpeakersDefault;
+
+    private void ToggleLiveTranscription() => ViewModel.LiveTranscriptionEnabled = !ViewModel.LiveTranscriptionEnabled;
+
+    private async Task ToggleTheme() => await ThemeService.ToggleAsync();
+
+    private void OnObservedChanged(object? sender, PropertyChangedEventArgs e) => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        ViewModel.PropertyChanged -= OnObservedChanged;
+        ThemeService.PropertyChanged -= OnObservedChanged;
+    }
+}

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Verso</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div id="app">Carregando…</div>
+
+<script>
+    // Interop mínimo (T57): alterna a classe `dark` no elemento raiz do documento,
+    // equivalente ao `html.dark` do protótipo. Não há equivalente em C#/Blazor puro para
+    // manipular classList do documento hospedeiro, então isso fica isolado aqui em vez de
+    // duplicado — ver BlazorThemeApplicator.cs.
+    window.versoInterop = {
+        setDarkTheme: function (isDark) {
+            document.documentElement.classList.toggle('dark', isDark);
+        }
+    };
+</script>
+
+<div id="blazor-error-ui">
+    Ocorreu um erro inesperado.
+    <a href="" class="reload">Recarregar</a>
+    <a class="dismiss">🗙</a>
+</div>
+<!-- Define window.versoWaveform antes do Blazor iniciar (T66); Recording.razor só invoca
+     essas funções via IJSRuntime após o primeiro OnAfterRenderAsync, então a ordem em relação
+     a blazor.webview.js abaixo não é sensível a race condition. -->
+<script src="js/waveform.js"></script>
+<script src="js/editor.js"></script>
+<script src="_framework/blazor.webview.js"></script>
+</body>
+</html>

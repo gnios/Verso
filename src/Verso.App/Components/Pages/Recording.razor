@@ -1,0 +1,248 @@
+@*
+    Tela de Gravação ao vivo (T66), reaproveitando o `RecordingViewModel` (Fase 16) tal como
+    está — timer, forma de onda simulada e frases "ao vivo" mockadas já são inteiramente
+    calculados em C# (ver `RecordingViewModel.AnimateWaveform`/`AddLivePhrase`). Este componente
+    só faz o binding desses dados e comandos, fiel às classes `.rec-*` do protótipo
+    (transcriba-v2-icons-transcriptions.html).
+
+    O `RecordingViewModel` é registrado como Transient (ver `AppServiceCollectionExtensions`) e
+    resolvido pelo `NavigationService` a cada `NavigateTo(ScreenKey.Recording)` — por isso este
+    componente recebe a instância via `[Parameter]` (repassada pelo componente pai que observa
+    `NavigationService.CurrentViewModel`, ver `MainLayout.razor`) em vez de usar `@inject`, que
+    resolveria uma instância Transient diferente e desconectada da navegação.
+
+    Waveform via `<canvas>` + JS interop pontual isolado em `wwwroot/js/waveform.js` — única
+    exceção documentada de JS residual do app (ver seção "Risks" de design.md, AD-005). O JS não
+    contém nenhuma lógica de animação/randomização: apenas materializa em pixels os valores de
+    altura/estado "ativo" de cada barra já calculados pelo `RecordingViewModel`.
+
+    Nota sobre os botões: o protótipo HTML tem um bug onde o botão de pausa (`rec-pause-btn`)
+    chama `togglePause()`, uma função nunca definida no `<script>` original — toda a lógica de
+    início/pausa/retomada fica sobrecarregada no botão principal (`toggleRecording()`). O
+    `RecordingViewModel` já corrige isso com três comandos dedicados e funcionais
+    (`StartRecordingCommand`/`TogglePauseCommand`/`StopRecordingCommand`); aqui cada botão é
+    ligado ao comando que lhe corresponde semanticamente, preservando a aparência/visibilidade
+    idêntica ao protótipo.
+*@
+@using System.Linq
+@implements IDisposable
+@inject IJSRuntime JS
+
+<div class="rec-container">
+    <div class="rec-devices">
+        <select @bind="ViewModel.SelectedMicrophone">
+            @foreach (var microphone in ViewModel.MicrophoneOptions)
+            {
+                <option value="@microphone">@microphone</option>
+            }
+        </select>
+        <select @bind="ViewModel.SelectedSource">
+            @foreach (var source in ViewModel.SourceOptions)
+            {
+                <option value="@source">@source</option>
+            }
+        </select>
+    </div>
+
+    <div class="rec-main">
+        <div class="rec-timer">@ViewModel.TimerDisplay</div>
+        <div class="rec-status">
+            <div class="rec-dot @(ViewModel.IsLive ? "live" : "")"></div>
+            <span>@ViewModel.StatusText</span>
+        </div>
+        <div class="rec-controls">
+            @if (ViewModel.ShowPauseStop)
+            {
+                <button class="rec-btn rec-btn-secondary" title="Pausar/retomar" @onclick="() => ViewModel.TogglePauseCommand.Execute(null)">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
+                </button>
+            }
+            <button class="rec-btn rec-btn-record @(ViewModel.IsRecordButtonRecording ? "recording" : "")" title="Gravar" @onclick="() => ViewModel.StartRecordingCommand.Execute(null)">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    @if (ViewModel.IsRecordButtonRecording)
+                    {
+                        <rect x="6" y="6" width="12" height="12" rx="2" />
+                    }
+                    else
+                    {
+                        <circle cx="12" cy="12" r="7" />
+                    }
+                </svg>
+            </button>
+            @if (ViewModel.ShowPauseStop)
+            {
+                <button class="rec-btn rec-btn-secondary" title="Parar" @onclick="async () => await ViewModel.StopRecordingCommand.ExecuteAsync(null)">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
+                </button>
+            }
+        </div>
+    </div>
+
+    <div class="rec-waveform">
+        <canvas @ref="_waveformCanvas" style="width:100%;height:100%;display:block"></canvas>
+    </div>
+
+    @if (ViewModel.ShowLiveSection)
+    {
+        <div class="rec-live-section">
+            <div class="rec-live-header">
+                <div class="rec-dot live"></div>
+                Transcrição em tempo real
+            </div>
+            <div class="rec-live-body">
+                @foreach (var segment in ViewModel.LiveSegments)
+                {
+                    <div class="rec-live-segment">
+                        <div class="rec-live-speaker @(segment.IsSpeakerA ? "speaker-a" : "speaker-b")">@segment.Speaker</div>
+                        <div class="rec-live-text">@segment.Text</div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public RecordingViewModel ViewModel { get; set; } = null!;
+
+    private ElementReference _waveformCanvas;
+    private RecordingViewModel? _subscribedViewModel;
+    private bool _waveformRenderQueued;
+    private bool _canvasReady;
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_subscribedViewModel, ViewModel))
+        {
+            return;
+        }
+
+        UnsubscribeViewModel();
+        _subscribedViewModel = ViewModel;
+        SubscribeViewModel();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        try
+        {
+            await JS.InvokeVoidAsync("versoWaveform.init", _waveformCanvas);
+            _canvasReady = true;
+            await RenderWaveformAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+            // WebView foi fechado/recarregado antes do primeiro render concluir — sem ação.
+        }
+    }
+
+    private void SubscribeViewModel()
+    {
+        if (_subscribedViewModel is null)
+        {
+            return;
+        }
+
+        _subscribedViewModel.PropertyChanged += OnViewModelPropertyChanged;
+        _subscribedViewModel.LiveSegments.CollectionChanged += OnLiveSegmentsChanged;
+        foreach (var bar in _subscribedViewModel.WaveformBars)
+        {
+            bar.PropertyChanged += OnWaveformBarChanged;
+        }
+    }
+
+    private void UnsubscribeViewModel()
+    {
+        if (_subscribedViewModel is null)
+        {
+            return;
+        }
+
+        _subscribedViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        _subscribedViewModel.LiveSegments.CollectionChanged -= OnLiveSegmentsChanged;
+        foreach (var bar in _subscribedViewModel.WaveformBars)
+        {
+            bar.PropertyChanged -= OnWaveformBarChanged;
+        }
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        => InvokeAsync(StateHasChanged);
+
+    private void OnLiveSegmentsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        => InvokeAsync(StateHasChanged);
+
+    private void OnWaveformBarChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        // `AnimateWaveform` atualiza as 48 barras em um laço síncrono a cada tick; sem essa
+        // coalescência, cada barra dispararia sua própria chamada JS. `InvokeAsync` só executa a
+        // continuação após o laço síncrono terminar, então o flag garante uma única chamada
+        // `render` por tick, já com os 48 valores atualizados.
+        if (_waveformRenderQueued)
+        {
+            return;
+        }
+
+        _waveformRenderQueued = true;
+        _ = InvokeAsync(async () =>
+        {
+            _waveformRenderQueued = false;
+            await RenderWaveformAsync();
+        });
+    }
+
+    private async Task RenderWaveformAsync()
+    {
+        if (!_canvasReady || _subscribedViewModel is null)
+        {
+            return;
+        }
+
+        var bars = _subscribedViewModel.WaveformBars
+            .Select(bar => new WaveformBarPayload(bar.Height, bar.IsActive))
+            .ToArray();
+
+        try
+        {
+            await JS.InvokeVoidAsync("versoWaveform.render", _waveformCanvas, bars);
+        }
+        catch (JSDisconnectedException)
+        {
+            // WebView foi fechado/recarregado entre o agendamento e a execução — sem ação.
+        }
+        catch (ObjectDisposedException)
+        {
+            // Mesmo cenário acima, em outra forma de exceção dependendo do estado do WebView.
+        }
+    }
+
+    public void Dispose()
+    {
+        UnsubscribeViewModel();
+        _ = DisposeWaveformJsAsync();
+    }
+
+    private async Task DisposeWaveformJsAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("versoWaveform.dispose", _waveformCanvas);
+        }
+        catch (JSDisconnectedException)
+        {
+            // WebView já desconectado (ex.: app fechando) — sem necessidade de limpar.
+        }
+        catch (ObjectDisposedException)
+        {
+            // Mesmo cenário acima, em outra forma de exceção dependendo do estado do WebView.
+        }
+    }
+
+    private sealed record WaveformBarPayload(double Height, bool IsActive);
+}
