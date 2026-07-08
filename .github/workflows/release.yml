@@ -85,6 +85,24 @@ jobs:
           $sum = (Get-ChildItem $pub -Recurse -File | Measure-Object Length -Sum).Sum
           Write-Host "Tamanho de publish apos cleanup: $([math]::Round($sum/1MB, 1)) MB"
 
+      - name: Assinar Verso.App.exe (Azure Trusted Signing)
+        # Ativa automaticamente quando AZURE_SIGNING_ACCOUNT estiver definido (repo Variables).
+        # Enquanto não configurado, o build sai sem assinar (alerta do SmartScreen permanece).
+        if: ${{ vars.AZURE_SIGNING_ACCOUNT != '' }}
+        uses: azure/artifact-signing-action@v2
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_CERTIFICATE_PROFILE }}
+          files-folder: publish/${{ matrix.variant }}
+          files-folder-filter: exe
+          files-folder-recurse: false
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
       - name: Empacotar zip
         shell: pwsh
         run: |
