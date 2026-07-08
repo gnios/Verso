@@ -41,14 +41,19 @@ tests/Verso.Tests  testes xUnit
 
 ## Releases
 
-Pipeline em `.github/workflows/release.yml` (runner `windows-latest`). Ao publicar uma tag `v*.*.*`, o CI builda um **self-contained** win-x64, empacota num zip e cria um GitHub Release com o executável anexado.
+Pipeline em `.github/workflows/release.yml` (runner `windows-latest`). Ao publicar uma tag `v*.*.*`, o CI builda **duas variantes self-contained** win-x64 e cria um GitHub Release com ambas anexadas:
+
+- **`Verso-x.y.z-cpu-win-x64.zip`** (~100 MB) — só runtime CPU. Recomendado para quem não tem GPU NVIDIA.
+- **`Verso-x.y.z-gpu-win-x64.zip`** (~500 MB) — inclui runtimes CUDA/Vulkan para aceleração por GPU.
+
+Nenhuma das duas exige instalação do .NET — só o WebView2 Runtime no Windows do usuário.
 
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-O release não exige instalação do .NET — só o WebView2 Runtime no Windows do usuário.
+> **Aviso de segurança do Windows:** os executáveis **não são assinados** (sem certificado de code signing). Ao abrir pela primeira vez, o Windows pode mostrar o alerta do SmartScreen ("O Windows protegeu seu computador"). Clique em **Mais informações → Executar mesmo assim**. Para eliminar esse alerta seria necessário assinar os binários com um certificado Authenticode (EV).
 
 ## Roadmap
 
