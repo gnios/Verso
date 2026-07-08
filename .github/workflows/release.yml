@@ -33,15 +33,18 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          # Usa a tag como versão quando disparado por tag; caso contrário, short SHA.
+          # Tag v*.*.* -> version SEM o 'v' (NuGet rejeita 'v0.1.0'); short SHA no dispatch.
           if ($env:GITHUB_REF -match 'refs/tags/(v.*)') {
-            $ver = $Matches[1]
+            $tag = $Matches[1]          # v0.1.0
+            $ver = $tag.Substring(1)    # 0.1.0
             $makeRelease = 'true'
           } else {
+            $tag = ''
             $ver = "0.0.0-dev+$($env:GITHUB_SHA.Substring(0,7))"
             $makeRelease = 'false'
           }
-          Write-Host "version=$ver"
+          Write-Host "tag=$tag version=$ver"
+          "tag=$tag" >> $env:GITHUB_OUTPUT
           "version=$ver" >> $env:GITHUB_OUTPUT
           "makeRelease=$makeRelease" >> $env:GITHUB_OUTPUT
 
@@ -87,10 +90,10 @@ jobs:
         shell: pwsh
         run: |
           $ver = '${{ steps.version.outputs.version }}'
-          $tag = $ver   # tag já é "v*.*.*"
+          $tag = '${{ steps.version.outputs.tag }}'   # tag real (v0.1.0)
           $notes = "Verso $ver (Windows x64)`n`nBuild self-contained — não requer instalação do .NET runtime.`n`n**Pré-requisito:** Windows 10/11 com o Microsoft Edge WebView2 Runtime (presente por padrão no Windows 11).`n`nDescompacte e execute ``Verso.App.exe``."
           gh release create $tag `
-            dist/Verso-${tag}-win-x64.zip `
+            dist/Verso-${ver}-win-x64.zip `
             --title "Verso $ver" `
             --notes $notes `
             --verify-tag
