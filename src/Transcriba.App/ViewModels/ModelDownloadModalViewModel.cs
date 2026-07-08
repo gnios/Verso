@@ -15,6 +15,9 @@ public partial class ModelDownloadModalViewModel : ViewModelBase
     {
         Message = quality switch
         {
+            ModelQuality.PtBrTurbo =>
+                "O modelo pt-BR Turbo (distil, ~538 MB) está sendo baixado do HuggingFace. " +
+                "Isso pode levar alguns minutos e ocorre apenas na primeira transcrição com este modelo.",
             ModelQuality.High =>
                 "O modelo de qualidade Alta (~3 GB) está sendo baixado via Whisper.net. " +
                 "Isso pode levar alguns minutos e ocorre apenas na primeira transcrição com esta qualidade.",

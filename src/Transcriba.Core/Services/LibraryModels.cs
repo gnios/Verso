@@ -9,7 +9,10 @@ public enum LibraryStatusFilter
     Done
 }
 
-public sealed record LibraryFilter(LibraryStatusFilter Status = LibraryStatusFilter.All, int? TagId = null);
+public sealed record LibraryFilter(
+    LibraryStatusFilter Status = LibraryStatusFilter.All,
+    int? TagId = null,
+    bool UnassignedOnly = false);
 
 public sealed record TranscriptionSummary(
     Guid Id,

@@ -4,7 +4,9 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
+using Transcriba.Core;
 using Transcriba.Core.Data.Entities;
+using Transcriba.Core.Engine;
 using Transcriba.Core.Services;
 
 namespace Transcriba.App.ViewModels;
@@ -29,6 +31,8 @@ public partial class SettingsViewModel : ViewModelBase
         new(ExecutionDevice.Vulkan, "Vulkan"),
     ];
 
+    public IReadOnlyList<ModelOptionViewModel> ModelOptions { get; } = ModelCatalog.All;
+
     [ObservableProperty]
     private string _name = "";
 
@@ -49,6 +53,17 @@ public partial class SettingsViewModel : ViewModelBase
 
     [ObservableProperty]
     private DeviceOptionViewModel? _selectedDeviceOption;
+
+    [ObservableProperty]
+    private ModelOptionViewModel? _selectedModelOption;
+
+    [ObservableProperty]
+    private ModelOptionViewModel? _recommendedModelOption;
+
+    [ObservableProperty]
+    private string _modelRecommendationReason = "";
+
+    public long DetectedRamGb { get; private set; }
 
     public SettingsViewModel(IServiceScopeFactory scopeFactory)
     {
@@ -72,6 +87,8 @@ public partial class SettingsViewModel : ViewModelBase
         LiveTranscriptionEnabled = settings.LiveTranscriptionEnabled;
         SelectedDeviceOption = DeviceOptions.FirstOrDefault(option => option.Value == settings.Device)
             ?? DeviceOptions[0];
+        SelectedModelOption = ModelCatalog.Find(settings.DefaultQuality);
+        RecomputeModelRecommendation();
         _suppressPersist = false;
     }
 
@@ -124,6 +141,38 @@ public partial class SettingsViewModel : ViewModelBase
         }
 
         _ = UpdateSettingsAsync(settings => settings.Device = value.Value);
+        RecomputeModelRecommendation();
+    }
+
+    [RelayCommand]
+    private void UseRecommendedModel()
+    {
+        if (RecommendedModelOption is null)
+        {
+            return;
+        }
+
+        SelectedModelOption = RecommendedModelOption;
+    }
+
+    partial void OnSelectedModelOptionChanged(ModelOptionViewModel? value)
+    {
+        if (_suppressPersist || value is null)
+        {
+            return;
+        }
+
+        _ = UpdateSettingsAsync(settings => settings.DefaultQuality = value.Value);
+    }
+
+    private void RecomputeModelRecommendation()
+    {
+        var ramBytes = SystemMemory.TotalPhysicalMemoryBytes;
+        DetectedRamGb = ramBytes <= 0 ? 0 : ramBytes / (1024L * 1024L * 1024L);
+        var device = SelectedDeviceOption?.Value ?? ExecutionDevice.Auto;
+        var rec = ModelRecommender.Recommend(device, ramBytes);
+        RecommendedModelOption = ModelCatalog.Find(rec.Quality);
+        ModelRecommendationReason = rec.Reason;
     }
 
     private async Task UpdateSettingsAsync(System.Action<UserSettings> mutate)

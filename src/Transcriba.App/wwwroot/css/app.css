@@ -137,6 +137,8 @@ input,select,textarea{font-family:inherit;color:inherit}
 .upload-label{font-size:12px;font-weight:600;color:var(--fg-secondary);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;display:block}
 .upload-select,.upload-input{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;background:var(--bg);outline:none;transition:border .15s}
 .upload-select:focus,.upload-input:focus{border-color:var(--accent)}
+.upload-hint{font-size:11px;color:var(--accent);margin-top:4px;font-weight:500}
+.upload-select:disabled{background:var(--surface);color:var(--muted);cursor:not-allowed}
 .upload-btn{padding:10px 28px;background:var(--accent);color:#fff;border-radius:var(--radius);font-size:14px;font-weight:600;margin-top:20px;transition:background .15s;align-self:start;border:none;cursor:pointer}
 .upload-btn:hover{background:var(--accent-hover)}
 .upload-btn:disabled{background:var(--muted);cursor:not-allowed}
@@ -196,14 +198,13 @@ html.dark .rec-btn-record.recording{background:#e4e4e3}
 .editor-title-input:focus{background:var(--surface);box-shadow:0 0 0 2px var(--accent-light)}
 .editor-meta{font-size:13px;color:var(--muted);margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .editor-meta-dot{width:3px;height:3px;border-radius:50%;background:var(--muted)}
+.editor-meta-time{display:inline-flex;align-items:center;gap:4px;color:var(--accent);font-weight:500}
+.editor-meta-time svg{width:13px;height:13px;color:var(--accent)}
 .editor-tags{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:16px}
 .editor-tags-editable{align-items:center}
 .tag{display:inline-flex;align-items:center;gap:4px}
 .tag-remove{border:none;background:rgba(0,0,0,.15);color:inherit;width:16px;height:16px;border-radius:50%;display:grid;place-items:center;font-size:12px;line-height:1;cursor:pointer;padding:0;flex-shrink:0}
 .tag-remove:hover{background:rgba(0,0,0,.3)}
-.tag-add{display:inline-flex;align-items:center}
-.tag-add-input{padding:4px 8px;font-size:12px;border:1px dashed var(--border-dark);border-radius:var(--radius);background:transparent;outline:none;color:var(--fg-secondary);min-width:120px}
-.tag-add-input:focus{border-color:var(--accent);border-style:solid}
 /* Combobox discreto de pesquisa (inline na meta do editor) */
 .research-combobox{position:relative;display:inline-flex}
 .research-combobox-trigger{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border:1px solid transparent;border-radius:var(--radius);background:transparent;color:var(--fg-secondary);font-size:12px;cursor:pointer;transition:background .12s,border-color .12s;max-width:220px}
@@ -225,6 +226,31 @@ html.dark .rec-btn-record.recording{background:#e4e4e3}
 .research-combobox-item.selected{background:var(--accent-light);color:var(--accent)}
 .research-combobox-item-icon{font-size:14px;width:18px;text-align:center;flex-shrink:0}
 .research-combobox-empty{padding:10px 8px;font-size:12px;color:var(--muted);text-align:center}
+/* Combobox de tags (inline no header do editor) — espelha o research-combobox com trigger tracejado + criar-nova */
+.tag-combobox{position:relative;display:inline-flex}
+.tag-combobox-trigger{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border:1px dashed var(--border-dark);border-radius:var(--radius);background:transparent;color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;transition:background .12s,border-color .12s,color .12s;white-space:nowrap}
+.tag-combobox-trigger:hover{background:var(--surface-hover);color:var(--fg-secondary);border-color:var(--accent)}
+.tag-combobox-trigger.open{background:var(--surface);border-color:var(--accent);border-style:solid;color:var(--fg-secondary)}
+.tag-combobox-plus{width:12px;height:12px;flex-shrink:0}
+.tag-combobox-label{font-size:11px}
+.tag-combobox-overlay{position:fixed;inset:0;z-index:900}
+.tag-combobox-panel{position:absolute;top:calc(100% + 4px);left:0;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);min-width:240px;max-width:320px;z-index:1000;padding:6px;display:flex;flex-direction:column;gap:4px}
+.tag-combobox-search{display:flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius)}
+.tag-combobox-search input{border:none;outline:none;background:transparent;font-size:13px;width:100%;color:var(--fg)}
+.tag-combobox-search svg{width:13px;height:13px;color:var(--muted);flex-shrink:0}
+.tag-combobox-list{max-height:240px;overflow-y:auto;padding:2px 0;display:flex;flex-direction:column;gap:2px}
+.tag-combobox-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:var(--radius);font-size:13px;color:var(--fg-secondary);cursor:pointer;transition:background .1s}
+.tag-combobox-item:hover{background:var(--surface-hover);color:var(--fg)}
+.tag-combobox-item.assigned{opacity:.5;cursor:default}
+.tag-combobox-item.assigned:hover{background:transparent;color:var(--fg-secondary)}
+.tag-combobox-item-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.tag-combobox-item-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.tag-combobox-item-check{width:14px;height:14px;color:var(--accent);flex-shrink:0}
+.tag-combobox-create{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:var(--radius);font-size:13px;color:var(--accent);cursor:pointer;transition:background .1s;border-top:1px solid var(--border);margin-top:2px}
+.tag-combobox-create:hover{background:var(--accent-light)}
+.tag-combobox-create-icon{width:14px;height:14px;flex-shrink:0}
+.tag-combobox-create strong{font-weight:600}
+.tag-combobox-empty{padding:10px 8px;font-size:12px;color:var(--muted);text-align:center}
 .editor-toolbar{display:flex;align-items:center;gap:5px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border);flex-wrap:wrap;position:relative}
 .editor-toolbar button{padding:5px 9px;font-size:12px;border-radius:var(--radius);display:flex;align-items:center;gap:4px;color:var(--fg-secondary);transition:background .1s;white-space:nowrap}
 .editor-toolbar button:hover{background:var(--surface-hover)}
@@ -376,3 +402,12 @@ html.dark .rec-btn-record.recording{background:#e4e4e3}
 #blazor-error-ui{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--red-light);color:var(--red);padding:10px 16px;font-size:13px;z-index:2000}
 #blazor-error-ui .dismiss{cursor:pointer;float:right}
 .blazor-error-boundary{background:var(--red-light);color:var(--red);padding:12px;border-radius:var(--radius-md)}
+/* Settings — modelo de transcrição recommendation block */
+.settings-recommendation{margin-top:10px;padding:12px;border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:var(--radius);background:var(--surface)}
+.settings-recommendation-title{font-size:12px;font-weight:600;color:var(--fg-secondary);margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.settings-ram-hint{font-size:11px;font-weight:500;color:var(--muted);background:var(--surface-hover);padding:1px 7px;border-radius:99px}
+.settings-recommendation-body{font-size:13px;color:var(--fg);line-height:1.45;margin-bottom:8px}
+.settings-recommendation-body .rec-model{font-weight:600;color:var(--accent)}
+.settings-recommendation-reason{font-size:12px;color:var(--muted);display:block;margin-top:2px}
+.settings-recommendation-btn{padding:5px 12px;font-size:12px;font-weight:600;border:1px solid var(--accent);border-radius:var(--radius);background:var(--accent-light);color:var(--accent);cursor:pointer;transition:background .12s}
+.settings-recommendation-btn:hover{background:var(--accent);color:#fff}

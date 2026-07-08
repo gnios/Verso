@@ -30,6 +30,9 @@ public partial class SidebarViewModel : ViewModelBase
     private int _doneCount;
 
     [ObservableProperty]
+    private int _unassignedCount;
+
+    [ObservableProperty]
     private bool _isNewMenuOpen;
 
     [ObservableProperty]
@@ -82,6 +85,8 @@ public partial class SidebarViewModel : ViewModelBase
             new LibraryFilter(LibraryStatusFilter.Progress));
         DoneCount = await libraryService.GetCountAsync(
             new LibraryFilter(LibraryStatusFilter.Done));
+        UnassignedCount = await libraryService.GetCountAsync(
+            new LibraryFilter(UnassignedOnly: true));
     }
 
     [RelayCommand]
@@ -107,6 +112,12 @@ public partial class SidebarViewModel : ViewModelBase
         _navigation.NavigateTo(
             ScreenKey.Dashboard,
             new NavigationParameter(StatusFilter: LibraryStatusFilter.Done));
+
+    [RelayCommand]
+    private void NavigateUnassigned() =>
+        _navigation.NavigateTo(
+            ScreenKey.Dashboard,
+            new NavigationParameter(UnassignedOnly: true));
 
     [RelayCommand]
     private void NavigateRecording() =>

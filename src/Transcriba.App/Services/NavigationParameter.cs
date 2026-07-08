@@ -7,4 +7,5 @@ public sealed record NavigationParameter(
     LibraryStatusFilter? StatusFilter = null,
     int? TagId = null,
     int? ResearchId = null,
-    Guid? TranscriptionId = null);
+    Guid? TranscriptionId = null,
+    bool UnassignedOnly = false);

@@ -9,12 +9,29 @@ namespace Transcriba.Tests.Engine;
 public class ModelManagerTests
 {
     [Theory]
-    [InlineData(ModelQuality.Standard, GgmlType.Small, "ggml-small.bin")]
-    [InlineData(ModelQuality.High, GgmlType.LargeV3, "ggml-large-v3.bin")]
+[InlineData(ModelQuality.Standard, GgmlType.Small, "ggml-small.bin")]
+[InlineData(ModelQuality.High, GgmlType.LargeV3, "ggml-large-v3.bin")]
+[InlineData(ModelQuality.Tiny, GgmlType.Tiny, "ggml-tiny.bin")]
+[InlineData(ModelQuality.Base, GgmlType.Base, "ggml-base.bin")]
+[InlineData(ModelQuality.Medium, GgmlType.Medium, "ggml-medium.bin")]
+[InlineData(ModelQuality.LargeV2, GgmlType.LargeV2, "ggml-large-v2.bin")]
+[InlineData(ModelQuality.LargeV3Turbo, GgmlType.LargeV3Turbo, "ggml-large-v3-turbo.bin")]
+[InlineData(ModelQuality.LargeV1, GgmlType.LargeV1, "ggml-large-v1.bin")]
+[InlineData(ModelQuality.TinyEn, GgmlType.TinyEn, "ggml-tiny.en.bin")]
+[InlineData(ModelQuality.BaseEn, GgmlType.BaseEn, "ggml-base.en.bin")]
+[InlineData(ModelQuality.SmallEn, GgmlType.SmallEn, "ggml-small.en.bin")]
+[InlineData(ModelQuality.MediumEn, GgmlType.MediumEn, "ggml-medium.en.bin")]
     public void MapQualityToGgmlType_MapsExpectedValues(ModelQuality quality, GgmlType expectedType, string expectedFileName)
     {
         Assert.Equal(expectedType, ModelManager.MapQualityToGgmlType(quality));
         Assert.Equal(expectedFileName, ModelManager.GetModelFileName(quality));
+    }
+
+    [Fact]
+    public void GetModelFileName_PtBrTurbo_ReturnsCustomGgmlFileName()
+    {
+        // PtBrTurbo não tem GgmlType canônico — nome de arquivo é fixo (modelo fine-tuned pt-BR).
+        Assert.Equal("ggml-distil-large-v3-ptbr-q5_0.bin", ModelManager.GetModelFileName(ModelQuality.PtBrTurbo));
     }
 
     [Fact]

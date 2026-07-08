@@ -353,6 +353,11 @@ public class LibraryService(IDbContextFactory<TranscribaDbContext> dbContextFact
             query = query.Where(t => t.Tags.Any(tag => tag.Id == tagId));
         }
 
+        if (filter.UnassignedOnly)
+        {
+            query = query.Where(t => t.ResearchPageId == null);
+        }
+
         return query;
     }
 

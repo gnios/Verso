@@ -38,6 +38,13 @@ public sealed class ModelManager
 
     });
 
+    // Modelo distil-whisper-large-v3 fine-tuned para pt-BR (GGML Q5_0), hospedado no HuggingFace.
+    // Não tem GgmlType canônico no Whisper.net — baixado por URL direta fora do WhisperGgmlDownloader.
+    private const string PtBrTurboFileName = "ggml-distil-large-v3-ptbr-q5_0.bin";
+    private const string PtBrTurboUrl =
+        "https://huggingface.co/lucasparis1103/distil-whisper-large-v3-ptbr-ggml/resolve/main/ggml-distil-large-v3-ptbr-q5_0.bin";
+    private const long PtBrTurboMinSizeBytes = 512_000_000;
+
 
 
     private readonly ILogger<ModelManager>? _logger;
@@ -69,69 +76,60 @@ public sealed class ModelManager
 
 
     public static string GetModelFileName(GgmlType type) => type switch
-
     {
-
         GgmlType.Tiny => "ggml-tiny.bin",
-
+        GgmlType.TinyEn => "ggml-tiny.en.bin",
         GgmlType.Base => "ggml-base.bin",
-
+        GgmlType.BaseEn => "ggml-base.en.bin",
         GgmlType.Small => "ggml-small.bin",
-
+        GgmlType.SmallEn => "ggml-small.en.bin",
         GgmlType.Medium => "ggml-medium.bin",
-
+        GgmlType.MediumEn => "ggml-medium.en.bin",
+        GgmlType.LargeV1 => "ggml-large-v1.bin",
         GgmlType.LargeV2 => "ggml-large-v2.bin",
-
         GgmlType.LargeV3 => "ggml-large-v3.bin",
-
         GgmlType.LargeV3Turbo => "ggml-large-v3-turbo.bin",
-
         _ => $"ggml-{type.ToString().ToLowerInvariant()}.bin",
-
     };
 
 
 
     public static GgmlType MapQualityToGgmlType(ModelQuality quality) => quality switch
-
     {
-
         ModelQuality.Standard => GgmlType.Small,
-
         ModelQuality.High => GgmlType.LargeV3,
-
+        ModelQuality.Tiny => GgmlType.Tiny,
+        ModelQuality.Base => GgmlType.Base,
+        ModelQuality.Medium => GgmlType.Medium,
+        ModelQuality.LargeV2 => GgmlType.LargeV2,
+        ModelQuality.LargeV3Turbo => GgmlType.LargeV3Turbo,
+        ModelQuality.LargeV1 => GgmlType.LargeV1,
+        ModelQuality.TinyEn => GgmlType.TinyEn,
+        ModelQuality.BaseEn => GgmlType.BaseEn,
+        ModelQuality.SmallEn => GgmlType.SmallEn,
+        ModelQuality.MediumEn => GgmlType.MediumEn,
         _ => GgmlType.Small,
-
     };
 
-
-
     public static string GetModelFileName(ModelQuality quality) =>
-
-        GetModelFileName(MapQualityToGgmlType(quality));
-
+        quality == ModelQuality.PtBrTurbo ? PtBrTurboFileName : GetModelFileName(MapQualityToGgmlType(quality));
 
 
     public static long GetMinimumModelSizeBytes(GgmlType ggmlType) => ggmlType switch
-
     {
-
         GgmlType.Tiny => 50_000_000,
-
+        GgmlType.TinyEn => 50_000_000,
         GgmlType.Base => 100_000_000,
-
+        GgmlType.BaseEn => 100_000_000,
         GgmlType.Small => 400_000_000,
-
+        GgmlType.SmallEn => 400_000_000,
         GgmlType.Medium => 1_200_000_000,
-
+        GgmlType.MediumEn => 1_200_000_000,
+        GgmlType.LargeV1 => 2_500_000_000,
         GgmlType.LargeV2 => 2_500_000_000,
-
         GgmlType.LargeV3 => 2_500_000_000,
-
         GgmlType.LargeV3Turbo => 1_200_000_000,
-
         _ => 10_000_000,
-
     };
 
 
@@ -263,8 +261,27 @@ public sealed class ModelManager
 
 
     public Task EnsureModelAsync(string modelPath, ModelQuality quality, CancellationToken cancellationToken = default) =>
+        quality == ModelQuality.PtBrTurbo
+            ? EnsureCustomModelAsync(modelPath, quality, cancellationToken)
+            : EnsureModelInternalAsync(modelPath, MapQualityToGgmlType(quality), cancellationToken, quality);
 
-        EnsureModelInternalAsync(modelPath, MapQualityToGgmlType(quality), cancellationToken, quality);
+    /// <summary>
+    /// Validação por ModelQuality — usa o tamanho mínimo do GgmlType canônico, exceto para o
+    /// modelo pt-BR customizado (sem GgmlType), que tem tamanho mínimo próprio.
+    /// </summary>
+    public static bool IsModelFileValid(string modelPath, ModelQuality quality)
+    {
+        if (!File.Exists(modelPath))
+        {
+            return false;
+        }
+
+        var minSize = quality == ModelQuality.PtBrTurbo
+            ? PtBrTurboMinSizeBytes
+            : GetMinimumModelSizeBytes(MapQualityToGgmlType(quality));
+
+        return new FileInfo(modelPath).Length >= minSize && HasGgmlMagic(modelPath);
+    }
 
 
 
@@ -474,6 +491,100 @@ public sealed class ModelManager
 
         }
 
+    }
+
+    /// <summary>
+    /// Download de um modelo GGML de URL direta (fora do catálogo canônico do Whisper.net),
+    /// usado hoje pelo distil-whisper-large-v3 pt-BR. Mesma estrutura de EnsureModelInternalAsync:
+    /// lock por caminho, arquivo temporário, validação por tamanho+magic, notificação de UI.
+    /// </summary>
+    private async Task EnsureCustomModelAsync(string modelPath, ModelQuality quality, CancellationToken cancellationToken)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(modelPath)!);
+
+        if (IsModelFileValid(modelPath, quality))
+        {
+            _logger?.LogDebug("Modelo pt-BR já disponível em {ModelPath} ({SizeBytes} bytes)", modelPath, new FileInfo(modelPath).Length);
+            return;
+        }
+
+        var downloadLock = DownloadLocks.GetOrAdd(modelPath, _ => new SemaphoreSlim(1, 1));
+        await downloadLock.WaitAsync(cancellationToken);
+
+        try
+        {
+            if (IsModelFileValid(modelPath, quality))
+            {
+                return;
+            }
+
+            var tempPath = modelPath + ".download";
+
+            if (File.Exists(modelPath) && !IsModelFileValid(modelPath, quality))
+            {
+                _logger?.LogWarning("Modelo pt-BR inválido em {ModelPath}. Será baixado novamente.", modelPath);
+                ReleaseModelFile(modelPath);
+            }
+
+            if (IsModelFileValid(tempPath, quality))
+            {
+                _logger?.LogInformation("Finalizando download parcial em {TempPath}", tempPath);
+                FinalizeDownload(tempPath, modelPath);
+                return;
+            }
+
+            if (File.Exists(tempPath))
+            {
+                _logger?.LogWarning("Arquivo temporário incompleto em {TempPath}. Removendo.", tempPath);
+                ReleaseTempFile(tempPath);
+            }
+
+            var url = quality == ModelQuality.PtBrTurbo ? PtBrTurboUrl : throw new InvalidOperationException($"Modelo {quality} não tem URL de download customizado.");
+            _logger?.LogInformation("Baixando modelo pt-BR de {Url}…", url);
+            _downloadNotifier?.DownloadStarted(quality);
+
+            try
+            {
+                using var response = await DownloadHttpClient.Value.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                response.EnsureSuccessStatusCode();
+                await using var modelStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                await using (var fileWriter = File.Create(tempPath))
+                {
+                    await modelStream.CopyToAsync(fileWriter, cancellationToken);
+                    await fileWriter.FlushAsync(cancellationToken);
+                }
+
+                var downloadedSize = new FileInfo(tempPath).Length;
+                if (!IsModelFileValid(tempPath, quality))
+                {
+                    var magicDescription = DescribeModelMagic(tempPath);
+                    throw new InvalidOperationException(
+                        $"Download do modelo pt-BR incompleto ou inválido ({downloadedSize} bytes, magic={magicDescription}). " +
+                        $"Esperado pelo menos {PtBrTurboMinSizeBytes} bytes.");
+                }
+
+                FinalizeDownload(tempPath, modelPath);
+                _logger?.LogInformation("Modelo pt-BR salvo em {ModelPath} ({SizeBytes} bytes)", modelPath, downloadedSize);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Falha ao baixar modelo pt-BR de {Url}", url);
+                if (File.Exists(tempPath) && !IsModelFileValid(tempPath, quality))
+                {
+                    ReleaseTempFile(tempPath);
+                }
+
+                throw;
+            }
+            finally
+            {
+                _downloadNotifier?.DownloadCompleted();
+            }
+        }
+        finally
+        {
+            downloadLock.Release();
+        }
     }
 
 

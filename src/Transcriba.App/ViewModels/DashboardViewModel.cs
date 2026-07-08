@@ -32,11 +32,14 @@ public partial class DashboardViewModel : ViewModelBase
     private int? _tagFilterId;
 
     [ObservableProperty]
-    private bool _isEmpty;
+    private bool _unassignedOnly;
 
+    [ObservableProperty]
+    private bool _isEmpty;
     public bool IsAllFilterActive => ActiveStatusFilter == LibraryStatusFilter.All;
     public bool IsProgressFilterActive => ActiveStatusFilter == LibraryStatusFilter.Progress;
     public bool IsDoneFilterActive => ActiveStatusFilter == LibraryStatusFilter.Done;
+    public bool IsUnassignedFilterActive => UnassignedOnly;
 
     public DashboardViewModel(
         IServiceScopeFactory scopeFactory,
@@ -83,6 +86,9 @@ public partial class DashboardViewModel : ViewModelBase
 
     [RelayCommand]
     private void SetDoneFilter() => ActiveStatusFilter = LibraryStatusFilter.Done;
+
+    partial void OnUnassignedOnlyChanged(bool value) => _ = LoadAsync();
+
 
     internal void OpenTranscription(Guid transcriptionId) =>
         _serviceProvider.GetRequiredService<NavigationService>().NavigateTo(
@@ -158,16 +164,23 @@ public partial class DashboardViewModel : ViewModelBase
             TagFilterId = tagId;
             ActiveStatusFilter = LibraryStatusFilter.All;
         }
+
+        if (parameter.UnassignedOnly)
+        {
+            UnassignedOnly = true;
+        }
+
     }
 
     private async Task LoadAsync()
     {
         using var scope = _scopeFactory.CreateScope();
         var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
-        var filter = new LibraryFilter(ActiveStatusFilter, TagFilterId);
+        var filter = new LibraryFilter(ActiveStatusFilter, TagFilterId, UnassignedOnly);
         var summaries = string.IsNullOrWhiteSpace(SearchText)
             ? await libraryService.GetTranscriptions(filter)
             : await libraryService.SearchText(SearchText, filter);
+
 
         Cards.Clear();
         foreach (var summary in summaries)

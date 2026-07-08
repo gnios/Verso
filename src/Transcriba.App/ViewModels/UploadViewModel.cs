@@ -36,11 +36,7 @@ public partial class UploadViewModel : ViewModelBase
         new("en", "English"),
     ];
 
-    public IReadOnlyList<QualityOptionViewModel> QualityOptions { get; } =
-    [
-        new(ModelQuality.Standard, "Padrão"),
-        new(ModelQuality.High, "Alta"),
-    ];
+    public IReadOnlyList<ModelOptionViewModel> ModelOptions { get; } = ModelCatalog.All;
 
     public IReadOnlyList<SpeakerModeOptionViewModel> SpeakerModeOptions { get; } =
     [
@@ -70,10 +66,11 @@ public partial class UploadViewModel : ViewModelBase
     private LanguageOptionViewModel? _selectedLanguageOption;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsLanguageLocked))]
     private ModelQuality _quality = ModelQuality.Standard;
 
     [ObservableProperty]
-    private QualityOptionViewModel? _selectedQualityOption;
+    private ModelOptionViewModel? _selectedModelOption;
 
     [ObservableProperty]
     private SpeakerMode _speakerMode = SpeakerMode.Automatic;
@@ -96,8 +93,9 @@ public partial class UploadViewModel : ViewModelBase
 
     public bool HasSelectedFile => !string.IsNullOrWhiteSpace(SelectedFilePath);
     public bool CanStart => HasSelectedFile && !IsStarting && !string.IsNullOrWhiteSpace(Title);
-
     public string SupportedFormatsLabel => UploadMediaFormats.DisplayList;
+    /// <summary>O modelo pt-BR Turbo (distil) trava o idioma em pt-BR.</summary>
+    public bool IsLanguageLocked => Quality == ModelQuality.PtBrTurbo;
 
     public UploadViewModel(
         IServiceScopeFactory scopeFactory,
@@ -168,21 +166,37 @@ public partial class UploadViewModel : ViewModelBase
 
     partial void OnSelectedFilePathChanged(string? value) => NotifyStartState();
 
-    partial void OnIsStartingChanged(bool value) => NotifyStartState();
-
     partial void OnSelectedLanguageOptionChanged(LanguageOptionViewModel? value)
     {
-        if (value is not null)
+        if (value is null)
         {
-            Language = value.Code;
+            return;
+        }
+
+        Language = value.Code;
+
+        // O modelo pt-BR Turbo (distil) é fine-tuned apenas para português — trava o idioma em pt.
+        if (Quality == ModelQuality.PtBrTurbo && value.Code != "pt")
+        {
+            SelectedLanguageOption = LanguageOptions.First(option => option.Code == "pt");
+            Language = "pt";
         }
     }
 
-    partial void OnSelectedQualityOptionChanged(QualityOptionViewModel? value)
+    partial void OnSelectedModelOptionChanged(ModelOptionViewModel? value)
     {
-        if (value is not null)
+        if (value is null)
         {
-            Quality = value.Value;
+            return;
+        }
+
+        Quality = value.Value;
+
+        // Selecionar o modelo pt-BR Turbo força o idioma em pt-BR (o modelo é fine-tuned só para pt).
+        if (value.Value == ModelQuality.PtBrTurbo)
+        {
+            Language = "pt";
+            SelectedLanguageOption = LanguageOptions.First(option => option.Code == "pt");
         }
     }
 
@@ -212,12 +226,14 @@ public partial class UploadViewModel : ViewModelBase
             var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
             var settingsService = scope.ServiceProvider.GetRequiredService<SettingsService>();
             var settings = await settingsService.GetAsync();
+            // Segurança extra: o modelo pt-BR Turbo é fine-tuned só para pt — nunca envia outro idioma ao engine.
+            var language = Quality == ModelQuality.PtBrTurbo ? "pt" : Language;
 
             await libraryService.CreateForUploadAsync(
                 transcriptionId,
                 Title.Trim(),
                 mediaPath,
-                Language,
+                language,
                 Quality,
                 SpeakerMode,
                 SelectedResearch?.Id,
@@ -227,7 +243,7 @@ public partial class UploadViewModel : ViewModelBase
             _queueService.Enqueue(new TranscriptionJobRequest(
                 transcriptionId,
                 mediaPath,
-                Language,
+                language,
                 Quality,
                 settings.Device));
 
@@ -255,7 +271,8 @@ public partial class UploadViewModel : ViewModelBase
         Language = settings.DefaultLanguage;
         SpeakerMode = settings.IdentifySpeakersDefault ? SpeakerMode.Automatic : SpeakerMode.Off;
         SelectedLanguageOption = LanguageOptions.First(option => option.Code == Language);
-        SelectedQualityOption = QualityOptions.First(option => option.Value == Quality);
+        Quality = settings.DefaultQuality;
+        SelectedModelOption = ModelCatalog.Find(Quality);
         SelectedSpeakerModeOption = SpeakerModeOptions.First(option => option.Value == SpeakerMode);
 
         ResearchOptions.Clear();
@@ -300,11 +317,6 @@ public partial class UploadViewModel : ViewModelBase
 }
 
 public sealed record LanguageOptionViewModel(string Code, string Label)
-{
-    public override string ToString() => Label;
-}
-
-public sealed record QualityOptionViewModel(ModelQuality Value, string Label)
 {
     public override string ToString() => Label;
 }

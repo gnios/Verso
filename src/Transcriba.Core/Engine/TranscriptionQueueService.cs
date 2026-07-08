@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Collections.Concurrent;
 using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
@@ -100,8 +101,10 @@ public sealed class TranscriptionQueueService : BackgroundService
             await UpdateStatusAsync(request.TranscriptionId, TranscriptionStatus.InProgress, null, stoppingToken);
             RaiseStatusChanged(request.TranscriptionId, TranscriptionStatusChanged.InProgress);
             var progress = new Progress<EngineProgress>(e => RaiseProgressChanged(request.TranscriptionId, e.Stage, e.PartIndex, e.TotalParts));
+            var stopwatch = Stopwatch.StartNew();
             var result = await _engine.TranscribeAsync(request, progress, linkedCts.Token);
-            await PersistSuccessAsync(request, result, stoppingToken);
+            stopwatch.Stop();
+            await PersistSuccessAsync(request, result, stopwatch.Elapsed.TotalSeconds, stoppingToken);
 
             RaiseStatusChanged(request.TranscriptionId, TranscriptionStatusChanged.Done);
         }
@@ -129,6 +132,7 @@ public sealed class TranscriptionQueueService : BackgroundService
     private async Task PersistSuccessAsync(
         TranscriptionJobRequest request,
         TranscriptionResult result,
+        double processingSeconds,
         CancellationToken cancellationToken)
     {
         await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
@@ -184,7 +188,8 @@ public sealed class TranscriptionQueueService : BackgroundService
                 setters => setters
                     .SetProperty(t => t.Status, TranscriptionStatus.Done)
                     .SetProperty(t => t.ErrorMessage, (string?)null)
-                    .SetProperty(t => t.DurationSeconds, duration),
+                    .SetProperty(t => t.DurationSeconds, duration)
+                    .SetProperty(t => t.ProcessingDurationSeconds, (double?)processingSeconds),
                 cancellationToken);
 
         if (updated == 0)

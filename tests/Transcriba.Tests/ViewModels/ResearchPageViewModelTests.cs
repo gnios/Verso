@@ -139,6 +139,87 @@ public class ResearchPageViewModelTests
     }
 
     [Fact]
+    public async Task StatusFilter_Done_ShowsOnlyCompletedTranscriptions()
+    {
+        var (provider, directory, researchId, doneId, progressId) = await CreateResearchProviderAsync();
+        try
+        {
+            var page = await CreateResearchPageAsync(provider, researchId);
+            Assert.Equal(2, page.Transcriptions.Count);
+
+            page.SetDoneFilterCommand.Execute(null);
+
+            Assert.True(page.IsDoneFilterActive);
+            Assert.Single(page.Transcriptions);
+            Assert.Equal(doneId, page.Transcriptions[0].Id);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task StatusFilter_Progress_ShowsOnlyInProgressTranscriptions()
+    {
+        var (provider, directory, researchId, _, _) = await CreateResearchProviderAsync();
+        try
+        {
+            var page = await CreateResearchPageAsync(provider, researchId);
+
+            page.SetProgressFilterCommand.Execute(null);
+
+            Assert.True(page.IsProgressFilterActive);
+            Assert.Single(page.Transcriptions);
+            Assert.Equal(TranscriptionStatus.InProgress, page.Transcriptions[0].Status);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task SearchText_FiltersByTitleCaseInsensitive()
+    {
+        var (provider, directory, researchId, _, _) = await CreateResearchProviderAsync();
+        try
+        {
+            var page = await CreateResearchPageAsync(provider, researchId);
+
+            page.SearchText = "concluída";
+
+            Assert.Single(page.Transcriptions);
+            Assert.Contains(page.Transcriptions, c => c.Title.Contains("concluída", StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task SetAllFilter_AfterFilter_ShowsAllTranscriptions()
+    {
+        var (provider, directory, researchId, _, _) = await CreateResearchProviderAsync();
+        try
+        {
+            var page = await CreateResearchPageAsync(provider, researchId);
+            page.SetDoneFilterCommand.Execute(null);
+            Assert.Single(page.Transcriptions);
+
+            page.SetAllFilterCommand.Execute(null);
+
+            Assert.True(page.IsAllFilterActive);
+            Assert.Equal(2, page.Transcriptions.Count);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
     public async Task LoadAsync_EmptyTranscriptions_ShowsEmptyStateWithoutError()
     {
         var (provider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();

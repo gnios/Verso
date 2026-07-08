@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System;
 using System.Linq;
 using System.Collections.ObjectModel;
@@ -24,6 +25,14 @@ public partial class ResearchPageViewModel : ViewModelBase
 
     public ObservableCollection<TranscriptionCardViewModel> Transcriptions { get; } = [];
 
+    private List<TranscriptionSummary> _allSummaries = [];
+
+    [ObservableProperty]
+    private LibraryStatusFilter _activeStatusFilter = LibraryStatusFilter.All;
+
+    [ObservableProperty]
+    private string _searchText = "";
+
     [ObservableProperty]
     private string _title = "";
 
@@ -47,6 +56,10 @@ public partial class ResearchPageViewModel : ViewModelBase
     public bool IsYellow => ColorName == "yellow";
     public bool IsRed => ColorName == "red";
     public bool IsTeal => ColorName == "teal";
+
+    public bool IsAllFilterActive => ActiveStatusFilter == LibraryStatusFilter.All;
+    public bool IsProgressFilterActive => ActiveStatusFilter == LibraryStatusFilter.Progress;
+    public bool IsDoneFilterActive => ActiveStatusFilter == LibraryStatusFilter.Done;
 
     public ResearchPageViewModel(
         IServiceScopeFactory scopeFactory,
@@ -159,10 +172,93 @@ public partial class ResearchPageViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsTeal));
     }
 
+    partial void OnActiveStatusFilterChanged(LibraryStatusFilter value)
+    {
+        OnPropertyChanged(nameof(IsAllFilterActive));
+        OnPropertyChanged(nameof(IsProgressFilterActive));
+        OnPropertyChanged(nameof(IsDoneFilterActive));
+        ApplyFilter();
+    }
+
+    partial void OnSearchTextChanged(string value) => ApplyFilter();
+
+    [RelayCommand]
+    private void SetAllFilter() => ActiveStatusFilter = LibraryStatusFilter.All;
+
+    [RelayCommand]
+    private void SetProgressFilter() => ActiveStatusFilter = LibraryStatusFilter.Progress;
+
+    [RelayCommand]
+    private void SetDoneFilter() => ActiveStatusFilter = LibraryStatusFilter.Done;
+
+    internal async Task RetryTranscriptionAsync(Guid transcriptionId)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
+        var settingsService = scope.ServiceProvider.GetRequiredService<SettingsService>();
+
+        var transcription = await libraryService.GetTranscriptionAsync(transcriptionId);
+        if (transcription is null || string.IsNullOrWhiteSpace(transcription.MediaFilePath) || _queueService is null)
+        {
+            return;
+        }
+
+        var settings = await settingsService.GetAsync();
+        await libraryService.ResetToInProgressAsync(transcriptionId);
+
+        var card = Transcriptions.FirstOrDefault(t => t.Id == transcriptionId);
+        if (card is not null)
+        {
+            card.Status = TranscriptionStatus.InProgress;
+            card.ErrorMessage = null;
+        }
+
+        _queueService.Enqueue(new TranscriptionJobRequest(
+            transcriptionId,
+            transcription.MediaFilePath,
+            transcription.Language,
+            transcription.Quality,
+            settings.Device));
+    }
+
+    /// <summary>Filtra _allSummaries por status + busca e reconstrói a lista de cards exibida.</summary>
+    private void ApplyFilter()
+    {
+        var query = SearchText?.Trim() ?? "";
+        var filtered = _allSummaries.AsEnumerable();
+
+        filtered = ActiveStatusFilter switch
+        {
+            LibraryStatusFilter.Progress => filtered.Where(s => s.Status == TranscriptionStatus.InProgress),
+            LibraryStatusFilter.Done => filtered.Where(s => s.Status == TranscriptionStatus.Done),
+            _ => filtered,
+        };
+
+        if (!string.IsNullOrEmpty(query))
+        {
+            filtered = filtered.Where(s =>
+                s.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                (s.Preview?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false));
+        }
+
+        Transcriptions.Clear();
+        foreach (var summary in filtered)
+        {
+            Transcriptions.Add(new TranscriptionCardViewModel(
+                summary,
+                OpenTranscription,
+                retryHandler: id => _ = RetryTranscriptionAsync(id),
+                deleteHandler: id => _ = DeleteTranscriptionAsync(id)));
+        }
+
+        IsEmpty = Transcriptions.Count == 0;
+    }
+
     private async Task LoadAsync()
     {
         if (_researchId <= 0)
         {
+            _allSummaries = [];
             Transcriptions.Clear();
             IsEmpty = true;
             return;
@@ -171,12 +267,12 @@ public partial class ResearchPageViewModel : ViewModelBase
         using var scope = _scopeFactory.CreateScope();
         var researchService = scope.ServiceProvider.GetRequiredService<ResearchService>();
         var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
-
         var research = await researchService.GetByIdAsync(_researchId);
         if (research is null)
         {
             Title = "";
             Description = "";
+            _allSummaries = [];
             Transcriptions.Clear();
             IsEmpty = true;
             return;
@@ -187,16 +283,7 @@ public partial class ResearchPageViewModel : ViewModelBase
         Icon = research.Icon;
         ColorName = research.ColorName;
 
-        var summaries = await libraryService.GetTranscriptionsForResearchAsync(_researchId);
-        Transcriptions.Clear();
-        foreach (var summary in summaries)
-        {
-            Transcriptions.Add(new TranscriptionCardViewModel(
-                summary,
-                OpenTranscription,
-                deleteHandler: id => _ = DeleteTranscriptionAsync(id)));
-        }
-
-        IsEmpty = Transcriptions.Count == 0;
+        _allSummaries = (await libraryService.GetTranscriptionsForResearchAsync(_researchId)).ToList();
+        ApplyFilter();
     }
 }
