@@ -49,3 +49,21 @@ git push origin v0.1.0
 ```
 
 O release não exige instalação do .NET — só o WebView2 Runtime no Windows do usuário.
+
+## Roadmap
+
+Itens pendentes, extraídos do estado atual do código e do log de decisões.
+
+### Pendente de validação
+
+- **Confirmar estabilidade do crash nativo (`0x80131506`)** — mitigações aplicadas no engine (fábrica fresca por job, sem `WithStringPool`, cancelamento entre chunks, dispose explícito); falta UAT com uma transcrição longa real para confirmar ausência do crash (AD-006).
+- **UAT ponta a ponta** — upload → transcrição → editor → exportação, nunca validado de ponta a ponta manualmente.
+
+### Planejado
+
+- **Drag & drop funcional no upload** — hoje só seleção por clique; o drop encerra só o feedback visual (`Upload.razor`, TODO no código).
+- **Progresso determinado no download de modelos** — a barra atual é indeterminada.
+
+### Futuro (fora de escopo atual)
+
+- **Suporte Linux/macOS** — o app é Windows-only (WPF + WebView2); exigiria reescrever a UI fora do WPF.
