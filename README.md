@@ -53,7 +53,21 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-> **Aviso de segurança do Windows:** os executáveis **não são assinados** (sem certificado de code signing). Ao abrir pela primeira vez, o Windows pode mostrar o alerta do SmartScreen ("O Windows protegeu seu computador"). Clique em **Mais informações → Executar mesmo assim**. Para eliminar esse alerta seria necessário assinar os binários com um certificado Authenticode (EV).
+> **Aviso de segurança do Windows:** por padrão os executáveis **não são assinados**. Ao abrir pela primeira vez, o Windows pode mostrar o alerta do SmartScreen ("O Windows protegeu seu computador") — clique em **Mais informações → Executar mesmo assim**. Para eliminar o alerta, ative a assinatura via Azure Trusted Signing (abaixo).
+
+### Assinatura do código (opcional, via Azure Trusted Signing)
+
+A etapa de assinatura já está no pipeline e ativa **automaticamente** quando as variáveis do Azure estão configuradas. Enquanto não configurar, as releases saem sem assinar (o alerta do SmartScreen permanece).
+
+**Setup (uma vez):**
+
+1. No Azure: crie um **Trusted Signing Account** + **Certificate Profile** (a Microsoft valida a identidade — pode levar alguns dias).
+2. No Entra ID: registre um App, gere um **client secret** e conceda a role **Trusted Signing Certificate Profile Signer** ao app no Certificate Profile.
+3. No GitHub (Settings → Secrets and variables → Actions):
+   - **Secrets:** `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`
+   - **Variables:** `AZURE_SIGNING_ENDPOINT` (ex.: `https://eus.codesigning.azure.net/` — conforme a região da conta), `AZURE_SIGNING_ACCOUNT`, `AZURE_CERTIFICATE_PROFILE`
+
+A próxima `git tag vX.Y.Z && git push origin vX.Y.Z` assina o `Verso.App.exe` automaticamente. Para publicações estreantes, o SmartScreen pode ainda exibir o aviso uma vez até ganhar reputação — acelere enviando o arquivo ao [portal de submissão do Microsoft SmartScreen](https://www.microsoft.com/wdsi/filesubmission).
 
 ## Roadmap
 
