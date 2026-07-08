@@ -128,7 +128,7 @@ jobs:
         run: |
           tag="${{ steps.rel.outputs.tag }}"
           ver="${{ steps.rel.outputs.version }}"
-          gh release create "$tag" \
+          gh release create "$tag" -R "${{ github.repository }}" \
             assets/Verso-cpu-win-x64/*.zip assets/Verso-gpu-win-x64/*.zip \
             --title "Verso $ver" \
             --notes "Verso $ver (Windows x64)
