@@ -25,7 +25,10 @@ transcricao-output.txt
 Thumbs.db
 .DS_Store
 
-# Logs/PIDs de smoke test manual do Transcriba.App (dotnet run/Start-Process)
+# Logs/PIDs de smoke test manual do Verso.App (dotnet run/Start-Process)
 app_stdout.log
 app_stderr.log
 app_pid.csv
+
+# Estado interno do tlc-spec-driven (decisões/specs — não vai ao repo público)
+.specs/

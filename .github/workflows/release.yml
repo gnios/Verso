@@ -1,0 +1,96 @@
+name: release
+
+# Pipeline de distribuição Windows do Verso (app WPF + Blazor Hybrid, net10.0-windows).
+# O app é Windows-only (WPF/WebView2 não rodam em Linux), então o runner é windows-latest.
+#
+# Gatilhos:
+#   - push de tag v*.*.*  -> builda, publica self-contained e cria um GitHub Release com o zip anexado
+#   - workflow_dispatch    -> builda e publica o artifact (sem criar Release), útil para validação
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # necessário para criar o GitHub Release e fazer upload do asset
+
+jobs:
+  release-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # histórico completo (decisão do mantenedor) + tags para versioning
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Determinar versão
+        id: version
+        shell: pwsh
+        run: |
+          # Usa a tag como versão quando disparado por tag; caso contrário, short SHA.
+          if ($env:GITHUB_REF -match 'refs/tags/(v.*)') {
+            $ver = $Matches[1]
+            $makeRelease = 'true'
+          } else {
+            $ver = "0.0.0-dev+$($env:GITHUB_SHA.Substring(0,7))"
+            $makeRelease = 'false'
+          }
+          Write-Host "version=$ver"
+          "version=$ver" >> $env:GITHUB_OUTPUT
+          "makeRelease=$makeRelease" >> $env:GITHUB_OUTPUT
+
+      - name: Restaurar dependências
+        run: dotnet restore Verso.sln
+
+      - name: Build (Release)
+        run: dotnet build Verso.sln -c Release --no-restore
+
+      - name: Publicar self-contained (win-x64)
+        run: |
+          dotnet publish src/Verso.App/Verso.App.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:Version=${{ steps.version.outputs.version }} `
+            -o publish/win-x64
+
+      - name: Empacotar zip
+        shell: pwsh
+        run: |
+          $ver = '${{ steps.version.outputs.version }}'
+          $zip = "Verso-${ver}-win-x64.zip"
+          Compress-Archive -Path publish/win-x64/* -DestinationPath "dist/$zip" -Force
+          Write-Host "Criado dist/$zip"
+          "assetPath=dist/$zip" >> $env:GITHUB_OUTPUT
+          "assetName=$zip" >> $env:GITHUB_OUTPUT
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Verso-win-x64
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Criar GitHub Release
+        if: steps.version.outputs.makeRelease == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $ver = '${{ steps.version.outputs.version }}'
+          $tag = $ver   # tag já é "v*.*.*"
+          $notes = "Verso $ver (Windows x64)`n`nBuild self-contained — não requer instalação do .NET runtime.`n`n**Pré-requisito:** Windows 10/11 com o Microsoft Edge WebView2 Runtime (presente por padrão no Windows 11).`n`nDescompacte e execute ``Verso.App.exe``."
+          gh release create $tag `
+            dist/Verso-${tag}-win-x64.zip `
+            --title "Verso $ver" `
+            --notes $notes `
+            --verify-tag

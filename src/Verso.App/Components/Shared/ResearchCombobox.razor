@@ -1,0 +1,131 @@
+@*
+    Combobox discreto de pesquisa para o header do Editor: trigger inline com a meta
+    (data · duração · locutores · [pesquisa]), abre um painel com busca por nome e lista
+    todas as pesquisas com seus ícones. Seleção desvincula/vincula via OnSelected.
+*@
+@using Verso.App.ViewModels
+
+<div class="research-combobox">
+    <button type="button" class="research-combobox-trigger @(IsOpen ? "open" : "") @(HasSelection ? "has-selection" : "")"
+            @onclick="ToggleOpen">
+        <span class="research-combobox-icon">@(HasSelection ? SelectedOption!.Icon : "📂")</span>
+        <span class="research-combobox-label">@TriggerLabel</span>
+        <svg class="research-combobox-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+    </button>
+    @if (IsOpen)
+    {
+        <div class="research-combobox-overlay" @onclick="Close"></div>
+        <div class="research-combobox-panel">
+            <div class="research-combobox-search">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
+                <input type="text" placeholder="Filtrar pesquisa…" value="@SearchText"
+                       @oninput="OnSearchInput" @onkeydown="OnSearchKeyDown" @ref="_searchInput" />
+            </div>
+            <div class="research-combobox-list">
+                <div class="research-combobox-item @(SelectedId is null ? "selected" : "")" @onclick="() => Select(null)">
+                    <span class="research-combobox-item-icon">📂</span>
+                    <span>Nenhuma pesquisa</span>
+                </div>
+                @foreach (var option in FilteredOptions)
+                {
+                    var captured = option;
+                    <div class="research-combobox-item @(captured.Id == SelectedId ? "selected" : "")"
+                         @onclick="() => Select(captured.Id)">
+                        <span class="research-combobox-item-icon">@captured.Icon</span>
+                        <span>@captured.Name</span>
+                    </div>
+                }
+                @if (!FilteredOptions.Any())
+                {
+                    <div class="research-combobox-empty">Nenhuma pesquisa encontrada.</div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<ResearchOptionViewModel> Options { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public int? SelectedId { get; set; }
+
+    [Parameter]
+    public EventCallback<int?> OnSelected { get; set; }
+
+    private bool _shouldFocus;
+    private bool IsOpen;
+    private string SearchText = "";
+    private ElementReference _searchInput;
+
+    private ResearchOptionViewModel? SelectedOption =>
+        Options.FirstOrDefault(o => o.Id is not null && o.Id == SelectedId);
+
+    private bool HasSelection => SelectedOption is not null;
+    private string TriggerLabel => SelectedOption?.Name ?? "Pesquisa";
+
+    private IEnumerable<ResearchOptionViewModel> FilteredOptions
+    {
+        get
+        {
+            // O "Nenhuma pesquisa" (Id null) é renderizado separadamente no topo da lista.
+            var real = Options.Where(o => o.Id is not null);
+            var query = SearchText.Trim();
+            if (string.IsNullOrEmpty(query))
+            {
+                return real;
+            }
+
+            return real.Where(o => o.Name.Contains(query, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    private void ToggleOpen()
+    {
+        IsOpen = !IsOpen;
+        if (IsOpen)
+        {
+            SearchText = "";
+            _shouldFocus = true;
+        }
+    }
+
+    private void Close() => IsOpen = false;
+
+    private void OnSearchInput(ChangeEventArgs e) => SearchText = e.Value?.ToString() ?? "";
+
+    private async Task OnSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            Close();
+            return;
+        }
+
+        if (e.Key == "Enter")
+        {
+            // Enter seleciona o primeiro resultado filtrado; se não há nenhum, desvincula.
+            var first = FilteredOptions.FirstOrDefault();
+            await Select(first?.Id ?? null);
+        }
+    }
+
+    private async Task Select(int? id)
+    {
+        IsOpen = false;
+        SearchText = "";
+        await OnSelected.InvokeAsync(id);
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (_shouldFocus)
+        {
+            _shouldFocus = false;
+            _ = _searchInput.FocusAsync();
+        }
+    }
+
+    public void Dispose() { }
+}

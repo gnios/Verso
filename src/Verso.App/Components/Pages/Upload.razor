@@ -1,0 +1,236 @@
+@*
+    Upload (T62) reaproveitando UploadViewModel (fila real via TranscriptionQueueService/MediaStorageService)
+    — fiel às classes `.upload-*`/`.screen-*` do protótipo (transcriba-v2-icons-transcriptions.html,
+    seção `#screen-upload`).
+
+    ViewModel recebido via [Parameter] (e não @inject) pelo mesmo motivo do Dashboard/ResearchPage/
+    Settings: UploadViewModel é Transient (AppServiceCollectionExtensions) e a instância viva é a
+    resolvida pelo NavigationService em NavigationService.CurrentViewModel a cada
+    NavigateTo(ScreenKey.Upload) — quem monta este componente (MainLayout.razor, integração central
+    pendente de fase futura) deve passar essa instância.
+
+    Drag&drop: os eventos @ondragover/@ondragleave/@ondrop dão apenas feedback visual (classe
+    "dragover"), pois o WebView2/Blazor Hybrid, como qualquer motor Chromium, só expõe o objeto
+    `File` do navegador em um drop — não o caminho absoluto no disco. Ler o caminho real exigiria
+    hook nativo no WebView2 hospedeiro (ICoreWebView2CompositionController::Drop com IDataObject/
+    CF_HDROP, modo "windowless"/composição), que é infraestrutura do host (MainWindow/BlazorWebView),
+    fora do escopo deste componente e do arquivo que esta task pode tocar (MainLayout.razor é do
+    integrador). Por isso a seleção real de arquivo usa IFileOpenService (OpenFileDialog nativo via
+    WpfFileOpenService), que funciona de ponta a ponta.
+*@
+@implements IDisposable
+@using System.Linq
+@using Verso.Core.Data.Entities
+@using Verso.App.Components.Shared
+@inject IFileOpenService FileOpenService
+
+<section class="screen active">
+    <div class="screen-header">
+        <h1 class="screen-title">Nova transcrição</h1>
+        <p class="screen-subtitle">Faça upload de um arquivo de áudio ou vídeo</p>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(ViewModel.ValidationError))
+    {
+        <div class="upload-error">@ViewModel.ValidationError</div>
+    }
+
+    @if (!ViewModel.HasSelectedFile)
+    {
+        <div class="upload-zone @(ViewModel.IsDragOver ? "dragover" : "")"
+             @onclick="OnZoneClickedAsync"
+             @ondragover="OnDragOver" @ondragover:preventDefault="true"
+             @ondragleave="OnDragLeave"
+             @ondrop="OnDrop" @ondrop:preventDefault="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+            <div class="upload-zone-title">Arraste um arquivo aqui</div>
+            <div class="upload-zone-sub">@ViewModel.SupportedFormatsLabel</div>
+        </div>
+    }
+    else
+    {
+        <div class="upload-file-info show">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
+            <div>
+                <div class="upload-file-name">@ViewModel.SelectedFileName</div>
+                <div class="upload-file-size">@ViewModel.SelectedFileSize</div>
+            </div>
+            <button type="button" class="upload-file-clear" title="Remover arquivo" @onclick="() => ViewModel.ClearFileCommand.Execute(null)">✕</button>
+        </div>
+
+        <div class="upload-details">
+            <div class="modal-field full-row">
+                <label>Ícone</label>
+                <IconPicker ViewModel="ViewModel.IconPicker" />
+            </div>
+
+            <div class="modal-field">
+                <label>Título</label>
+                <input type="text" value="@ViewModel.Title" @oninput="OnTitleInput"
+                       placeholder="Ex.: Entrevista 01 — Mobilidade" />
+            </div>
+
+            <div class="modal-field">
+                <label>Tags (vírgula)</label>
+                <input type="text" value="@ViewModel.TagsText" @oninput="OnTagsInput"
+                       placeholder="entrevista, campo, piloto" />
+            </div>
+        </div>
+
+        <div class="upload-form">
+            <div>
+                <label class="upload-label">Idioma</label>
+                <select class="upload-select" value="@ViewModel.SelectedLanguageOption?.Code" disabled="@ViewModel.IsLanguageLocked" @onchange="OnLanguageChanged">
+                    @foreach (var option in ViewModel.LanguageOptions)
+                    {
+                        <option value="@option.Code">@option.Label</option>
+                    }
+                </select>
+                @if (ViewModel.IsLanguageLocked)
+                {
+                    <div class="upload-hint">Idioma fixado em pt-BR pelo modelo selecionado.</div>
+                }
+            </div>
+            <div>
+                <label class="upload-label">Qualidade</label>
+                <select class="upload-select" value="@ViewModel.SelectedModelOption?.Value" @onchange="OnModelChanged">
+                    @foreach (var option in ViewModel.ModelOptions)
+                    {
+                        <option value="@option.Value">@option.Label · @option.SizeLabel</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label class="upload-label">Locutores</label>
+                <select class="upload-select" value="@ViewModel.SelectedSpeakerModeOption?.Value" @onchange="OnSpeakerModeChanged">
+                    @foreach (var option in ViewModel.SpeakerModeOptions)
+                    {
+                        <option value="@option.Value">@option.Label</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label class="upload-label">Pesquisa</label>
+                <select class="upload-select" value="@(ViewModel.SelectedResearch?.Id?.ToString() ?? "")" @onchange="OnResearchChanged">
+                    @foreach (var option in ViewModel.ResearchOptions)
+                    {
+                        <option value="@(option.Id?.ToString() ?? "")">@option.Name</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        <button type="button" class="upload-btn" disabled="@(!ViewModel.CanStart)" @onclick="() => ViewModel.StartTranscriptionCommand.ExecuteAsync(null)">
+            @(ViewModel.IsStarting ? "Enviando…" : "Iniciar transcrição")
+        </button>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public required UploadViewModel ViewModel { get; set; }
+
+    private UploadViewModel? _subscribed;
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_subscribed, ViewModel))
+        {
+            return;
+        }
+
+        Unsubscribe();
+        _subscribed = ViewModel;
+        ViewModel.PropertyChanged += OnViewModelChanged;
+    }
+
+    private async Task OnZoneClickedAsync()
+    {
+        var path = await FileOpenService.PickMediaFileAsync();
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            ViewModel.TrySelectFile(path);
+        }
+    }
+
+    private void OnDragOver()
+    {
+        // Feedback visual apenas: sem acesso ao File do navegador aqui (evitamos JS interop
+        // desnecessário já que não há caminho absoluto a extrair — ver comentário no topo do arquivo).
+        ViewModel.IsDragOver = true;
+    }
+
+    private void OnDragLeave() => ViewModel.ClearDragOver();
+
+    private void OnDrop()
+    {
+        // TODO: drag&drop funcional requer path absoluto do arquivo, ver nota no tasks.md (T62).
+        // Por ora o drop só encerra o feedback visual; a seleção real é feita via clique (OpenFileDialog).
+        ViewModel.ClearDragOver();
+    }
+
+    private void OnLanguageChanged(ChangeEventArgs e)
+    {
+        var code = e.Value?.ToString();
+        var option = ViewModel.LanguageOptions.FirstOrDefault(o => o.Code == code);
+        if (option is not null)
+        {
+            ViewModel.SelectedLanguageOption = option;
+        }
+    }
+
+    private void OnModelChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<ModelQuality>(e.Value?.ToString(), out var quality))
+        {
+            var option = ViewModel.ModelOptions.FirstOrDefault(o => o.Value == quality);
+            if (option is not null) ViewModel.SelectedModelOption = option;
+        }
+    }
+
+    private void OnSpeakerModeChanged(ChangeEventArgs e)
+    {
+        if (!Enum.TryParse<SpeakerMode>(e.Value?.ToString(), out var mode))
+        {
+            return;
+        }
+
+        var option = ViewModel.SpeakerModeOptions.FirstOrDefault(o => o.Value == mode);
+        if (option is not null)
+        {
+            ViewModel.SelectedSpeakerModeOption = option;
+        }
+    }
+
+    private void OnResearchChanged(ChangeEventArgs e)
+    {
+        var idText = e.Value?.ToString();
+        var id = string.IsNullOrEmpty(idText) ? (int?)null : int.Parse(idText);
+        var option = ViewModel.ResearchOptions.FirstOrDefault(o => o.Id == id);
+        if (option is not null)
+        {
+            ViewModel.SelectedResearch = option;
+        }
+    }
+    private void OnTitleInput(ChangeEventArgs e) =>
+        ViewModel.Title = e.Value?.ToString() ?? "";
+
+    private void OnTagsInput(ChangeEventArgs e) =>
+        ViewModel.TagsText = e.Value?.ToString() ?? "";
+
+
+    private void OnViewModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) =>
+        InvokeAsync(StateHasChanged);
+
+    private void Unsubscribe()
+    {
+        if (_subscribed is null)
+        {
+            return;
+        }
+
+        _subscribed.PropertyChanged -= OnViewModelChanged;
+    }
+
+    public void Dispose() => Unsubscribe();
+}

@@ -1,0 +1,107 @@
+@*
+    Shell principal do app (T56): grid `sidebar (260px) | content`, replicando a estrutura
+    `.app`/`.sidebar`/`.content` do protótipo (transcriba-v2-icons-transcriptions.html).
+
+    Este componente é agora o RootComponent do BlazorWebView (ver MainWindow.xaml) — o antigo
+    Shell.razor (placeholder do bootstrap T52-T54, que a T55 usou para provar o mecanismo de
+    StateHasChanged via NavigationService.PropertyChanged) foi removido: essa é a "abordagem
+    mais simples que funciona" mencionada na T56, já que não há mais motivo para um componente
+    raiz intermediário quando o MainLayout já observa o NavigationService diretamente.
+
+    As telas reais (Dashboard, Upload, Editor, etc.) ainda não existem em Razor — o placeholder
+    abaixo será substituído pelas Fases 19-24 (T60-T67), que renderizarão o
+    NavigationService.CurrentViewModel de acordo com o CurrentScreen.
+*@
+@using Verso.App.Components.Shared
+@using Verso.App.Components.Pages
+@implements IDisposable
+@inject NavigationService NavigationService
+@inject ThemeService ThemeService
+@inject BlazorThemeApplicator ThemeApplicator
+@inject IJSRuntime JS
+
+<div class="app">
+    <Sidebar />
+    <main class="content">
+        @* Integração central: cada tela real observa o NavigationService.CurrentViewModel do tipo
+           correspondente. *@
+        @if (NavigationService.CurrentScreen == ScreenKey.Dashboard && NavigationService.CurrentViewModel is DashboardViewModel dashboardVm)
+        {
+            <Dashboard ViewModel="dashboardVm" />
+        }
+        else if (NavigationService.CurrentScreen == ScreenKey.Research && NavigationService.CurrentViewModel is ResearchPageViewModel researchVm)
+        {
+            <ResearchPage ViewModel="researchVm" />
+        }
+        else if (NavigationService.CurrentScreen == ScreenKey.Upload && NavigationService.CurrentViewModel is UploadViewModel uploadVm)
+        {
+            <Upload ViewModel="uploadVm" />
+        }
+        else if (NavigationService.CurrentScreen == ScreenKey.Recording && NavigationService.CurrentViewModel is RecordingViewModel recordingVm)
+        {
+            <Recording ViewModel="recordingVm" />
+        }
+        else if (NavigationService.CurrentScreen == ScreenKey.Settings && NavigationService.CurrentViewModel is SettingsViewModel settingsVm)
+        {
+            <Settings ViewModel="settingsVm" />
+        }
+        else if (NavigationService.CurrentScreen == ScreenKey.Editor && NavigationService.CurrentViewModel is EditorViewModel editorVm)
+        {
+            <Editor ViewModel="editorVm" />
+        }
+        else
+        {
+            <section class="screen active">
+                <div class="screen-header">
+                    <h1 class="screen-title">Verso</h1>
+                </div>
+                <p>Tela "@NavigationService.CurrentScreen" ainda não portada para Razor (Fase 22 em andamento).</p>
+            </section>
+        }
+    </main>
+    <NewPageModal />
+    <ModelDownloadModal />
+    <ConfirmationDialog />
+</div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        NavigationService.PropertyChanged += OnNavigationServiceChanged;
+
+        // Equivalente ao que `MainWindowViewModel` fazia na versão Avalonia (garante que
+        // exista um ViewModel de tela resolvido assim que a shell é montada).
+        if (NavigationService.CurrentViewModel is null)
+        {
+            NavigationService.NavigateTo(ScreenKey.Dashboard);
+        }
+
+        // Lê a preferência de tema persistida (SettingsService) e aplica via
+        // BlazorThemeApplicator (T57). Como o IJSRuntime deste componente só é anexado no
+        // primeiro OnAfterRenderAsync, uma chamada de Apply() feita aqui fica pendente e é
+        // disparada assim que AttachJsRuntime rodar (ver BlazorThemeApplicator).
+        await ThemeService.InitializeAsync();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            ThemeApplicator.AttachJsRuntime(JS);
+        }
+    }
+
+    private void OnNavigationServiceChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(Services.NavigationService.CurrentScreen)
+            or nameof(Services.NavigationService.CurrentViewModel))
+        {
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public void Dispose()
+    {
+        NavigationService.PropertyChanged -= OnNavigationServiceChanged;
+    }
+}
