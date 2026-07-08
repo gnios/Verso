@@ -10,5 +10,6 @@ public class UserSettings
     public bool IdentifySpeakersDefault { get; set; } = true;
     public bool LiveTranscriptionEnabled { get; set; } = true; // inerte no MVP
     public ExecutionDevice Device { get; set; } = ExecutionDevice.Auto;
+    public ModelQuality DefaultQuality { get; set; } = ModelQuality.Standard;
     public bool DarkTheme { get; set; }
 }

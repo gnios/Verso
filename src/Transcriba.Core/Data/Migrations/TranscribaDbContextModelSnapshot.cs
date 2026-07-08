@@ -166,6 +166,9 @@ namespace Transcriba.Core.Data.Migrations
                     b.Property<string>("MediaFilePath")
                         .HasColumnType("TEXT");
 
+                    b.Property<double?>("ProcessingDurationSeconds")
+                        .HasColumnType("REAL");
+
                     b.Property<int>("Quality")
                         .HasColumnType("INTEGER");
 
@@ -203,6 +206,9 @@ namespace Transcriba.Core.Data.Migrations
                     b.Property<string>("DefaultLanguage")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("DefaultQuality")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Device")
                         .HasColumnType("INTEGER");

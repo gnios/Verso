@@ -35,6 +35,7 @@ public partial class EditorViewModel : ViewModelBase
     public ObservableCollection<SegmentItemViewModel> Segments { get; } = [];
     public ObservableCollection<TranscriptionCardTagViewModel> Tags { get; } = [];
     public ObservableCollection<ResearchOptionViewModel> ResearchOptions { get; } = [];
+    public ObservableCollection<TagOptionViewModel> TagOptions { get; } = [];
 
     [ObservableProperty]
     private string _newTagInput = "";
@@ -79,6 +80,9 @@ public partial class EditorViewModel : ViewModelBase
 
     [ObservableProperty]
     private string _metaDuration = "";
+
+    [ObservableProperty]
+    private string _metaProcessingTime = "";
 
     [ObservableProperty]
     private string _metaSpeakerCount = "";
@@ -241,6 +245,7 @@ public partial class EditorViewModel : ViewModelBase
 
         Tags.Add(new TranscriptionCardTagViewModel(name, TagColorCatalog.GetColor(name)));
         NewTagInput = "";
+        await LoadTagOptionsAsync();
         await _sidebar.LoadAsync();
     }
 
@@ -260,8 +265,8 @@ public partial class EditorViewModel : ViewModelBase
         using var scope = _scopeFactory.CreateScope();
         var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
         await libraryService.UpdateTranscriptionTagsAsync(_transcriptionId, newSet);
-
         Tags.Remove(tag);
+        await LoadTagOptionsAsync();
         await _sidebar.LoadAsync();
     }
 
@@ -564,6 +569,24 @@ public partial class EditorViewModel : ViewModelBase
         SelectedResearchId = selectedId;
     }
 
+    private async Task LoadTagOptionsAsync()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
+        var tags = await libraryService.GetTagsAsync();
+
+        TagOptions.Clear();
+        foreach (var t in tags)
+        {
+            TagOptions.Add(new TagOptionViewModel
+            {
+                Id = t.Id,
+                Name = t.Name,
+                ColorName = TagColorCatalog.GetColor(t.Name),
+            });
+        }
+    }
+
     private async Task LoadAsync()
     {
         if (_transcriptionId == Guid.Empty)
@@ -597,6 +620,7 @@ public partial class EditorViewModel : ViewModelBase
 
         MetaDate = transcription.CreatedAt.ToString("d MMM yyyy", CultureInfo.GetCultureInfo("pt-BR"));
         MetaDuration = FormatDurationDisplay(transcription.DurationSeconds);
+        MetaProcessingTime = FormatProcessingTime(transcription.ProcessingDurationSeconds);
         MetaSpeakerCount = $"{transcription.Speakers.Count} locutor{(transcription.Speakers.Count == 1 ? "" : "es")}";
 
         Tags.Clear();
@@ -604,6 +628,8 @@ public partial class EditorViewModel : ViewModelBase
         {
             Tags.Add(new TranscriptionCardTagViewModel(tag.Name, TagColorCatalog.GetColor(tag.Name)));
         }
+
+        await LoadTagOptionsAsync();
 
         IsInProgress = transcription.Status == TranscriptionStatus.InProgress;
         IsError = transcription.Status == TranscriptionStatus.Error;
@@ -710,6 +736,7 @@ public partial class EditorViewModel : ViewModelBase
         ResearchId = null;
         ResearchOptions.Clear();
         SelectedResearchId = null;
+        TagOptions.Clear();
         NewTagInput = "";
         NotifyExportAvailability();
     }
@@ -758,5 +785,30 @@ public partial class EditorViewModel : ViewModelBase
         }
 
         return TranscriptionTextFormatter.FormatDuration(duration);
+    }
+
+    /// <summary>
+    /// Formata o tempo de processamento da transcrição para exibição elegante no meta.
+    /// null/vazio → ""; senão "Xh Ymin", "Ymin Zs" ou "Zs" (arredondado).
+    /// </summary>
+    private static string FormatProcessingTime(double? seconds)
+    {
+        if (!seconds.HasValue || seconds.Value <= 0)
+        {
+            return "";
+        }
+
+        var span = TimeSpan.FromSeconds(seconds.Value);
+        if (span.TotalHours >= 1)
+        {
+            return $"{(int)span.TotalHours}h {span.Minutes}min";
+        }
+
+        if (span.TotalMinutes >= 1)
+        {
+            return $"{(int)span.TotalMinutes}min {span.Seconds}s";
+        }
+
+        return $"{Math.Round(span.TotalSeconds)}s";
     }
 }

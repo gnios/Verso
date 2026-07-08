@@ -50,6 +50,7 @@ public class SettingsViewModelTests
                     IdentifySpeakersDefault = false,
                     LiveTranscriptionEnabled = false,
                     Device = ExecutionDevice.Vulkan,
+                    DefaultQuality = ModelQuality.Medium,
                 });
                 await ctx.SaveChangesAsync();
             }
@@ -64,6 +65,9 @@ public class SettingsViewModelTests
             Assert.False(settings.IdentifySpeakersDefault);
             Assert.False(settings.LiveTranscriptionEnabled);
             Assert.Equal(ExecutionDevice.Vulkan, settings.SelectedDeviceOption!.Value);
+            Assert.Equal(ModelQuality.Medium, settings.SelectedModelOption!.Value);
+            Assert.NotNull(settings.RecommendedModelOption);
+            Assert.False(string.IsNullOrEmpty(settings.ModelRecommendationReason));
         }
         finally
         {
@@ -188,6 +192,63 @@ public class SettingsViewModelTests
             var saved = await service.GetAsync();
 
             Assert.Equal(ExecutionDevice.Cuda, saved.Device);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task ChangeModel_PersistsDefaultQuality()
+    {
+        var (provider, directory) = await CreateProviderAsync();
+        try
+        {
+            var settings = CreateSettings(provider);
+            await settings.LoadAsync();
+
+            settings.SelectedModelOption = settings.ModelOptions.First(o => o.Value == ModelQuality.Tiny);
+            await Task.Delay(50);
+
+            using var scope = provider.CreateScope();
+            var service = scope.ServiceProvider.GetRequiredService<SettingsService>();
+            var saved = await service.GetAsync();
+
+            Assert.Equal(ModelQuality.Tiny, saved.DefaultQuality);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task ChangeDevice_UpdatesRecommendation()
+    {
+        var (provider, directory) = await CreateProviderAsync();
+        try
+        {
+            var settings = CreateSettings(provider);
+            await settings.LoadAsync();
+
+            Assert.NotNull(settings.RecommendedModelOption);
+
+            settings.SelectedDeviceOption = settings.DeviceOptions.First(o => o.Value == ExecutionDevice.Cuda);
+            await Task.Delay(50);
+
+            Assert.True(
+                settings.RecommendedModelOption!.Value == ModelQuality.LargeV3Turbo ||
+                settings.RecommendedModelOption!.Value == ModelQuality.High);
+
+            settings.SelectedDeviceOption = settings.DeviceOptions.First(o => o.Value == ExecutionDevice.Cpu);
+            await Task.Delay(50);
+
+            Assert.NotNull(settings.RecommendedModelOption);
+
+            Assert.True(settings.UseRecommendedModelCommand.CanExecute(null));
+            settings.UseRecommendedModelCommand.Execute(null);
+            Assert.Equal(settings.RecommendedModelOption!.Value, settings.SelectedModelOption!.Value);
         }
         finally
         {

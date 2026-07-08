@@ -1,0 +1,174 @@
+@*
+    Combobox de tags para o header do Editor: trigger inline com aparência de pill
+    tracejada ("+ Adicionar tag…"), abre painel com busca por nome, lista todas as
+    tags globais com seu ponto colorido (TagColorCatalog) e oferece criar uma tag
+    nova diretamente ali quando o texto filtrado não coincide exatamente com uma
+    existente. Tags já atribuídas aparecem marcadas (✓) e não são clicáveis.
+    Atribuição via OnAddTag(string name) — o pai decide persistir (EditorViewModel).
+*@
+@using Transcriba.App.ViewModels
+
+<div class="tag-combobox">
+    <button type="button" class="tag-combobox-trigger @(IsOpen ? "open" : "")"
+            @onclick="ToggleOpen">
+        <svg class="tag-combobox-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+        <span class="tag-combobox-label">Adicionar tag…</span>
+    </button>
+    @if (IsOpen)
+    {
+        <div class="tag-combobox-overlay" @onclick="Close"></div>
+        <div class="tag-combobox-panel">
+            <div class="tag-combobox-search">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
+                <input type="text" placeholder="Filtrar tag…" value="@SearchText"
+                       @oninput="OnSearchInput" @onkeydown="OnSearchKeyDown" @ref="_searchInput" />
+            </div>
+            <div class="tag-combobox-list">
+                @foreach (var option in FilteredOptions)
+                {
+                    var captured = option;
+                    var assigned = IsAssigned(captured.Name);
+                    <div class="tag-combobox-item @(assigned ? "assigned" : "")"
+                         @onclick="() => Select(captured.Name, disabled: assigned)">
+                        <span class="tag-combobox-item-dot tag-@captured.ColorName"></span>
+                        <span class="tag-combobox-item-name">@captured.Name</span>
+                        @if (assigned)
+                        {
+                            <svg class="tag-combobox-item-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                        }
+                    </div>
+                }
+                @if (CanCreateNew)
+                {
+                    <div class="tag-combobox-create" @onclick="() => Select(SearchText.Trim(), disabled: false)">
+                        <svg class="tag-combobox-create-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                        <span>Criar tag <strong>@SearchText.Trim()</strong></span>
+                    </div>
+                }
+                @if (!FilteredOptions.Any() && !CanCreateNew)
+                {
+                    <div class="tag-combobox-empty">Nenhuma tag encontrada.</div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<TagOptionViewModel> Options { get; set; } = [];
+
+    /// <summary>Nomes já atribuídos à transcrição atual — exibidos com ✓ e não clicáveis.</summary>
+    [Parameter]
+    public IReadOnlyList<string> AssignedNames { get; set; } = [];
+
+    [Parameter]
+    public EventCallback<string> OnAddTag { get; set; }
+
+    private bool _shouldFocus;
+    private bool IsOpen;
+    private string SearchText = "";
+    private ElementReference _searchInput;
+
+    private IEnumerable<TagOptionViewModel> FilteredOptions
+    {
+        get
+        {
+            var query = SearchText.Trim();
+            if (string.IsNullOrEmpty(query))
+            {
+                return Options;
+            }
+
+            return Options.Where(o => o.Name.Contains(query, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    /// <summary>
+    /// Pode criar nova tag quando há texto de busca não-vazio e nenhuma opção existe
+    /// com nome exato (case-insensitive) — evita duplicar via "criar".
+    /// </summary>
+    private bool CanCreateNew
+    {
+        get
+        {
+            var query = SearchText.Trim();
+            if (string.IsNullOrEmpty(query))
+            {
+                return false;
+            }
+
+            return !Options.Any(o => string.Equals(o.Name, query, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    private bool IsAssigned(string name) =>
+        AssignedNames.Any(a => string.Equals(a, name, StringComparison.OrdinalIgnoreCase));
+
+    private void ToggleOpen()
+    {
+        IsOpen = !IsOpen;
+        if (IsOpen)
+        {
+            SearchText = "";
+            _shouldFocus = true;
+        }
+    }
+
+    private void Close() => IsOpen = false;
+
+    private void OnSearchInput(ChangeEventArgs e) => SearchText = e.Value?.ToString() ?? "";
+
+    private async Task OnSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            Close();
+            return;
+        }
+
+        if (e.Key == "Enter")
+        {
+            var query = SearchText.Trim();
+            if (string.IsNullOrEmpty(query))
+            {
+                return;
+            }
+
+            // Coincidência exata → atribui a existente; senão cria nova.
+            var exact = Options.FirstOrDefault(o => string.Equals(o.Name, query, StringComparison.OrdinalIgnoreCase));
+            if (exact is not null)
+            {
+                await Select(exact.Name, disabled: IsAssigned(exact.Name));
+            }
+            else
+            {
+                await Select(query, disabled: false);
+            }
+        }
+    }
+
+    private async Task Select(string name, bool disabled)
+    {
+        if (disabled)
+        {
+            // Tag já atribuída — não faz nada (apenas mantém o painel aberto).
+            return;
+        }
+
+        IsOpen = false;
+        SearchText = "";
+        await OnAddTag.InvokeAsync(name);
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (_shouldFocus)
+        {
+            _shouldFocus = false;
+            _ = _searchInput.FocusAsync();
+        }
+    }
+
+    public void Dispose() { }
+}

@@ -24,7 +24,7 @@ public partial class SidebarResearchItemViewModel : ViewModelBase
     public bool CanDelete => _deleteHandler is not null;
 
     [ObservableProperty]
-    private bool _isExpanded;
+    private bool _isExpanded = true;
 
     public SidebarResearchItemViewModel(
         ResearchPage research,

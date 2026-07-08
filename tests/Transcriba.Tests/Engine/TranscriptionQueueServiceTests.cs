@@ -25,8 +25,9 @@ public class TranscriptionQueueServiceTests
             .SingleAsync(t => t.Id == transcriptionId);
         Assert.Equal(TranscriptionStatus.Done, transcription.Status);
         Assert.Null(transcription.ErrorMessage);
-        Assert.Single(transcription.Segments);
         Assert.Equal("segmento ok", transcription.Segments[0].Text);
+        Assert.True(transcription.ProcessingDurationSeconds.HasValue);
+        Assert.True(transcription.ProcessingDurationSeconds!.Value > 0);
     }
 
     [Fact]

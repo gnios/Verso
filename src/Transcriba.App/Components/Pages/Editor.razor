@@ -52,6 +52,14 @@
                     <span>@ViewModel.MetaDuration</span>
                     <span class="editor-meta-dot"></span>
                     <span>@ViewModel.MetaSpeakerCount</span>
+                    @if (!string.IsNullOrWhiteSpace(ViewModel.MetaProcessingTime))
+                    {
+                        <span class="editor-meta-dot"></span>
+                        <span class="editor-meta-time" title="Tempo que o motor demorou para transcrever">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                            @ViewModel.MetaProcessingTime
+                        </span>
+                    }
                     <span class="editor-meta-dot"></span>
                     <ResearchCombobox Options="ViewModel.ResearchOptions" SelectedId="ViewModel.SelectedResearchId" OnSelected="OnResearchSelected" />
                 </div>
@@ -64,9 +72,7 @@
                             <button type="button" class="tag-remove" title="Remover tag" @onclick="() => ViewModel.RemoveTagCommand.ExecuteAsync(tag)" @onclick:stopPropagation="true">×</button>
                         </span>
                     }
-                    <div class="tag-add">
-                        <input type="text" class="tag-add-input" placeholder="Adicionar tag…" value="@ViewModel.NewTagInput" @oninput="OnTagInput" @onkeydown="OnTagKeyDown" />
-                    </div>
+                    <TagCombobox Options="ViewModel.TagOptions" AssignedNames="ViewModel.Tags.Select(t => t.Name).ToList()" OnAddTag="OnAddTagFromCombobox" />
                 </div>
 
                 @if (ViewModel.IsInProgress || ViewModel.IsError)
@@ -195,15 +201,10 @@
         }
     }
 
-    private void OnTagInput(ChangeEventArgs e) =>
-        ViewModel.NewTagInput = e.Value?.ToString() ?? "";
-
-    private async Task OnTagKeyDown(KeyboardEventArgs e)
+    private async Task OnAddTagFromCombobox(string name)
     {
-        if (e.Key == "Enter")
-        {
-            await ViewModel.AddTagCommand.ExecuteAsync(null);
-        }
+        ViewModel.NewTagInput = name;
+        await ViewModel.AddTagCommand.ExecuteAsync(null);
     }
 
     private async Task OnResearchSelected(int? researchId) =>

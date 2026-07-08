@@ -87,6 +87,35 @@
     </div>
 
     <div class="settings-section">
+        <div class="settings-section-title">Modelo de transcrição</div>
+        <div class="settings-row">
+            <div>
+                <div class="settings-row-label">Modelo padrão</div>
+            </div>
+            <select value="@ViewModel.SelectedModelOption?.Value" @onchange="OnModelChanged">
+                @foreach (var option in ViewModel.ModelOptions)
+                {
+                    <option value="@option.Value">@option.Label · @option.SizeLabel</option>
+                }
+            </select>
+        </div>
+        @if (ViewModel.RecommendedModelOption is not null)
+        {
+            <div class="settings-recommendation">
+                <div class="settings-recommendation-title">
+                    Recomendado para seu computador
+                    <span class="settings-ram-hint">(@(ViewModel.DetectedRamGb) GB · @(ViewModel.SelectedDeviceOption?.Label))</span>
+                </div>
+                <div class="settings-recommendation-body">
+                    <span class="rec-model">@ViewModel.RecommendedModelOption?.Label · @ViewModel.RecommendedModelOption?.SizeLabel</span>
+                    <span class="settings-recommendation-reason">@ViewModel.ModelRecommendationReason</span>
+                </div>
+                <button type="button" class="settings-recommendation-btn" @onclick="UseRecommended">Usar recomendado</button>
+            </div>
+        }
+    </div>
+
+    <div class="settings-section">
         <div class="settings-section-title">Aparência</div>
         <div class="settings-row">
             <div>
@@ -150,6 +179,19 @@
         }
     }
 
+    private void OnModelChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<ModelQuality>(e.Value?.ToString(), out var quality))
+        {
+            var option = ViewModel.ModelOptions.FirstOrDefault(o => o.Value == quality);
+            if (option is not null)
+            {
+                ViewModel.SelectedModelOption = option;
+            }
+        }
+    }
+
+    private void UseRecommended() => ViewModel.UseRecommendedModelCommand.Execute(null);
     private void ToggleIdentifySpeakers() => ViewModel.IdentifySpeakersDefault = !ViewModel.IdentifySpeakersDefault;
 
     private void ToggleLiveTranscription() => ViewModel.LiveTranscriptionEnabled = !ViewModel.LiveTranscriptionEnabled;

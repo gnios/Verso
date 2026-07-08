@@ -102,13 +102,13 @@ public class SidebarViewModelTests
         };
         var item = new SidebarResearchItemViewModel(research, navigation);
 
-        Assert.False(item.IsExpanded);
-
-        item.ToggleExpandCommand.Execute(null);
         Assert.True(item.IsExpanded);
 
         item.ToggleExpandCommand.Execute(null);
         Assert.False(item.IsExpanded);
+
+        item.ToggleExpandCommand.Execute(null);
+        Assert.True(item.IsExpanded);
     }
 
     [Fact]
@@ -125,6 +125,27 @@ public class SidebarViewModelTests
             Assert.Equal(ScreenKey.Dashboard, navigation.CurrentScreen);
             var parameter = Assert.IsType<NavigationParameter>(navigation.NavigationParameter);
             Assert.Equal(7, parameter.TagId);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task NavigateUnassigned_NavigatesToDashboardWithUnassignedFilter()
+    {
+        var (provider, directory) = await CreateSidebarProviderAsync();
+        try
+        {
+            var navigation = provider.GetRequiredService<NavigationService>();
+            var sidebar = provider.GetRequiredService<SidebarViewModel>();
+
+            sidebar.NavigateUnassignedCommand.Execute(null);
+
+            Assert.Equal(ScreenKey.Dashboard, navigation.CurrentScreen);
+            var parameter = Assert.IsType<NavigationParameter>(navigation.NavigationParameter);
+            Assert.True(parameter.UnassignedOnly);
         }
         finally
         {

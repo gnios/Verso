@@ -252,6 +252,30 @@ public class DashboardViewModelTests
     }
 
     [Fact]
+    public async Task NavigationParameter_UnassignedOnly_ActivatesFilterAndReturnsAvulsaCards()
+    {
+        var (provider, directory, _, _, _) = await CreateDashboardProviderAsync();
+        try
+        {
+            var navigation = provider.GetRequiredService<NavigationService>();
+            navigation.NavigateTo(
+                ScreenKey.Dashboard,
+                new NavigationParameter(UnassignedOnly: true));
+
+            var dashboard = Assert.IsType<DashboardViewModel>(navigation.CurrentViewModel);
+            await Task.Delay(50);
+
+            Assert.True(dashboard.IsUnassignedFilterActive);
+            // A semente do dashboard não associa nenhuma transcrição a uma pesquisa — todas são avulsas.
+            Assert.Equal(4, dashboard.Cards.Count);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
     public async Task SearchText_WithProgressFilter_ReturnsMatchingCards()
     {
         var (provider, directory, _, _, _) = await CreateDashboardProviderAsync();

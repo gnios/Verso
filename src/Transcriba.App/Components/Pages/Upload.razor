@@ -80,19 +80,23 @@
         <div class="upload-form">
             <div>
                 <label class="upload-label">Idioma</label>
-                <select class="upload-select" value="@ViewModel.SelectedLanguageOption?.Code" @onchange="OnLanguageChanged">
+                <select class="upload-select" value="@ViewModel.SelectedLanguageOption?.Code" disabled="@ViewModel.IsLanguageLocked" @onchange="OnLanguageChanged">
                     @foreach (var option in ViewModel.LanguageOptions)
                     {
                         <option value="@option.Code">@option.Label</option>
                     }
                 </select>
+                @if (ViewModel.IsLanguageLocked)
+                {
+                    <div class="upload-hint">Idioma fixado em pt-BR pelo modelo selecionado.</div>
+                }
             </div>
             <div>
                 <label class="upload-label">Qualidade</label>
-                <select class="upload-select" value="@ViewModel.SelectedQualityOption?.Value" @onchange="OnQualityChanged">
-                    @foreach (var option in ViewModel.QualityOptions)
+                <select class="upload-select" value="@ViewModel.SelectedModelOption?.Value" @onchange="OnModelChanged">
+                    @foreach (var option in ViewModel.ModelOptions)
                     {
-                        <option value="@option.Value">@option.Label</option>
+                        <option value="@option.Value">@option.Label · @option.SizeLabel</option>
                     }
                 </select>
             </div>
@@ -175,17 +179,12 @@
         }
     }
 
-    private void OnQualityChanged(ChangeEventArgs e)
+    private void OnModelChanged(ChangeEventArgs e)
     {
-        if (!Enum.TryParse<ModelQuality>(e.Value?.ToString(), out var quality))
+        if (Enum.TryParse<ModelQuality>(e.Value?.ToString(), out var quality))
         {
-            return;
-        }
-
-        var option = ViewModel.QualityOptions.FirstOrDefault(o => o.Value == quality);
-        if (option is not null)
-        {
-            ViewModel.SelectedQualityOption = option;
+            var option = ViewModel.ModelOptions.FirstOrDefault(o => o.Value == quality);
+            if (option is not null) ViewModel.SelectedModelOption = option;
         }
     }
 

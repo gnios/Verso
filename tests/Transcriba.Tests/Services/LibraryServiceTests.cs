@@ -72,6 +72,51 @@ public class LibraryServiceTests
     }
 
     [Fact]
+    public async Task GetTranscriptions_FiltersUnassignedOnly_ReturnsOnlyTranscriptionsWithoutResearch()
+    {
+        var (provider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();
+        try
+        {
+            var factory = TestDbHelper.GetFactory(provider);
+            await using (var ctx = await factory.CreateDbContextAsync())
+            {
+                var research = new ResearchPage { Title = "Mobilidade", Icon = "🚲", ColorName = "green" };
+                ctx.ResearchPages.Add(research);
+                await ctx.SaveChangesAsync();
+
+                ctx.Transcriptions.AddRange(
+                    new Transcription
+                    {
+                        Id = Guid.NewGuid(),
+                        Title = "Avulsa",
+                        Status = TranscriptionStatus.Done,
+                        CreatedAt = DateTime.UtcNow,
+                        ResearchPageId = null,
+                    },
+                    new Transcription
+                    {
+                        Id = Guid.NewGuid(),
+                        Title = "Da pesquisa",
+                        Status = TranscriptionStatus.Done,
+                        CreatedAt = DateTime.UtcNow,
+                        ResearchPageId = research.Id,
+                    });
+                await ctx.SaveChangesAsync();
+            }
+
+            var service = new LibraryService(factory);
+            var results = await service.GetTranscriptions(new LibraryFilter(UnassignedOnly: true));
+
+            Assert.Single(results);
+            Assert.Equal("Avulsa", results[0].Title);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
     public async Task SearchText_FiltersByTitleCaseInsensitive()
     {
         var (provider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();

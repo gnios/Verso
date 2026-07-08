@@ -49,37 +49,22 @@
             </button>
         </div>
 
+        <div class="dash-toolbar">
+            <button class="dash-filter @(ViewModel.IsAllFilterActive ? "active" : "")" @onclick="() => ViewModel.SetAllFilterCommand.Execute(null)">Todas</button>
+            <button class="dash-filter @(ViewModel.IsProgressFilterActive ? "active" : "")" @onclick="() => ViewModel.SetProgressFilterCommand.Execute(null)">Em andamento</button>
+            <button class="dash-filter @(ViewModel.IsDoneFilterActive ? "active" : "")" @onclick="() => ViewModel.SetDoneFilterCommand.Execute(null)">Concluídas</button>
+            <input class="dash-search" type="text" placeholder="Buscar por título ou conteúdo…" value="@ViewModel.SearchText" @oninput="OnSearchInput" />
+        </div>
         @if (ViewModel.IsEmpty)
         {
-            <div style="text-align:center;padding:48px;color:var(--muted)">Nenhuma transcrição associada a esta pesquisa ainda.</div>
+            <div style="grid-column:1/-1;text-align:center;padding:48px;color:var(--muted)">Nenhuma transcrição encontrada.</div>
         }
         else
         {
-            <div class="research-list">
-                @foreach (var transcription in ViewModel.Transcriptions)
+            <div class="dash-grid">
+                @foreach (var card in ViewModel.Transcriptions)
                 {
-                    <div class="research-item" @onclick="() => transcription.OpenCommand.Execute(null)">
-                        <div class="research-item-icon" style="background:var(--@(ViewModel.ColorName)-light)">@transcription.Icon</div>
-                        <div class="research-item-info">
-                            <div class="research-item-title">@transcription.Title</div>
-                            <div class="research-item-sub">
-                                @transcription.Date · @transcription.Duration ·
-                                <span class="status-badge @StatusBadgeClass(transcription)" style="@StatusBadgeStyle(transcription)">@transcription.StatusLabel</span>
-                            </div>
-                        </div>
-                        <div class="research-item-right">
-                            @foreach (var tag in transcription.Tags)
-                            {
-                                <span class="tag tag-sm tag-@tag.ColorName">@tag.Name</span>
-                            }
-                            @if (transcription.CanDelete)
-                            {
-                                <button class="dash-card-action dash-card-action-danger" title="Excluir" @onclick="() => transcription.DeleteCommand.Execute(null)" @onclick:stopPropagation="true">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
-                                </button>
-                            }
-                        </div>
-                    </div>
+                    <TranscriptionCard @key="card.Id" ViewModel="card" />
                 }
             </div>
         }
@@ -105,20 +90,10 @@
         ViewModel.Transcriptions.CollectionChanged += OnCollectionChanged;
     }
 
-    // Fidelidade ao protótipo: `renderResearchPage` não trata status de erro (mock só tem
-    // "progress"/"done"), mas o modelo de dados real suporta `TranscriptionStatus.Error`
-    // (ver design.md). Reaproveita as mesmas variáveis de cor (`--red`/`--red-light`) já
-    // usadas por outras badges/tags do app, sem introduzir classes novas no CSS compartilhado.
-    private static string StatusBadgeClass(TranscriptionCardViewModel transcription) =>
-        transcription switch
-        {
-            { IsInProgress: true } => "status-progress",
-            { IsDone: true } => "status-done",
-            _ => ""
-        };
-
-    private static string StatusBadgeStyle(TranscriptionCardViewModel transcription) =>
-        transcription.IsError ? "background:var(--red-light);color:var(--red)" : "";
+    private void OnSearchInput(ChangeEventArgs e)
+    {
+        ViewModel.SearchText = e.Value?.ToString() ?? "";
+    }
 
     private void OnViewModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) =>
         InvokeAsync(StateHasChanged);
