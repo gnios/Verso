@@ -98,16 +98,19 @@ public class Program
         _ => "application/octet-stream",
     };
 
-    // Logging unificado para debug e release: o logger em arquivo (rolling diário em
-    // <appdir>/data/logs) é a única janela persistente do que ocorre por trás —
-    // engine, fila de transcrição, downloads, erros nativos do whisper.cpp. O app é
-    // portátil: logs ao lado do exe. O console só é anexado em #if DEBUG.
+    // Logging focado no que importa: início/conclusão da transcrição, runtime usado
+    // (CUDA/Vulkan/CPU), progresso por parte e erros. O resto (Blazor/ASP.NET Core, EF
+    // Core, logs nativos verbosos do whisper.cpp) fica em Warning+ — silencioso em
+    // release. O console só é anexado em #if DEBUG.
     private static void ConfigureLogging(ILoggingBuilder logging)
     {
         logging.ClearProviders();
         logging.AddVersoFileLogger();
         logging.SetMinimumLevel(LogLevel.Information);
-        logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
+        // Framework/infra: só avisos e erros (cala o ruído de Blazor/ASP.NET Core).
+        logging.AddFilter("Microsoft", LogLevel.Warning);
+        logging.AddFilter("System", LogLevel.Warning);
+        // Logs do próprio app (engine, fila, serviços) em Information — é o sinal que interessa.
         logging.AddFilter("Verso", LogLevel.Information);
 #if DEBUG
         logging.SetMinimumLevel(LogLevel.Debug);
@@ -134,13 +137,19 @@ public class Program
         });
     }
 
+    /// <summary>
+    /// Mapeia os níveis de log nativos do whisper.cpp para os níveis do .NET.
+    /// <c>Debug</c> e <c>Info</c> viram <c>LogLevel.Debug</c> — só aparecem em debug
+    /// e não lotam o arquivo de log em release com centenas de linhas por segmento.
+    /// <c>Warning</c> e <c>Error</c> do whisper.cpp sobem como tal em qualquer build.
+    /// </summary>
     private static LogLevel MapWhisperLevel(WhisperLogLevel level) => level switch
     {
         WhisperLogLevel.Debug => LogLevel.Debug,
-        WhisperLogLevel.Info => LogLevel.Information,
+        WhisperLogLevel.Info => LogLevel.Debug,   // silencioso em release
         WhisperLogLevel.Warning => LogLevel.Warning,
         WhisperLogLevel.Error => LogLevel.Error,
-        _ => LogLevel.Information,
+        _ => LogLevel.Debug,
     };
 
 #if DEBUG

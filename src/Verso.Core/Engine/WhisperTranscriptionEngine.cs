@@ -154,6 +154,9 @@ public sealed class WhisperTranscriptionEngine : IDisposable
 
         var parte = partes[index];
         progress?.Report(new EngineProgress("transcribing", index + 1, partes.Count));
+                _logger?.LogInformation(
+                    "Transcrição {TranscriptionId}: parte {Part}/{Total} ({SampleCount:N0} amostras)",
+                    request.TranscriptionId, index + 1, partes.Count, parte.Samples.Length);
 
         // try/finally explícito por chunk garante DisposeAsync mesmo se ProcessAsync
         // lançar — não dependemos do scope do `await using`, que pode sobrepor o
