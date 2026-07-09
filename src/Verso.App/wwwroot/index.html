@@ -19,6 +19,47 @@
         }
     };
 </script>
+<script>
+    // Reprodutor de áudio HTML5 para o shell cross-platform (Photino). O <audio> é
+    // controlado por versoPlayback.* e os eventos de posição/término são repassados ao
+    // HtmlMediaPlaybackService (C#) via DotNetObjectReference. A mídia local é servida
+    // pelo scheme customizado verso-media:// (registrado em Program.cs), que faz stream
+    // do arquivo do disco — o webview não abre file:// de um path absoluto.
+    (function () {
+        let audio = null;
+        let dotnet = null;
+        const ensure = () => {
+            if (!audio) {
+                audio = new Audio();
+                audio.addEventListener('timeupdate', () => {
+                    if (dotnet) dotnet.invokeMethodAsync('RaisePositionChanged', audio.currentTime);
+                });
+                audio.addEventListener('loadedmetadata', () => {
+                    if (dotnet) dotnet.invokeMethodAsync('RaiseMetadata', audio.duration || 0);
+                });
+                audio.addEventListener('ended', () => {
+                    if (dotnet) dotnet.invokeMethodAsync('RaiseEnded');
+                });
+            }
+            return audio;
+        };
+        window.versoPlayback = {
+            init: function (ref) { dotnet = ref; },
+            load: function (url, rate, volume) {
+                const a = ensure();
+                a.src = url;
+                a.playbackRate = rate || 1;
+                a.volume = (volume ?? 100) / 100;
+            },
+            unload: function () { if (audio) { audio.pause(); audio.removeAttribute('src'); audio.load(); } },
+            play: function () { if (audio) audio.play().catch(() => {}); },
+            pause: function () { if (audio) audio.pause(); },
+            seek: function (seconds) { if (audio) audio.currentTime = seconds; },
+            setRate: function (rate) { if (audio) audio.playbackRate = rate || 1; },
+            setVolume: function (vol) { if (audio) audio.volume = vol; }
+        };
+    })();
+</script>
 
 <div id="blazor-error-ui">
     Ocorreu um erro inesperado.

@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Verso.App.Services;
 using Verso.App.ViewModels;
@@ -12,8 +14,8 @@ public static class AppServiceCollectionExtensions
         services.AddSingleton<NavigationService>();
         services.AddSingleton<BlazorThemeApplicator>();
         services.AddSingleton<IThemeApplicator>(sp => sp.GetRequiredService<BlazorThemeApplicator>());
-        services.AddSingleton<IFileSaveService, WpfFileSaveService>();
-        services.AddSingleton<IFileOpenService, WpfFileOpenService>();
+        services.AddSingleton<IFileSaveService, PhotinoFileSaveService>();
+        services.AddSingleton<IFileOpenService, PhotinoFileOpenService>();
         services.AddSingleton<BlazorConfirmationService>();
         services.AddSingleton<IConfirmationService>(sp => sp.GetRequiredService<BlazorConfirmationService>());
         services.AddSingleton<ThemeService>();
@@ -24,6 +26,18 @@ public static class AppServiceCollectionExtensions
         services.AddSingleton<MainWindowViewModel>();
         services.AddSingleton<GpuDetector>();
         services.AddSingleton<ActiveGpuResolver>();
+        services.AddSingleton<FfmpegLocator>();
+
+        // Playback de áudio: NAudio (WASAPI/Media Foundation) no Windows; HTML5 <audio>
+        // via scheme customizado no Linux/macOS (NAudio não funciona fora do Windows).
+        // Try-add: testes registram um fake entre AddVersoServices e AddVersoAppServices.
+        if (!services.Any(d => d.ServiceType == typeof(Verso.Core.Media.IMediaPlaybackService)))
+        {
+            if (OperatingSystem.IsWindows())
+                services.AddSingleton<Verso.Core.Media.IMediaPlaybackService, Verso.Core.Media.NAudioPlaybackService>();
+            else
+                services.AddSingleton<Verso.Core.Media.IMediaPlaybackService, Media.HtmlMediaPlaybackService>();
+        }
 
         services.AddTransient<DashboardViewModel>();
         services.AddTransient<ResearchPageViewModel>();

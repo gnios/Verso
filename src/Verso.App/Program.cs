@@ -1,10 +1,9 @@
 using System;
 using System.Diagnostics;
-using System.Windows;
-using Microsoft.AspNetCore.Components.WebView.Wpf;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Photino.Blazor;
+using Verso.App.Components.Layout;
 using Verso.Core;
 using Verso.Core.Data;
 using Verso.Core.Engine;
@@ -15,11 +14,6 @@ namespace Verso.App;
 
 public class Program
 {
-    private static IHost? _host;
-
-    public static IServiceProvider Services =>
-        _host?.Services ?? throw new InvalidOperationException("Host ainda não foi inicializado.");
-
     [STAThread]
     public static void Main(string[] args)
     {
@@ -27,53 +21,83 @@ public class Program
         AttachDebugConsole();
 #endif
 
-        _host = Host.CreateDefaultBuilder(args)
-            .ConfigureLogging(ConfigureLogging)
-            .ConfigureServices(services =>
-            {
-                services.Configure<HostOptions>(options =>
-                {
-                    options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
-                });
-                services.AddWpfBlazorWebView();
-#if DEBUG
-                services.AddBlazorWebViewDeveloperTools();
-#endif
-                services.AddVersoDatabase();
-                services.AddVersoEngine();
-                services.AddVersoServices();
-                services.AddVersoAppServices();
-            })
-            .Build();
-        RouteWhisperNativeLogs(_host.Services);
-        _host.Start();
-        DbBootstrapper.MigrateAsync(_host.Services).GetAwaiter().GetResult();
+        var builder = PhotinoBlazorAppBuilder.CreateDefault(args);
 
+        builder.Services.AddLogging(ConfigureLogging);
+        builder.Services.AddVersoDatabase();
+        builder.Services.AddVersoEngine();
+        builder.Services.AddVersoServices();
+        builder.Services.AddVersoAppServices();
+
+        builder.RootComponents.Add<MainLayout>("#app");
+
+        var app = builder.Build();
+
+        // Anexa a janela nativa ao UiThread (marshaling cross-platform via PhotinoWindow.Invoke).
+        Services.UiThread.Initialize(app.MainWindow);
+
+        // Scheme customizado que faz stream de arquivos de mídia locais para o <audio> HTML5
+        // (HtmlMediaPlaybackService, Linux/macOS). O <audio> não abre file:// dentro do webview
+        // isolado, então servimos os bytes do disco via verso-media://<caminho codificado>.
+        app.MainWindow.RegisterCustomSchemeHandler("verso-media", HandleMediaScheme);
+
+        RouteWhisperNativeLogs(app.Services);
+        DbBootstrapper.MigrateAsync(app.Services).GetAwaiter().GetResult();
+
+        app.MainWindow
+            .SetTitle("Verso")
+            .SetSize(1200, 800)
+            .SetMinSize(900, 600)
+            .SetIconFile("Assets/verso.ico");
+
+        AppDomain.CurrentDomain.UnhandledException += (_, error) =>
+            app.MainWindow.ShowMessage("Erro fatal", error.ExceptionObject?.ToString() ?? "(sem detalhes)");
+
+        app.Run();
+    }
+
+    /// <summary>
+    /// Handler do scheme <c>verso-media://</c>: faz stream do arquivo de mídia local
+    /// (caminho absoluto codificado no segmento após o host) para o <c>&lt;audio&gt;</c> HTML5.
+    /// URL esperada: <c>verso-media://localhost/&lt;Uri.EscapeDataString(path)&gt;</c>.
+    /// </summary>
+    private static System.IO.Stream? HandleMediaScheme(object sender, string scheme, string url, out string contentType)
+    {
+        contentType = "application/octet-stream";
         try
         {
-            var app = new App();
-            // `InitializeComponent()` é gerado a partir do App.xaml e é quem aplica a
-            // propriedade `StartupUri` (definida no XAML) à instância — sem essa chamada
-            // o loop de mensagens do WPF roda (processo fica vivo) mas nenhuma janela é
-            // criada, pois `StartupUri` nunca é atribuída. Normalmente essa chamada é feita
-            // pelo `Main()` autogerado a partir de App.xaml, que não usamos aqui (Main
-            // customizado em Program.cs, ver <StartupObject> no .csproj).
-            app.InitializeComponent();
-            app.Resources["Services"] = _host.Services;
-            app.Run();
+            var uri = new Uri(url);
+            // LocalPath começa com '/'; remove e decodata o caminho absoluto codificado.
+            var encoded = uri.AbsolutePath.TrimStart('/');
+            var path = Uri.UnescapeDataString(encoded);
+            if (!System.IO.File.Exists(path))
+                return null;
+
+            contentType = MimeFromExtension(System.IO.Path.GetExtension(path));
+            return System.IO.File.OpenRead(path);
         }
-        finally
+        catch
         {
-            _host.StopAsync().GetAwaiter().GetResult();
-            _host.Dispose();
+            return null;
         }
     }
+
+    private static string MimeFromExtension(string ext) => ext.ToLowerInvariant() switch
+    {
+        ".mp3" => "audio/mpeg",
+        ".wav" => "audio/wav",
+        ".m4a" => "audio/mp4",
+        ".mp4" => "audio/mp4",
+        ".ogg" => "audio/ogg",
+        ".webm" => "audio/webm",
+        ".aac" => "audio/aac",
+        _ => "application/octet-stream",
+    };
 
     // Logging unificado para debug e release: o logger em arquivo (rolling diário em
     // <appdir>/data/logs) é a única janela persistente do que ocorre por trás —
     // engine, fila de transcrição, downloads, erros nativos do whisper.cpp. O app é
-    // portátil: logs ao lado do exe, não em %AppData%. O console só é anexado em #if
-    // DEBUG (AttachDebugConsole abre uma janela de console a parte).
+    // portátil: logs ao lado do exe. O console só é anexado em #if DEBUG.
     private static void ConfigureLogging(ILoggingBuilder logging)
     {
         logging.ClearProviders();
@@ -95,9 +119,7 @@ public class Program
 
     /// <summary>
     /// Encaminha os logs nativos do whisper.cpp (via whisper.net LogProvider) para o
-    /// logger em arquivo do app. <see cref="LogProvider.AddLogger"/> recebe o nível
-    /// nativo (WhisperLogLevel) e a mensagem; mapeamos para <see cref="LogLevel"/> e
-    /// escrevemos sob a categoria "Whisper.net" para que apareçam no mesmo arquivo.
+    /// logger em arquivo do app.
     /// </summary>
     private static void RouteWhisperNativeLogs(IServiceProvider services)
     {

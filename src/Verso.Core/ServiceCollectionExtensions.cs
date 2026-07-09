@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using Verso.Core.Export;
-using Verso.Core.Media;
 using Verso.Core.Services;
 
 namespace Verso.Core;
@@ -16,7 +15,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<SegmentEditingService>();
         services.AddScoped<SettingsService>();
         services.AddScoped<ExportService>();
-        services.AddSingleton<IMediaPlaybackService, NAudioPlaybackService>();
+        // IMediaPlaybackService (NAudioPlaybackService Windows / HtmlMediaPlaybackService Linux)
+        // é registrado no shell (Verso.App/AddVersoAppServices) — depende do SO e, no caso do
+        // HTML5, de IJSRuntime que pertence à camada de UI.
         return services;
     }
 }

@@ -19,6 +19,7 @@
 @inject ThemeService ThemeService
 @inject BlazorThemeApplicator ThemeApplicator
 @inject IJSRuntime JS
+@inject Verso.Core.Media.IMediaPlaybackService PlaybackService
 
 <div class="app">
     <Sidebar />
@@ -88,6 +89,10 @@
         if (firstRender)
         {
             ThemeApplicator.AttachJsRuntime(JS);
+            // No Linux/macOS o playback é HTML5 (<audio>) via HtmlMediaPlaybackService, que
+            // precisa do IJSRuntime para controlar o elemento. No Windows (NAudio) é no-op.
+            if (PlaybackService is Verso.App.Media.HtmlMediaPlaybackService htmlPlayback)
+                htmlPlayback.AttachJsRuntime(JS);
         }
     }
 

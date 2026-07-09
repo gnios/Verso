@@ -206,7 +206,11 @@ public partial class SettingsViewModel : ViewModelBase
 
     private void RecomputeModelRecommendation()
     {
+        // SystemMemory usa GlobalMemoryStatusEx (kernel32, Windows-only); retorna 0
+        // em outras plataformas — suficiente para o ModelRecommender não sugerir nada.
+#pragma warning disable CA1416
         var ramBytes = SystemMemory.TotalPhysicalMemoryBytes;
+#pragma warning restore CA1416
         DetectedRamGb = ramBytes <= 0 ? 0 : ramBytes / (1024L * 1024L * 1024L);
         var device = SelectedDeviceOption?.Value ?? ExecutionDevice.Auto;
         var rec = ModelRecommender.Recommend(device, ramBytes);
@@ -224,18 +228,28 @@ public partial class SettingsViewModel : ViewModelBase
 
     private void RefreshDeveloperInfoCore()
     {
-        using var scope = _scopeFactory.CreateScope();
-        var gpuDetector = scope.ServiceProvider.GetRequiredService<GpuDetector>();
-        var resolver = scope.ServiceProvider.GetRequiredService<ActiveGpuResolver>();
-        Gpus = gpuDetector.Detect().Select(g => new GpuInfoViewModel(g)).ToList();
+        // Detecção de GPU via WMI/nvidia-smi é Windows-only (GpuDetector usa System.Management).
+        // Em Linux/macOS a lista fica vazia — o backend CUDA ainda funciona se houver runtime.
+        if (OperatingSystem.IsWindows())
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var gpuDetector = scope.ServiceProvider.GetRequiredService<GpuDetector>();
+            var resolver = scope.ServiceProvider.GetRequiredService<ActiveGpuResolver>();
+            Gpus = gpuDetector.Detect().Select(g => new GpuInfoViewModel(g)).ToList();
 
-        // Resolve a GPU física que o backend ATIVO (ou o configurado, se nada carregado
-        // ainda) de fato usará — CUDA → nvidia-smi device 0, Vulkan → adaptador dedicado.
-        var backend = WhisperRuntimeInspector.LoadedBackend
-            ?? WhisperRuntimeInspector.GetBackend(
-                WhisperRuntimeConfigurator.ResolveRuntimeOrder(
-                    SelectedDeviceOption?.Value ?? ExecutionDevice.Auto).FirstOrDefault());
-        ActiveGpu = resolver.Resolve(backend);
+            // Resolve a GPU física que o backend ATIVO (ou o configurado, se nada carregado
+            // ainda) de fato usará — CUDA → nvidia-smi device 0, Vulkan → adaptador dedicado.
+            var backend = WhisperRuntimeInspector.LoadedBackend
+                ?? WhisperRuntimeInspector.GetBackend(
+                    WhisperRuntimeConfigurator.ResolveRuntimeOrder(
+                        SelectedDeviceOption?.Value ?? ExecutionDevice.Auto).FirstOrDefault());
+            ActiveGpu = resolver.Resolve(backend);
+        }
+        else
+        {
+            Gpus = new List<GpuInfoViewModel>();
+            ActiveGpu = null;
+        }
 
         // Notifica mudanças nas propriedades computadas de runtime (não são
         // [ObservableProperty] — dependem do estado estático do whisper.net).
@@ -306,13 +320,20 @@ public partial class SettingsViewModel : ViewModelBase
 
     private void RefreshActiveGpu()
     {
-        using var scope = _scopeFactory.CreateScope();
-        var resolver = scope.ServiceProvider.GetRequiredService<ActiveGpuResolver>();
-        var backend = WhisperRuntimeInspector.LoadedBackend
-            ?? WhisperRuntimeInspector.GetBackend(
-                WhisperRuntimeConfigurator.ResolveRuntimeOrder(
-                    SelectedDeviceOption?.Value ?? ExecutionDevice.Auto).FirstOrDefault());
-        ActiveGpu = resolver.Resolve(backend);
+        if (!OperatingSystem.IsWindows())
+        {
+            ActiveGpu = null;
+        }
+        else
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var resolver = scope.ServiceProvider.GetRequiredService<ActiveGpuResolver>();
+            var backend = WhisperRuntimeInspector.LoadedBackend
+                ?? WhisperRuntimeInspector.GetBackend(
+                    WhisperRuntimeConfigurator.ResolveRuntimeOrder(
+                        SelectedDeviceOption?.Value ?? ExecutionDevice.Auto).FirstOrDefault());
+            ActiveGpu = resolver.Resolve(backend);
+        }
         OnPropertyChanged(nameof(ActiveGpu));
         OnPropertyChanged(nameof(ActiveGpuLabel));
         OnPropertyChanged(nameof(ActiveGpuSourceLabel));

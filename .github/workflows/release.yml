@@ -1,18 +1,20 @@
 name: release
 
-# Pipeline de distribuição Windows do Verso (app WPF + Blazor Hybrid, net10.0-windows).
-# O app é Windows-only (WPF/WebView2 não rodam em Linux), então o runner é windows-latest.
+# Pipeline de distribuição cross-platform do Verso (Photino.Blazor, net10.0).
+# O app agora roda em Windows (WebView2) e Linux (WebKitGTK) — mesmos Razor components.
 #
-# Publica DUAS variantes por release (matrix cpu|gpu), ambas single-file (DLLs gerenciadas
-# embutidas no Verso.App.exe — raiz limpa, só o app) e portáteis (dados em <appdir>/data,
-# não em %AppData%):
-#   - cpu: sem runtimes CUDA/Vulkan (~200 MB) — roda em qualquer máquina
-#   - gpu: com runtimes CUDA/Vulkan win-x64 (~960 MB) — aceleração por GPU NVIDIA
-# Ambas removem runtimes Linux/macOS e peso morto (pdb/xml/Metal) antes do zip.
+# Publica DUAS variantes por plataforma (matrix os × cpu|gpu), ambas single-file
+# (DLLs gerenciadas embutidas no Verso/Verso.App.exe — raiz limpa) e portáteis
+# (dados em <appdir>/data):
+#   - cpu: sem runtimes CUDA/Vulkan — roda em qualquer máquina
+#   - gpu: com runtimes CUDA/Vulkan — aceleração por GPU NVIDIA
+# Plataformas:
+#   - windows-latest → win-x64  (WebView2 embutido no Windows 10/11)
+#   - ubuntu-latest  → linux-x64 (requer WebKitGTK + ffmpeg no destino)
 #
 # Gatilhos:
-#   - push de tag v*.*.*  -> builda as 2 variantes e cria um GitHub Release com os 2 zips
-#   - workflow_dispatch    -> builda e publica artifacts (sem Release), útil para validação
+#   - push de tag v*.*.*  -> builda tudo e cria um GitHub Release com os zips
+#   - workflow_dispatch    -> builda e publica artifacts (sem Release)
 on:
   push:
     tags:
@@ -24,11 +26,27 @@ permissions:
 
 jobs:
   build:
-    runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
-        variant: [cpu, gpu]
+        include:
+          - os: windows-latest
+            rid: win-x64
+            artifact: Verso-cpu-win-x64
+            variant: cpu
+          - os: windows-latest
+            rid: win-x64
+            artifact: Verso-gpu-win-x64
+            variant: gpu
+          - os: ubuntu-latest
+            rid: linux-x64
+            artifact: Verso-cpu-linux-x64
+            variant: cpu
+          - os: ubuntu-latest
+            rid: linux-x64
+            artifact: Verso-gpu-linux-x64
+            variant: gpu
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,69 +58,80 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Instalar dependências Linux (WebKitGTK p/ Photino)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-0 libwebkit2gtk-4.1-0 libavcodec-extra
+
       - name: Determinar versão
         id: version
-        shell: pwsh
+        shell: bash
         run: |
-          # Tag v*.*.* -> version SEM o 'v' (NuGet rejeita 'v0.1.0'); short SHA no dispatch.
-          if ($env:GITHUB_REF -match 'refs/tags/(v.*)') {
-            $tag = $Matches[1]          # v0.1.0
-            $ver = $tag.Substring(1)    # 0.1.0
-          } else {
-            $tag = ''
-            $ver = "0.0.0-dev+$($env:GITHUB_SHA.Substring(0,7))"
-          }
-          Write-Host "tag=$tag version=$ver"
-          "tag=$tag" >> $env:GITHUB_OUTPUT
-          "version=$ver" >> $env:GITHUB_OUTPUT
+          if [[ "$GITHUB_REF" =~ refs/tags/(v.*) ]]; then
+            tag="${BASH_REMATCH[1]}"
+            ver="${tag#v}"
+          else
+            tag=""
+            ver="0.0.0-dev+${GITHUB_SHA:0:7}"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
 
-      - name: Publicar self-contained (win-x64, single-file)
-        shell: pwsh
+      - name: Publicar self-contained (single-file)
+        shell: bash
         run: |
-          # Single-file empacota TODAS as DLLs gerenciadas dentro do Verso.App.exe, deixando
-          # a raiz limpa (só o app). Nativos (WPF/WebView2/whisper.cpp/CUDA) ficam externos
-          # em runtimes/<rid>/native/ — assim ainda dá para remover runtimes CUDA/Vulkan
+          # Single-file empacota TODAS as DLLs gerenciadas dentro do executável, deixando
+          # a raiz limpa. Nativos (Photino/whisper.cpp/CUDA) ficam externos em
+          # runtimes/<rid>/native/ — assim ainda dá para remover runtimes CUDA/Vulkan
           # não desejados antes do zip (variante CPU) sem inchar o exe.
-          dotnet publish src/Verso.App/Verso.App.csproj `
-            -c Release `
-            -r win-x64 `
-            --self-contained true `
-            -p:PublishSingleFile=true `
-            -p:IncludeNativeLibrariesForSelfExtract=false `
-            -p:Version=${{ steps.version.outputs.version }} `
+          dotnet publish src/Verso.App/Verso.App.csproj \
+            -c Release \
+            -r ${{ matrix.rid }} \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=false \
+            -p:Version=${{ steps.version.outputs.version }} \
             -o publish/${{ matrix.variant }}
 
       - name: Remover runtimes e arquivos desnecessários
-        shell: pwsh
+        shell: bash
         run: |
-          $pub = "publish/${{ matrix.variant }}"
-          # 1. Remove RIDs não-win-x64 (linux/osx/...) dos flavors de GPU (cuda, cuda12, vulkan).
-          Get-ChildItem "$pub/runtimes" -Directory -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -match '^(cuda|cuda12|vulkan)$' } |
-            ForEach-Object {
-              Get-ChildItem $_ -Directory | Where-Object { $_.Name -ne 'win-x64' } | Remove-Item -Recurse -Force
-            }
-          # 2. Variante CPU: remove CUDA e Vulkan inteiros, deixa só o runtime CPU (runtimes/win-x64).
-          if ('${{ matrix.variant }}' -eq 'cpu') {
-            Get-ChildItem "$pub/runtimes" -Directory -ErrorAction SilentlyContinue |
-              Where-Object { $_.Name -match '^(cuda|cuda12|vulkan)$' } |
-              Remove-Item -Recurse -Force
-          }
-          # 3. Remove runtimes de plataformas estrangeiras (app é win-x64-only): linux, macOS,
-          #    ARM/32-bit Windows e coreml (Apple). Mantém win-x64, noavx (fallback CPU) e openvino.
-          Get-ChildItem "$pub/runtimes" -Directory -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -match '^(linux|macos|win-arm64|win-x86|coreml)' } |
-            Remove-Item -Recurse -Force
-          # 4. Peso morto: símbolos de debug, docs XML e o backend Metal (macOS-only) do whisper.
-          Get-ChildItem $pub -Recurse -Include *.pdb,*.xml,ggml-metal.metal -File |
-            Remove-Item -Force
-          $sum = (Get-ChildItem $pub -Recurse -File | Measure-Object Length -Sum).Sum
-          Write-Host "Tamanho de publish apos cleanup: $([math]::Round($sum/1MB, 1)) MB"
+          pub="publish/${{ matrix.variant }}"
+          rid="${{ matrix.rid }}"
 
-      - name: Assinar Verso.App.exe (Azure Trusted Signing)
+          # Variante CPU: remove CUDA e Vulkan inteiros, deixa só o runtime CPU nativo.
+          if [ "${{ matrix.variant }}" = "cpu" ]; then
+            find "$pub/runtimes" -maxdepth 1 -type d \( -name 'cuda*' -o -name 'vulkan' \) -exec rm -rf {} + 2>/dev/null || true
+          fi
+
+          # Remove runtimes CUDA/Vulkan de plataformas estrangeiras ao RID atual.
+          for d in "$pub/runtimes"/*/ ; do
+            name="$(basename "$d")"
+            case "$name" in
+              cuda|cuda12|vulkan)
+                # dentro de cada flavor de GPU, remove os RIDs que não são o atual
+                find "$d" -maxdepth 1 -type d ! -name "$rid" -exec rm -rf {} + 2>/dev/null || true
+                ;;
+              linux|win|win-*)
+                # remove pastas de SO diferente do RID alvo
+                [ "${name%%-*}" != "${rid%%-*}" ] && rm -rf "$d" 2>/dev/null || true
+                ;;
+              osx|macos|coreml)
+                rm -rf "$d" 2>/dev/null || true
+                ;;
+            esac
+          done
+
+          # Peso morto: símbolos de debug, docs XML e o backend Metal (macOS-only) do whisper.
+          find "$pub" -type f \( -name '*.pdb' -o -name '*.xml' -o -name 'ggml-metal.metal' \) -delete 2>/dev/null || true
+
+          sum=$(du -sb "$pub" 2>/dev/null | awk '{printf "%.1f", $1/1048576}')
+          echo "Tamanho de publish apos cleanup: ${sum} MB"
+
+      - name: Assinar executável (Azure Trusted Signing — só Windows)
         # Ativa automaticamente quando AZURE_SIGNING_ACCOUNT estiver definido (repo Variables).
-        # Enquanto não configurado, o build sai sem assinar (alerta do SmartScreen permanece).
-        if: ${{ vars.AZURE_SIGNING_ACCOUNT != '' }}
+        if: runner.os == 'Windows' && vars.AZURE_SIGNING_ACCOUNT != ''
         uses: azure/artifact-signing-action@v2
         with:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -117,21 +146,26 @@ jobs:
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
+
       - name: Empacotar zip
-        shell: pwsh
+        shell: bash
         run: |
-          $ver = '${{ steps.version.outputs.version }}'
-          $variant = '${{ matrix.variant }}'
-          New-Item -ItemType Directory -Force -Path dist | Out-Null
-          $zip = "Verso-${ver}-${variant}-win-x64.zip"
-          Compress-Archive -Path "publish/$variant/*" -DestinationPath "dist/$zip" -Force
-          Write-Host "Criado dist/$zip"
+          ver='${{ steps.version.outputs.version }}'
+          mkdir -p dist
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            zip="Verso-${ver}-${{ matrix.variant }}-${{ matrix.rid }}.zip"
+            7z a -tzip "dist/$zip" "./publish/${{ matrix.variant }}/*" >/dev/null
+          else
+            zip="Verso-${ver}-${{ matrix.variant }}-${{ matrix.rid }}.tar.gz"
+            tar -czf "dist/$zip" -C "publish/${{ matrix.variant }}" .
+          fi
+          echo "Criado dist/$zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Verso-${{ matrix.variant }}-win-x64
-          path: dist/*.zip
+          name: ${{ matrix.artifact }}
+          path: dist/*
           if-no-files-found: error
           retention-days: 30
 
@@ -147,7 +181,6 @@ jobs:
 
       - name: Determinar versão/tag
         id: rel
-        shell: bash
         run: |
           tag="${GITHUB_REF#refs/tags/}"
           ver="${tag#v}"
@@ -161,17 +194,30 @@ jobs:
           tag="${{ steps.rel.outputs.tag }}"
           ver="${{ steps.rel.outputs.version }}"
           gh release create "$tag" -R "${{ github.repository }}" \
-            assets/Verso-cpu-win-x64/*.zip assets/Verso-gpu-win-x64/*.zip \
+            assets/Verso-cpu-win-x64/* assets/Verso-gpu-win-x64/* \
+            assets/Verso-cpu-linux-x64/* assets/Verso-gpu-linux-x64/* \
             --title "Verso $ver" \
-            --notes "Verso $ver (Windows x64)
+            --notes "Verso $ver — Windows x64 + Linux x64
 
-          - **Verso-${ver}-cpu-win-x64.zip** (~200 MB) — sem GPU, roda em qualquer máquina. Recomendado para quem não tem NVIDIA.
-          - **Verso-${ver}-gpu-win-x64.zip** (~960 MB) — inclui runtimes CUDA/Vulkan para aceleração por GPU.
+          ## Windows x64
+          - **Verso-${ver}-cpu-win-x64.zip** — sem GPU, roda em qualquer máquina. Recomendado para quem não tem NVIDIA.
+          - **Verso-${ver}-gpu-win-x64.zip** — inclui runtimes CUDA/Vulkan para aceleração por GPU.
 
-          Build self-contained single-file — não requer instalação do .NET runtime. A pasta raiz contém só o Verso.App.exe (e os nativos de WPF/WebView2); as DLLs gerenciadas estão embutidas no exe.
+          ## Linux x64
+          - **Verso-${ver}-cpu-linux-x64.tar.gz** — sem GPU.
+          - **Verso-${ver}-gpu-linux-x64.tar.gz** — inclui runtimes CUDA/Vulkan para aceleração por GPU.
 
-          App portátil: modelos, áudios, banco de dados e logs ficam numa pasta data/ ao lado do exe — mover a pasta leva tudo junto, sem depender de %AppData%.
+          Build self-contained single-file — não requer instalação do .NET runtime. A pasta raiz contém só o executável (e os nativos do Photino/whisper.cpp); as DLLs gerenciadas estão embutidas.
 
-          Pré-requisito: Windows 10/11 com o Microsoft Edge WebView2 Runtime (presente por padrão no Windows 11).
+          App portátil: modelos, áudios, banco de dados e logs ficam numa pasta \`data/\` ao lado do executável — mover a pasta leva tudo junto.
 
-          Descompacte e execute Verso.App.exe."
+          ### Pré-requisitos Windows
+          Windows 10/11 com o Microsoft Edge WebView2 Runtime (presente por padrão no Windows 11).
+
+          ### Pré-requisitos Linux
+          WebKitGTK e ffmpeg (para decodificação de áudio via whisper.net):
+          \`\`\`bash
+          sudo apt-get install -y libgtk-3-0 libwebkit2gtk-4.1-0 libavcodec-extra ffmpeg
+          \`\`\`
+
+          Descompacte e execute o Verso."
