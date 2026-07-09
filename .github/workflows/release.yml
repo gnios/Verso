@@ -7,7 +7,7 @@ name: release
 # embutidas no Verso.App.exe — raiz limpa, só o app) e portáteis (dados em <appdir>/data,
 # não em %AppData%):
 #   - cpu: sem runtimes CUDA/Vulkan (~200 MB) — roda em qualquer máquina
-#   - gpu: com runtimes CUDA/Vulkan win-x64 (~650 MB) — aceleração por GPU NVIDIA
+#   - gpu: com runtimes CUDA/Vulkan win-x64 (~960 MB) — aceleração por GPU NVIDIA
 # Ambas removem runtimes Linux/macOS e peso morto (pdb/xml/Metal) antes do zip.
 #
 # Gatilhos:
@@ -166,7 +166,7 @@ jobs:
             --notes "Verso $ver (Windows x64)
 
           - **Verso-${ver}-cpu-win-x64.zip** (~200 MB) — sem GPU, roda em qualquer máquina. Recomendado para quem não tem NVIDIA.
-          - **Verso-${ver}-gpu-win-x64.zip** (~650 MB) — inclui runtimes CUDA/Vulkan para aceleração por GPU.
+          - **Verso-${ver}-gpu-win-x64.zip** (~960 MB) — inclui runtimes CUDA/Vulkan para aceleração por GPU.
 
           Build self-contained single-file — não requer instalação do .NET runtime. A pasta raiz contém só o Verso.App.exe (e os nativos de WPF/WebView2); as DLLs gerenciadas estão embutidas no exe.
 
