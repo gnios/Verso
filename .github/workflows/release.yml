@@ -3,10 +3,12 @@ name: release
 # Pipeline de distribuição Windows do Verso (app WPF + Blazor Hybrid, net10.0-windows).
 # O app é Windows-only (WPF/WebView2 não rodam em Linux), então o runner é windows-latest.
 #
-# Publica DUAS variantes por release (matrix cpu|gpu):
-#   - cpu: sem runtimes CUDA/Vulkan (~150 MB) — roda em qualquer máquina
+# Publica DUAS variantes por release (matrix cpu|gpu), ambas single-file (DLLs gerenciadas
+# embutidas no Verso.App.exe — raiz limpa, só o app) e portáteis (dados em <appdir>/data,
+# não em %AppData%):
+#   - cpu: sem runtimes CUDA/Vulkan (~200 MB) — roda em qualquer máquina
 #   - gpu: com runtimes CUDA/Vulkan win-x64 (~650 MB) — aceleração por GPU NVIDIA
-# Ambas removem runtimes Linux/macOS (inúteis no Windows).
+# Ambas removem runtimes Linux/macOS e peso morto (pdb/xml/Metal) antes do zip.
 #
 # Gatilhos:
 #   - push de tag v*.*.*  -> builda as 2 variantes e cria um GitHub Release com os 2 zips
@@ -54,19 +56,23 @@ jobs:
           "tag=$tag" >> $env:GITHUB_OUTPUT
           "version=$ver" >> $env:GITHUB_OUTPUT
 
-      - name: Publicar self-contained (win-x64, pasta)
+      - name: Publicar self-contained (win-x64, single-file)
         shell: pwsh
         run: |
-          # Pasta (não single-file) para permitir remoção de runtimes antes do zip.
+          # Single-file empacota TODAS as DLLs gerenciadas dentro do Verso.App.exe, deixando
+          # a raiz limpa (só o app). Nativos (WPF/WebView2/whisper.cpp/CUDA) ficam externos
+          # em runtimes/<rid>/native/ — assim ainda dá para remover runtimes CUDA/Vulkan
+          # não desejados antes do zip (variante CPU) sem inchar o exe.
           dotnet publish src/Verso.App/Verso.App.csproj `
             -c Release `
             -r win-x64 `
             --self-contained true `
-            -p:PublishSingleFile=false `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=false `
             -p:Version=${{ steps.version.outputs.version }} `
             -o publish/${{ matrix.variant }}
 
-      - name: Remover runtimes desnecessários
+      - name: Remover runtimes e arquivos desnecessários
         shell: pwsh
         run: |
           $pub = "publish/${{ matrix.variant }}"
@@ -82,6 +88,14 @@ jobs:
               Where-Object { $_.Name -match '^(cuda|cuda12|vulkan)$' } |
               Remove-Item -Recurse -Force
           }
+          # 3. Remove runtimes de plataformas estrangeiras (app é win-x64-only): linux, macOS,
+          #    ARM/32-bit Windows e coreml (Apple). Mantém win-x64, noavx (fallback CPU) e openvino.
+          Get-ChildItem "$pub/runtimes" -Directory -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -match '^(linux|macos|win-arm64|win-x86|coreml)' } |
+            Remove-Item -Recurse -Force
+          # 4. Peso morto: símbolos de debug, docs XML e o backend Metal (macOS-only) do whisper.
+          Get-ChildItem $pub -Recurse -Include *.pdb,*.xml,ggml-metal.metal -File |
+            Remove-Item -Force
           $sum = (Get-ChildItem $pub -Recurse -File | Measure-Object Length -Sum).Sum
           Write-Host "Tamanho de publish apos cleanup: $([math]::Round($sum/1MB, 1)) MB"
 
@@ -151,10 +165,12 @@ jobs:
             --title "Verso $ver" \
             --notes "Verso $ver (Windows x64)
 
-          - **Verso-${ver}-cpu-win-x64.zip** (~150 MB) — sem GPU, roda em qualquer máquina. Recomendado para quem não tem NVIDIA.
+          - **Verso-${ver}-cpu-win-x64.zip** (~200 MB) — sem GPU, roda em qualquer máquina. Recomendado para quem não tem NVIDIA.
           - **Verso-${ver}-gpu-win-x64.zip** (~650 MB) — inclui runtimes CUDA/Vulkan para aceleração por GPU.
 
-          Build self-contained — não requer instalação do .NET runtime.
+          Build self-contained single-file — não requer instalação do .NET runtime. A pasta raiz contém só o Verso.App.exe (e os nativos de WPF/WebView2); as DLLs gerenciadas estão embutidas no exe.
+
+          App portátil: modelos, áudios, banco de dados e logs ficam numa pasta data/ ao lado do exe — mover a pasta leva tudo junto, sem depender de %AppData%.
 
           Pré-requisito: Windows 10/11 com o Microsoft Edge WebView2 Runtime (presente por padrão no Windows 11).
 

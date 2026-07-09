@@ -5,7 +5,7 @@ namespace Verso.Core.Data;
 
 /// <summary>
 /// Usada apenas pelas ferramentas de design-time do EF Core (`dotnet ef migrations add`).
-/// A configuração real de runtime (caminho do banco em %AppData%, migrations automáticas)
+/// A configuração real de runtime (caminho portátil do banco em <c>&lt;appdir&gt;/data</c>, migrations automáticas)
 /// é feita por <c>DbBootstrapper</c>.
 /// </summary>
 public class VersoDbContextFactory : IDesignTimeDbContextFactory<VersoDbContext>

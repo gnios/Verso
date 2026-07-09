@@ -65,8 +65,7 @@ public sealed class WhisperTranscriptionEngine : IDisposable
         _processorFactory = processorFactory ?? new WhisperProcessorFactory(factoryCache);
         _logger = logger;
         _mediaPlayback = mediaPlayback;
-        _modelsDirectory = modelsDirectory
-            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Verso", "models");
+        _modelsDirectory = modelsDirectory ?? VersoPaths.ModelsDirectory;
     }
 
     public int FactoryLoadCount => _factoryCache.LoadCount;
@@ -77,8 +76,14 @@ public sealed class WhisperTranscriptionEngine : IDisposable
         CancellationToken cancellationToken)
     {
         WhisperRuntimeConfigurator.Configure(request.Device);
+        _logger?.LogInformation(
+            "Iniciando transcrição {TranscriptionId}: dispositivo={Device}, modelo={Quality}, idioma={Language}",
+            request.TranscriptionId,
+            request.Device,
+            request.Quality,
+            request.Language);
         _logger?.LogDebug(
-            "Runtime Whisper: {RuntimeOrder}",
+            "Runtime Whisper (preferência): {RuntimeOrder}",
             string.Join(" → ", WhisperRuntimeConfigurator.ResolveRuntimeOrder(request.Device)));
 
         Directory.CreateDirectory(_modelsDirectory);
@@ -189,6 +194,13 @@ public sealed class WhisperTranscriptionEngine : IDisposable
 
             progress?.Report(new EngineProgress("done", partes.Count, partes.Count));
 
+            _logger?.LogInformation(
+                "Transcrição {TranscriptionId} concluída: {SegmentCount} segmentos em {Parts} partes (runtime {Backend})",
+                request.TranscriptionId,
+                ordered.Count,
+                partes.Count,
+                WhisperRuntimeInspector.LoadedBackend ?? "n/d");
+
             return new TranscriptionResult(ordered);
         }
         finally
@@ -207,6 +219,16 @@ public sealed class WhisperTranscriptionEngine : IDisposable
         try
         {
             _factoryCache.GetOrCreate(modelPath);
+
+            // Log do runtime EFETIVAMENTE carregado (RuntimeOptions.LoadedLibrary),
+            // que pode diferir da preferência configurada (ex.: Auto sem CUDA/Vulkan
+            // cai em CPU). Esta é a linha que responde "qual placa/backend está em uso".
+            var loaded = WhisperRuntimeInspector.LoadedRuntime;
+            _logger?.LogInformation(
+                "Runtime Whisper carregado: {Runtime} (backend {Backend}) — modelo {ModelPath}",
+                loaded is null ? "desconhecido" : WhisperRuntimeInspector.GetRuntimeLabel(loaded.Value),
+                WhisperRuntimeInspector.GetBackend(loaded) ?? "n/d",
+                modelPath);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

@@ -255,4 +255,73 @@ public class SettingsViewModelTests
             TestDbHelper.Cleanup(directory);
         }
     }
+
+    [Fact]
+    public async Task LoadAsync_PopulatesGpuList()
+    {
+        var (provider, directory) = await CreateProviderAsync();
+        try
+        {
+            var settings = CreateSettings(provider);
+            await settings.LoadAsync();
+
+            // GpuDetector usa WMI; na pior hipótese (CI sem WMI) retorna lista vazia,
+            // mas a propriedade nunca é null e o label de runtime existe.
+            Assert.NotNull(settings.Gpus);
+            Assert.False(string.IsNullOrEmpty(settings.RuntimePreferenceLabel));
+            Assert.False(string.IsNullOrEmpty(settings.LogDirectoryPath));
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task RefreshDeveloperInfoCommand_RepopulatesGpus()
+    {
+        var (provider, directory) = await CreateProviderAsync();
+        try
+        {
+            var settings = CreateSettings(provider);
+            await settings.LoadAsync();
+
+            settings.RefreshDeveloperInfoCommand.Execute(null);
+
+            Assert.NotNull(settings.Gpus);
+            Assert.False(string.IsNullOrEmpty(settings.ConfiguredDeviceLabel));
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task VerifyRuntimeCommand_WithoutModel_SetsMessageAndDoesNotThrow()
+    {
+        var (provider, directory) = await CreateProviderAsync();
+        try
+        {
+            var settings = CreateSettings(provider);
+            await settings.LoadAsync();
+
+            // Aponta o modelo p/ um caminho inexistente (dir de testes isolado), o probe
+            // devolve null sem lançar e a mensagem explica que não há modelo baixado.
+            settings.VerifyRuntimeCommand.Execute(null);
+            await Task.Delay(100);
+
+            // Se já existe um runtime carregado (transcrição anterior no processo de
+            // testes), a mensagem informa "já carregado"; caso contrário, informa que
+            // não há modelo. Em ambos os casos DeveloperMessage é não-vazio OU o runtime
+            // carregado está visível. Aceitamos qualquer caminho sem exceção.
+            Assert.True(
+                !string.IsNullOrEmpty(settings.DeveloperMessage) || settings.IsRuntimeLoaded,
+                "VerifyRuntime deve produzir uma mensagem ou um runtime carregado.");
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
 }

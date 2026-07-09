@@ -11,7 +11,7 @@ public class Transcription
     public double DurationSeconds { get; set; }
     /// <summary>Tempo de relógio que o motor demorou para transcrever (null até concluir). Em segundos.</summary>
     public double? ProcessingDurationSeconds { get; set; }
-    public string? MediaFilePath { get; set; }       // caminho copiado em %AppData%
+    public string? MediaFilePath { get; set; }       // caminho copiado em <appdir>/data/media
     public string Language { get; set; } = "pt";
     public ModelQuality Quality { get; set; }
     public SpeakerMode SpeakerMode { get; set; }

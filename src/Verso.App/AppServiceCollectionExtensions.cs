@@ -22,6 +22,8 @@ public static class AppServiceCollectionExtensions
         services.AddSingleton<ModelDownloadModalViewModel>();
         services.AddSingleton<IModelDownloadNotifier, ModelDownloadNotificationService>();
         services.AddSingleton<MainWindowViewModel>();
+        services.AddSingleton<GpuDetector>();
+        services.AddSingleton<ActiveGpuResolver>();
 
         services.AddTransient<DashboardViewModel>();
         services.AddTransient<ResearchPageViewModel>();

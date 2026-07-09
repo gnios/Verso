@@ -3,7 +3,7 @@ namespace Verso.Tests.Services;
 public class MediaStorageServiceTests
 {
     [Fact]
-    public async Task CopyToAppDataAsync_PreservesFileNameAndExtension()
+    public async Task CopyToStorageAsync_PreservesFileNameAndExtension()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), $"transcriba-media-{Guid.NewGuid():N}");
         var sourceDir = Path.Combine(tempRoot, "source");
@@ -17,7 +17,7 @@ public class MediaStorageServiceTests
             var transcriptionId = Guid.NewGuid();
             var service = new Verso.Core.Services.MediaStorageService(Path.Combine(tempRoot, "media"));
 
-            var copiedPath = await service.CopyToAppDataAsync(sourcePath, transcriptionId);
+            var copiedPath = await service.CopyToStorageAsync(sourcePath, transcriptionId);
 
             Assert.Equal(
                 Path.Combine(tempRoot, "media", transcriptionId.ToString("N"), "entrevista.mp3"),
