@@ -78,56 +78,71 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=$ver" >> "$GITHUB_OUTPUT"
 
-      - name: Publicar self-contained (single-file)
+      - name: Publicar self-contained (DLLs soltas — execução direta, sem re-extração)
         shell: bash
         run: |
-          # Single-file empacota TODAS as DLLs gerenciadas dentro do executável, deixando
-          # a raiz limpa. Nativos (Photino/whisper.cpp/CUDA) ficam externos em
-          # runtimes/<rid>/native/ — assim ainda dá para remover runtimes CUDA/Vulkan
-          # não desejados antes do zip (variante CPU) sem inchar o exe.
+          # Publicação self-contained com DLLs soltas (NÃO single-file). O single-file
+          # empacota as DLLs gerenciadas no exe e as extrai para %TEMP%/.net/<app> a cada
+          # execução — o usuário enxerga isso como "descompactar de novo". Com DLLs
+          # soltas, clicar no Verso.exe abre o app direto, sem extração. wwwroot segue
+          # embutido no Verso.dll (ManifestEmbeddedFileProvider). Nativos do
+          # Photino/whisper.cpp/CUDA ficam em runtimes/<rid>/ — removemos os não
+          # desejados no step de cleanup (variante CPU/GPU, RIDs estrangeiros).
           dotnet publish src/Verso.App/Verso.App.csproj \
             -c Release \
             -r ${{ matrix.rid }} \
             --self-contained true \
-            -p:PublishSingleFile=true \
-            -p:IncludeNativeLibrariesForSelfExtract=false \
             -p:Version=${{ steps.version.outputs.version }} \
             -o publish/${{ matrix.variant }}
 
-      - name: Remover runtimes e arquivos desnecessários
+      - name: Limpar runtimes e arquivos desnecessários
         shell: bash
         run: |
+          set -e
           pub="publish/${{ matrix.variant }}"
           rid="${{ matrix.rid }}"
 
-          # Variante CPU: remove CUDA e Vulkan inteiros, deixa só o runtime CPU nativo.
+          # Estrutura do Whisper.net AllRuntimes:
+          #   runtimes/<rid>/          (CPU nativo: win-x64, linux-x64, ...)
+          #   runtimes/noavx/<rid>/     (CPU sem AVX — fallback p/ CPUs antigas)
+          #   runtimes/openvino/<rid>/  (Intel OpenVINO)
+          #   runtimes/cuda/<rid>/      runtimes/cuda12/<rid>/   (CUDA)
+          #   runtimes/vulkan/<rid>/    (Vulkan)
+          #   runtimes/coreml/macos-*   (macOS-only)
+          # Cada flavor contém subpastas por RID (win-x64, linux-x64).
+
+          # 1. Variante CPU: remove GPU (CUDA/CUDA12/Vulkan) inteiros.
           if [ "${{ matrix.variant }}" = "cpu" ]; then
-            find "$pub/runtimes" -maxdepth 1 -type d \( -name 'cuda*' -o -name 'vulkan' \) -exec rm -rf {} + 2>/dev/null || true
+            rm -rf "$pub/runtimes/cuda" "$pub/runtimes/cuda12" "$pub/runtimes/vulkan"
           fi
 
-          # Remove runtimes CUDA/Vulkan de plataformas estrangeiras ao RID atual.
+          # 2. Em cada flavor restante (noavx, openvino, cuda, cuda12, vulkan), guarda
+          #    só a subpasta do RID alvo; remove o RID do outro SO.
+          for flavor in noavx openvino cuda cuda12 vulkan; do
+            if [ -d "$pub/runtimes/$flavor" ]; then
+              find "$pub/runtimes/$flavor" -mindepth 1 -maxdepth 1 -type d ! -name "$rid" -exec rm -rf {} +
+            fi
+          done
+
+          # 3. Remove macOS-only e pastas de RID estrangeiro no topo (linux-*, macos-*,
+          #    win-arm64, win-x86 — qualquer top-level que não seja o RID alvo e não seja
+          #    um flavor).
+          rm -rf "$pub/runtimes/coreml"
           for d in "$pub/runtimes"/*/ ; do
             name="$(basename "$d")"
             case "$name" in
-              cuda|cuda12|vulkan)
-                # dentro de cada flavor de GPU, remove os RIDs que não são o atual
-                find "$d" -maxdepth 1 -type d ! -name "$rid" -exec rm -rf {} + 2>/dev/null || true
-                ;;
-              linux|win|win-*)
-                # remove pastas de SO diferente do RID alvo
-                [ "${name%%-*}" != "${rid%%-*}" ] && rm -rf "$d" 2>/dev/null || true
-                ;;
-              osx|macos|coreml)
-                rm -rf "$d" 2>/dev/null || true
+              noavx|openvino|cuda|cuda12|vulkan) ;;   # flavors já tratados acima
+              *)
+                if [ "$name" != "$rid" ]; then rm -rf "$d"; fi
                 ;;
             esac
           done
 
-          # Peso morto: símbolos de debug, docs XML e o backend Metal (macOS-only) do whisper.
+          # 4. Peso morto: símbolos de debug, docs XML e o backend Metal (macOS-only).
           find "$pub" -type f \( -name '*.pdb' -o -name '*.xml' -o -name 'ggml-metal.metal' \) -delete 2>/dev/null || true
 
-          # wwwroot já está EMBUTIDO no exe (ManifestEmbeddedFileProvider); a pasta solta
-          # que o publish materializa é redundante — removida para não expor HTML/CSS/JS.
+          # 5. wwwroot já está EMBUTIDO no Verso.dll (ManifestEmbeddedFileProvider);
+          #    a pasta solta que o publish materializa é redundante — removida.
           rm -rf "$pub/wwwroot" 2>/dev/null || true
 
           sum=$(du -sb "$pub" 2>/dev/null | awk '{printf "%.1f", $1/1048576}')
