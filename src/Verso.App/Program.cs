@@ -8,6 +8,8 @@ using Microsoft.Extensions.Logging;
 using Verso.Core;
 using Verso.Core.Data;
 using Verso.Core.Engine;
+using Verso.Core.Logging;
+using Whisper.net.Logger;
 
 namespace Verso.App;
 
@@ -26,7 +28,7 @@ public class Program
 #endif
 
         _host = Host.CreateDefaultBuilder(args)
-            .ConfigureLogging(ConfigureDebugLogging)
+            .ConfigureLogging(ConfigureLogging)
             .ConfigureServices(services =>
             {
                 services.Configure<HostOptions>(options =>
@@ -43,6 +45,7 @@ public class Program
                 services.AddVersoAppServices();
             })
             .Build();
+        RouteWhisperNativeLogs(_host.Services);
         _host.Start();
         DbBootstrapper.MigrateAsync(_host.Services).GetAwaiter().GetResult();
 
@@ -66,12 +69,20 @@ public class Program
         }
     }
 
-#if DEBUG
-    private static void ConfigureDebugLogging(ILoggingBuilder logging)
+    // Logging unificado para debug e release: o logger em arquivo (rolling diário em
+    // <appdir>/data/logs) é a única janela persistente do que ocorre por trás —
+    // engine, fila de transcrição, downloads, erros nativos do whisper.cpp. O app é
+    // portátil: logs ao lado do exe, não em %AppData%. O console só é anexado em #if
+    // DEBUG (AttachDebugConsole abre uma janela de console a parte).
+    private static void ConfigureLogging(ILoggingBuilder logging)
     {
         logging.ClearProviders();
+        logging.AddVersoFileLogger();
+        logging.SetMinimumLevel(LogLevel.Information);
+        logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
+        logging.AddFilter("Verso", LogLevel.Information);
+#if DEBUG
         logging.SetMinimumLevel(LogLevel.Debug);
-        logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Information);
         logging.AddFilter("Verso", LogLevel.Debug);
         logging.AddConsole(options =>
         {
@@ -79,8 +90,34 @@ public class Program
             options.LogToStandardErrorThreshold = LogLevel.None;
         });
         Trace.Listeners.Add(new ConsoleTraceListener(useErrorStream: false));
+#endif
     }
 
+    /// <summary>
+    /// Encaminha os logs nativos do whisper.cpp (via whisper.net LogProvider) para o
+    /// logger em arquivo do app. <see cref="LogProvider.AddLogger"/> recebe o nível
+    /// nativo (WhisperLogLevel) e a mensagem; mapeamos para <see cref="LogLevel"/> e
+    /// escrevemos sob a categoria "Whisper.net" para que apareçam no mesmo arquivo.
+    /// </summary>
+    private static void RouteWhisperNativeLogs(IServiceProvider services)
+    {
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        LogProvider.AddLogger((level, message) =>
+        {
+            logger.Log(MapWhisperLevel(level), "Whisper(native): {Message}", message);
+        });
+    }
+
+    private static LogLevel MapWhisperLevel(WhisperLogLevel level) => level switch
+    {
+        WhisperLogLevel.Debug => LogLevel.Debug,
+        WhisperLogLevel.Info => LogLevel.Information,
+        WhisperLogLevel.Warning => LogLevel.Warning,
+        WhisperLogLevel.Error => LogLevel.Error,
+        _ => LogLevel.Information,
+    };
+
+#if DEBUG
     [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool AllocConsole();
 
@@ -91,10 +128,6 @@ public class Program
             Console.OutputEncoding = System.Text.Encoding.UTF8;
             Console.WriteLine("Verso — console de debug");
         }
-    }
-#else
-    private static void ConfigureDebugLogging(ILoggingBuilder logging)
-    {
     }
 #endif
 }

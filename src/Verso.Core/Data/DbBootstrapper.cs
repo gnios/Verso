@@ -5,12 +5,10 @@ namespace Verso.Core.Data;
 
 public static class DbBootstrapper
 {
-    public static string GetDefaultDbPath() =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Verso", "verso.db");
+    public static string GetDefaultDbPath() => VersoPaths.DatabasePath;
 
     /// <summary>
-    /// Registra <see cref="IDbContextFactory{VersoDbContext}"/> no container de DI, apontando
-    /// para <paramref name="dbPath"/> (ou o caminho padrão em %AppData% quando omitido), criando o
+    /// para <paramref name="dbPath"/> (ou o caminho portátil padrão em <c>&lt;appdir&gt;/data</c> quando omitido), criando o
     /// diretório de destino se ainda não existir.
     /// </summary>
     public static IServiceCollection AddVersoDatabase(this IServiceCollection services, string? dbPath = null)

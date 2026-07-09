@@ -319,7 +319,7 @@ public class ResearchPageViewModelTests
         var mediaStorage = provider.GetRequiredService<MediaStorageService>();
         var mediaPath = Path.Combine(directory, "source.wav");
         await File.WriteAllTextAsync(mediaPath, "audio");
-        await mediaStorage.CopyToAppDataAsync(mediaPath, doneId);
+        await mediaStorage.CopyToStorageAsync(mediaPath, doneId);
 
         try
         {

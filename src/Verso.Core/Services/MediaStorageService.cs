@@ -6,13 +6,10 @@ public class MediaStorageService
 
     public MediaStorageService(string? basePath = null)
     {
-        _basePath = basePath ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Verso",
-            "media");
+        _basePath = basePath ?? VersoPaths.MediaDirectory;
     }
 
-    public async Task<string> CopyToAppDataAsync(string sourcePath, Guid transcriptionId)
+    public async Task<string> CopyToStorageAsync(string sourcePath, Guid transcriptionId)
     {
         if (!File.Exists(sourcePath))
         {

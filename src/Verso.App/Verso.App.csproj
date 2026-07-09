@@ -4,6 +4,7 @@
     <TargetFramework>net10.0-windows10.0.17763.0</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
+    <ApplicationIcon>Assets\verso.ico</ApplicationIcon>
     <!-- Workaround documentado pela própria Microsoft para Blazor+WPF (dotnet/maui#5861). -->
     <RootNamespace>Verso.App</RootNamespace>
     <!-- Main custom em Program.cs (Generic Host) — evita conflito com o Main gerado a partir de App.xaml/StartupUri. -->
@@ -33,9 +34,14 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.9" />
+    <PackageReference Include="System.Management" Version="10.0.9" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Verso.Core\Verso.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets\verso.ico" />
+    <Resource Include="Assets\verso-logo.png" />
   </ItemGroup>
 </Project>

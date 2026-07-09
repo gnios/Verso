@@ -220,7 +220,7 @@ public partial class UploadViewModel : ViewModelBase
         try
         {
             var transcriptionId = Guid.NewGuid();
-            var mediaPath = await _mediaStorage.CopyToAppDataAsync(SelectedFilePath, transcriptionId);
+            var mediaPath = await _mediaStorage.CopyToStorageAsync(SelectedFilePath, transcriptionId);
 
             using var scope = _scopeFactory.CreateScope();
             var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
