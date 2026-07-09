@@ -9,7 +9,9 @@
       Photino.Blazor 4.0.13 publica apenas assets net8.0/net9.0; o NuGet faz fallback
       forward-compatible para net10.0 (verificado: restore + build limpos).
     -->
-    <OutputType>Exe</OutputType>
+    <!-- WinExe: subsystem de GUI no Windows (sem janela de console no Release). No Linux
+         e macOS é tratado igual a Exe — não há conceito de janela de console ao abrir. -->
+    <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <RootNamespace>Verso.App</RootNamespace>

@@ -36,3 +36,7 @@ app_pid.csv
 
 # Estado interno do tlc-spec-driven (decisões/specs — não vai ao repo público)
 .specs/
+
+# artefatos de inspecao locais
+tmp-verify/
+tmp-inspect/
