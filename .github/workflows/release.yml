@@ -78,20 +78,19 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=$ver" >> "$GITHUB_OUTPUT"
 
-      - name: Publicar self-contained (DLLs soltas — execução direta, sem re-extração)
+      - name: Publicar self-contained (single-file)
         shell: bash
         run: |
-          # Publicação self-contained com DLLs soltas (NÃO single-file). O single-file
-          # empacota as DLLs gerenciadas no exe e as extrai para %TEMP%/.net/<app> a cada
-          # execução — o usuário enxerga isso como "descompactar de novo". Com DLLs
-          # soltas, clicar no Verso.exe abre o app direto, sem extração. wwwroot segue
-          # embutido no Verso.dll (ManifestEmbeddedFileProvider). Nativos do
-          # Photino/whisper.cpp/CUDA ficam em runtimes/<rid>/ — removemos os não
-          # desejados no step de cleanup (variante CPU/GPU, RIDs estrangeiros).
+          # Single-file empacota as DLLs gerenciadas dentro do Verso.exe (raiz limpa:
+          # só o exe + os nativos). Nativos (Photino/whisper.cpp/CUDA) ficam externos em
+          # runtimes/<rid>/ via IncludeNativeLibrariesForSelfExtract=false, assim ainda dá
+          # pra remover runtimes CUDA/Vulkan indesejados no cleanup sem inchar o exe.
           dotnet publish src/Verso.App/Verso.App.csproj \
             -c Release \
             -r ${{ matrix.rid }} \
             --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=false \
             -p:Version=${{ steps.version.outputs.version }} \
             -o publish/${{ matrix.variant }}
 
@@ -166,25 +165,14 @@ jobs:
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
 
-      - name: Empacotar zip
-        shell: bash
-        run: |
-          ver='${{ steps.version.outputs.version }}'
-          mkdir -p dist
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            zip="Verso-${ver}-${{ matrix.variant }}-${{ matrix.rid }}.zip"
-            7z a -tzip "dist/$zip" "./publish/${{ matrix.variant }}/*" >/dev/null
-          else
-            zip="Verso-${ver}-${{ matrix.variant }}-${{ matrix.rid }}.tar.gz"
-            tar -czf "dist/$zip" -C "publish/${{ matrix.variant }}" .
-          fi
-          echo "Criado dist/$zip"
-
-      - name: Upload artifact
+      - name: Upload artifact (pasta publicada — GitHub zipa uma vez no download)
+        # NÃO pré-zipamos: o actions/upload-artifact já entrega o artifact como um único
+        # zip no download. Pré-zipar gera "zip dentro de zip" (redundante p/ quem inspeciona
+        # via workflow_dispatch). O zip final p/ o Release é montado no job de release.
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: dist/*
+          path: publish/${{ matrix.variant }}
           if-no-files-found: error
           retention-days: 30
 
@@ -206,6 +194,18 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=$ver" >> "$GITHUB_OUTPUT"
 
+      - name: Empacotar cada variante em zip único (asset do Release)
+        shell: bash
+        run: |
+          ver='${{ steps.rel.outputs.version }}'
+          mkdir -p release-assets
+          for d in assets/*/ ; do
+            name="$(basename "$d")"          # ex.: Verso-cpu-win-x64
+            zip="Verso-${ver}-${name}.zip"
+            (cd "$d" && zip -r -q "../../release-assets/$zip" .)
+            echo "Criado release-assets/$zip"
+          done
+
       - name: Criar GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -213,8 +213,7 @@ jobs:
           tag="${{ steps.rel.outputs.tag }}"
           ver="${{ steps.rel.outputs.version }}"
           gh release create "$tag" -R "${{ github.repository }}" \
-            assets/Verso-cpu-win-x64/* assets/Verso-gpu-win-x64/* \
-            assets/Verso-cpu-linux-x64/* assets/Verso-gpu-linux-x64/* \
+            release-assets/*.zip \
             --title "Verso $ver" \
             --notes "Verso $ver — Windows x64 + Linux x64
 
@@ -223,10 +222,10 @@ jobs:
           - **Verso-${ver}-gpu-win-x64.zip** — inclui runtimes CUDA/Vulkan para aceleração por GPU.
 
           ## Linux x64
-          - **Verso-${ver}-cpu-linux-x64.tar.gz** — sem GPU.
-          - **Verso-${ver}-gpu-linux-x64.tar.gz** — inclui runtimes CUDA/Vulkan para aceleração por GPU.
+          - **Verso-${ver}-cpu-linux-x64.zip** — sem GPU.
+          - **Verso-${ver}-gpu-linux-x64.zip** — inclui runtimes CUDA/Vulkan para aceleração por GPU.
 
-          Build self-contained single-file — não requer instalação do .NET runtime. A pasta raiz contém só o executável (e os nativos do Photino/whisper.cpp); as DLLs gerenciadas estão embutidas.
+          Build self-contained single-file — não requer instalação do .NET runtime. A pasta raiz contém só o Verso.exe (e os nativos do Photino/whisper.cpp); as DLLs gerenciadas estão embutidas no exe.
 
           App portátil: modelos, áudios, banco de dados e logs ficam numa pasta \`data/\` ao lado do executável — mover a pasta leva tudo junto.
 
