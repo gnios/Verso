@@ -37,14 +37,25 @@
     <ProjectReference Include="..\Verso.Core\Verso.Core.csproj" />
   </ItemGroup>
 
+  <PropertyGroup>
+    <!-- Gera o manifesto dos recursos embutidos (wwwroot) p/ ManifestEmbeddedFileProvider. -->
+    <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
+  </PropertyGroup>
+
   <ItemGroup>
-    <Content Update="wwwroot\**">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
+    <!-- wwwroot embarcado DENTRO do exe: o ManifestEmbeddedFileProvider (passado em
+         Program.cs) serve o HostPage/HTML/CSS/JS dos recursos embutidos, sem pasta solta
+         no disco. Mantemos o wwwroot como Content (static web assets do framework —
+         blazor.webview.js) e o embutimos também como recurso p/ o file provider. -->
+    <EmbeddedResource Include="wwwroot\**" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="10.0.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- O ícone precisa ficar no disco: SetIconFile lê por caminho (não recurso). -->
     <Content Include="Assets\verso.ico" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="Assets\verso-logo.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

@@ -126,6 +126,10 @@ jobs:
           # Peso morto: símbolos de debug, docs XML e o backend Metal (macOS-only) do whisper.
           find "$pub" -type f \( -name '*.pdb' -o -name '*.xml' -o -name 'ggml-metal.metal' \) -delete 2>/dev/null || true
 
+          # wwwroot já está EMBUTIDO no exe (ManifestEmbeddedFileProvider); a pasta solta
+          # que o publish materializa é redundante — removida para não expor HTML/CSS/JS.
+          rm -rf "$pub/wwwroot" 2>/dev/null || true
+
           sum=$(du -sb "$pub" 2>/dev/null | awk '{printf "%.1f", $1/1048576}')
           echo "Tamanho de publish apos cleanup: ${sum} MB"
 

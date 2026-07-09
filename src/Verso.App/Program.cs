@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging;
 using Photino.Blazor;
 using Verso.App.Components.Layout;
@@ -21,7 +22,10 @@ public class Program
         AttachDebugConsole();
 #endif
 
-        var builder = PhotinoBlazorAppBuilder.CreateDefault(args);
+        // wwwroot servido dos recursos embutidos no exe (ManifestEmbeddedFileProvider),
+        // não de <output>/wwwroot no disco — a release não expõe mais a pasta wwwroot.
+        var wwwrootProvider = new ManifestEmbeddedFileProvider(typeof(Program).Assembly, "wwwroot");
+        var builder = PhotinoBlazorAppBuilder.CreateDefault(wwwrootProvider, args);
 
         builder.Services.AddLogging(ConfigureLogging);
         builder.Services.AddVersoDatabase();
