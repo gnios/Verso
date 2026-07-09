@@ -11,7 +11,7 @@
 @implements IDisposable
 
 <div class="dash-card" @onclick="() => ViewModel.OpenCommand.Execute(null)">
-    <div class="dash-card-title">@ViewModel.Icon @ViewModel.Title</div>
+    <div class="dash-card-title">@ViewModel.StatusIcon@(string.IsNullOrEmpty(ViewModel.StatusIcon) ? "" : " ")@ViewModel.Icon @ViewModel.Title</div>
     <div class="dash-card-preview">@ViewModel.Preview</div>
     <div class="tags-row">
         @foreach (var tag in ViewModel.Tags)
@@ -47,6 +47,10 @@
                 <div class="dash-card-progress-fill @(ViewModel.IsProgressIndeterminate ? "indeterminate" : "")" style="@(ViewModel.IsProgressIndeterminate ? "" : $"width:{ViewModel.ProgressWidth}%")"></div>
             </div>
             <div class="dash-card-progress-label">@ViewModel.ProgressLabel</div>
+            @if (!string.IsNullOrEmpty(ViewModel.EstimatedTimeLabel))
+            {
+                <div class="dash-card-estimate">@ViewModel.EstimatedTimeLabel</div>
+            }
         </div>
     }
     @if (ViewModel.IsError && !string.IsNullOrWhiteSpace(ViewModel.ErrorMessage))

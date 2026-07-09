@@ -6,14 +6,14 @@ public enum LibraryStatusFilter
 {
     All,
     Progress,
-    Done
+    Done,
+    Error
 }
 
 public sealed record LibraryFilter(
     LibraryStatusFilter Status = LibraryStatusFilter.All,
     int? TagId = null,
     bool UnassignedOnly = false);
-
 public sealed record TranscriptionSummary(
     Guid Id,
     string Title,
@@ -23,6 +23,8 @@ public sealed record TranscriptionSummary(
     DateTime Date,
     double DurationSeconds,
     int SpeakersCount,
+    ModelQuality Quality,
+    ExecutionDevice Device,
     IReadOnlyList<string> Tags,
     string Preview);
 

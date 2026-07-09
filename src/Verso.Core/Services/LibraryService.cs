@@ -62,13 +62,14 @@ public class LibraryService(IDbContextFactory<VersoDbContext> dbContextFactory)
         string mediaFilePath,
         string language,
         ModelQuality quality,
+        ExecutionDevice device,
         SpeakerMode speakerMode,
         int? researchPageId,
+        double durationSeconds,
         string? icon = null,
         IEnumerable<string>? tagNames = null)
     {
         await using var context = await dbContextFactory.CreateDbContextAsync();
-
         var transcription = new Transcription
         {
             Id = id,
@@ -78,8 +79,10 @@ public class LibraryService(IDbContextFactory<VersoDbContext> dbContextFactory)
             MediaFilePath = mediaFilePath,
             Language = language,
             Quality = quality,
+            Device = device,
             SpeakerMode = speakerMode,
             ResearchPageId = researchPageId,
+            DurationSeconds = durationSeconds,
             CreatedAt = DateTime.UtcNow,
         };
 
@@ -345,6 +348,7 @@ public class LibraryService(IDbContextFactory<VersoDbContext> dbContextFactory)
         {
             LibraryStatusFilter.Progress => query.Where(t => t.Status == TranscriptionStatus.InProgress),
             LibraryStatusFilter.Done => query.Where(t => t.Status == TranscriptionStatus.Done),
+            LibraryStatusFilter.Error => query.Where(t => t.Status == TranscriptionStatus.Error),
             _ => query
         };
 
@@ -375,6 +379,8 @@ public class LibraryService(IDbContextFactory<VersoDbContext> dbContextFactory)
                 t.CreatedAt,
                 t.DurationSeconds,
                 t.Speakers.Count,
+                t.Quality,
+                t.Device,
                 t.Tags.Select(tag => tag.Name).ToList(),
                 t.Segments
                     .OrderBy(s => s.SortOrder)

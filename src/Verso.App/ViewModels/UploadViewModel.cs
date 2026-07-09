@@ -228,6 +228,8 @@ public partial class UploadViewModel : ViewModelBase
             var settings = await settingsService.GetAsync();
             // Segurança extra: o modelo pt-BR Turbo é fine-tuned só para pt — nunca envia outro idioma ao engine.
             var language = Quality == ModelQuality.PtBrTurbo ? "pt" : Language;
+            var audioLoader = _services.GetRequiredService<Verso.Core.Engine.AudioLoader>();
+            var durationSeconds = audioLoader.GetDuration(mediaPath);
 
             await libraryService.CreateForUploadAsync(
                 transcriptionId,
@@ -235,8 +237,10 @@ public partial class UploadViewModel : ViewModelBase
                 mediaPath,
                 language,
                 Quality,
+                settings.Device,
                 SpeakerMode,
                 SelectedResearch?.Id,
+                durationSeconds,
                 IconPicker.SelectedIcon,
                 ParseTags(TagsText));
 

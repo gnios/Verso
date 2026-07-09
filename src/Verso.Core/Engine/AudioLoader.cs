@@ -97,4 +97,48 @@ public sealed class AudioLoader
 
         return samples;
     }
+
+    /// <summary>
+    /// Lê apenas a duração do áudio (em segundos) usando ffprobe, sem carregar o áudio inteiro.
+    /// Rápido — lê só o header do arquivo.
+    /// </summary>
+    public double GetDuration(string inputPath)
+    {
+        try
+        {
+            var ffprobe = _ffmpegLocator.EnsureFfmpeg();
+            var ffprobeDir = Path.GetDirectoryName(ffprobe);
+            var ffprobePath = Path.Combine(ffprobeDir!, "ffprobe.exe");
+            if (!File.Exists(ffprobePath))
+                ffprobePath = Path.Combine(ffprobeDir!, "ffprobe");
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = ffprobePath,
+                Arguments = $"-v error -show_entries format=duration -of csv=p=0 \"{inputPath}\"",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+
+            using var process = Process.Start(psi);
+            if (process is null) return 0;
+
+            var output = process.StandardOutput.ReadToEnd().Trim();
+            process.WaitForExit();
+
+            if (process.ExitCode == 0 &&
+                double.TryParse(output, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var duration))
+            {
+                return duration;
+            }
+        }
+        catch
+        {
+            // ffprobe não disponível ou arquivo inválido — retorna 0 (desconhecido)
+        }
+
+        return 0;
+    }
 }

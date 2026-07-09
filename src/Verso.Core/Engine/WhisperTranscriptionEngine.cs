@@ -82,7 +82,7 @@ public sealed class WhisperTranscriptionEngine : IDisposable
             request.Device,
             request.Quality,
             request.Language);
-        _logger?.LogDebug(
+        _logger?.LogInformation(
             "Runtime Whisper (preferência): {RuntimeOrder}",
             string.Join(" → ", WhisperRuntimeConfigurator.ResolveRuntimeOrder(request.Device)));
 
@@ -115,7 +115,7 @@ public sealed class WhisperTranscriptionEngine : IDisposable
 
         progress?.Report(new EngineProgress("preparing"));
         var silenceChunks = SilenceSplitter.SplitBySilence(samples);
-        var (maxPartes, _, threadsPorJob) = ChunkPlanner.CalculateParallelLimits(request.Device);
+        var (maxPartes, paralelismo, threadsPorJob) = ChunkPlanner.CalculateParallelLimits(request.Device);
         var partes = ChunkPlanner.GroupParts(silenceChunks, maxPartes);
 
         LoadModelFactory(modelPath);
@@ -136,61 +136,99 @@ public sealed class WhisperTranscriptionEngine : IDisposable
         {
             progress?.Report(new EngineProgress("transcribing", 0, partes.Count));
 
-            // Paralelismo é sempre 1 (ver comentário em ChunkPlanner.CalculateParallelLimits):
-            // o whisper.net/whisper.cpp não garante segurança para decodificação nativa
-            // concorrente a partir do mesmo contexto/modelo (sandrohanea/whisper.net#341).
-            // As partes são processadas uma de cada vez, em ordem, usando todos os núcleos
-            // disponíveis dentro de cada chamada individual.
-            //
-            // Cancelamento: apenas entre chunks (ThrowIfCancellationRequested no início de
-            // cada iteração). O CancellationToken NÃO é repassado para processor.ProcessAsync
-            // — rasgar o enumerável nativo no meio de whisper_full_with_state deixa estado
-            // nativo inconsistente e corrompe a heap (ver comentário em
-            // WhisperProcessorAdapter.ProcessAsync).
-            var segmentos = new List<TranscriptionSegmentResult>();
-            for (var index = 0; index < partes.Count; index++)
+            // Cancelamento: apenas entre partes (ThrowIfCancellationRequested no início
+            // de cada iteração). O CancellationToken NÃO é repassado para
+            // processor.ProcessAsync — rasgar o enumerável nativo no meio de
+            // whisper_full_with_state deixa estado nativo inconsistente e corrompe a
+            // heap (ver comentário em WhisperProcessorAdapter.ProcessAsync).
+            List<TranscriptionSegmentResult> ordered;
+
+            if (paralelismo <= 1)
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                // Caminho sequencial (compatível com código existente): reusa o
+                // WhisperFactory cacheado, seguro porque só um processor existe por vez.
+                var segmentos = new List<TranscriptionSegmentResult>();
+                for (var index = 0; index < partes.Count; index++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
 
-        var parte = partes[index];
-        progress?.Report(new EngineProgress("transcribing", index + 1, partes.Count));
+                    var parte = partes[index];
+                    _logger?.LogInformation(
+                        "Parte {ParteIndex}/{ParteTotal} da transcrição {TranscriptionId}",
+                        index + 1,
+                        partes.Count,
+                        request.TranscriptionId);
 
-        // try/finally explícito por chunk garante DisposeAsync mesmo se ProcessAsync
-        // lançar — não dependemos do scope do `await using`, que pode sobrepor o
-        // dispose de um chunk com o create do próximo. O dump mostrou 2
-        // WhisperProcessor vivos simultaneamente, o que sugere overlap de
-        // lifecycle entre iterações adjacentes.
-        var processor = _processorFactory.CreateProcessor(
-            modelPath,
-            request.Language,
-            threadsPorJob);
-        try
-        {
-            await foreach (var result in processor.ProcessAsync(parte.Samples, CancellationToken.None))
+                    // try/finally explícito por chunk garante DisposeAsync mesmo se
+                    // ProcessAsync lançar — não dependemos do scope do `await using`,
+                    // que pode sobrepor o dispose de um chunk com o create do próximo.
+                    var processor = _processorFactory.CreateProcessor(
+                        modelPath,
+                        request.Language,
+                        threadsPorJob);
+                    try
+                    {
+                        await foreach (var result in processor.ProcessAsync(parte.Samples, CancellationToken.None))
+                        {
+                            // Mapeia os timestamps do whisper (segundos dentro da parte
+                            // concatenada, onde o silêncio entre trechos foi removido)
+                            // de volta para o tempo real do áudio original usando os
+                            // ChunkSpan. Sem isso, segmentos após o primeiro trecho de
+                            // uma parte ficam adiantados pelo silêncio acumulado removido.
+                            var realStart = ChunkPlanner.MapToRealTime(result.Start.TotalSeconds, parte.Chunks);
+                            var realEnd = ChunkPlanner.MapToRealTime(result.End.TotalSeconds, parte.Chunks);
+                            segmentos.Add(new TranscriptionSegmentResult(
+                                realStart,
+                                realEnd,
+                                result.Text.Trim()));
+                        }
+                    }
+                    finally
+                    {
+                        await processor.DisposeAsync();
+                    }
+
+                    progress?.Report(new EngineProgress("transcribing", index + 1, partes.Count));
+                }
+
+                ordered = segmentos
+                    .OrderBy(s => s.StartSeconds)
+                    .ToList();
+            }
+            else
             {
-                // Mapeia os timestamps do whisper (segundos dentro da parte concatenada,
-                // onde o silêncio entre trechos foi removido) de volta para o tempo real
-                // do áudio original usando os ChunkSpan. Sem isso, segmentos após o
-                // primeiro trecho de uma parte ficam adiantados pelo silêncio acumulado
-                // removido, dessincronizando progressivamente do áudio (sintoma: começa
-                // certo, no fim totalmente fora).
-                var realStart = ChunkPlanner.MapToRealTime(result.Start.TotalSeconds, parte.Chunks);
-                var realEnd = ChunkPlanner.MapToRealTime(result.End.TotalSeconds, parte.Chunks);
-                segmentos.Add(new TranscriptionSegmentResult(
-                    realStart,
-                    realEnd,
-                    result.Text.Trim()));
-            }
-        }
-        finally
-        {
-            await processor.DisposeAsync();
-        }
-            }
+                // Caminho paralelo: cada parte decodifica em seu próprio
+                // WhisperFactory + WhisperProcessor (contexto nativo independente).
+                // whisper.net/whisper.cpp não é thread-safe para decodificação
+                // concorrente no MESMO factory, mas factories separados são seguros
+                // porque cada um carrega o modelo em memória nativa própria.
+                // Trade-off: N instâncias do modelo em GPU (~1.5GB cada p/ LargeV3Turbo).
+                _logger?.LogInformation(
+                    "Processamento paralelo de {PartCount} partes (concorrência={Paralelismo})",
+                    partes.Count,
+                    paralelismo);
 
-            var ordered = segmentos
-                .OrderBy(s => s.StartSeconds)
-                .ToList();
+                var results = new List<TranscriptionSegmentResult>[partes.Count];
+                var semaphore = new SemaphoreSlim(paralelismo);
+                var tasks = new Task[partes.Count];
+
+                for (var index = 0; index < partes.Count; index++)
+                {
+                    var idx = index; // captura de loop
+                    tasks[idx] = ProcessPartParallelAsync(
+                        partes[idx], idx, partes.Count, modelPath,
+                        request.Language, threadsPorJob,
+                        progress, semaphore, cancellationToken,
+                        results);
+                }
+
+                await Task.WhenAll(tasks);
+
+                ordered = results
+                    .SelectMany(r => r)
+                    .OrderBy(s => s.StartSeconds)
+                    .ToList();
+            }
 
             progress?.Report(new EngineProgress("done", partes.Count, partes.Count));
 
@@ -209,6 +247,57 @@ public sealed class WhisperTranscriptionEngine : IDisposable
             // desta transcrição. Sem isto, a mesma fábrica acumularia centenas de ciclos
             // de create/dispose de processor entre jobs, gatilho da corrupção de heap.
             _factoryCache.Invalidate(modelPath);
+        }
+    }
+
+    /// <summary>
+    /// Processa uma parte em paralelo, com seu próprio WhisperFactory + processor.
+    /// O semaphore limita o número de tasks concorrentes (uma por slot de GPU).
+    /// </summary>
+    private async Task ProcessPartParallelAsync(
+        WhisperPart part,
+        int index,
+        int totalParts,
+        string modelPath,
+        string language,
+        int threads,
+        IProgress<EngineProgress>? progress,
+        SemaphoreSlim semaphore,
+        CancellationToken cancellationToken,
+        List<TranscriptionSegmentResult>[] results)
+    {
+        await semaphore.WaitAsync(cancellationToken);
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _logger?.LogInformation(
+                "Parte {ParteIndex}/{ParteTotal} da transcrição (paralelo)",
+                index + 1,
+                totalParts);
+
+            // Cada parte cria seu próprio WhisperFactory + WhisperProcessor.
+            // O adapter OwnWhisperProcessorAdapter é dono do factory — disposa ambos.
+            await using var processor = _processorFactory.CreateOwnProcessor(
+                modelPath, language, threads);
+
+            var segmentos = new List<TranscriptionSegmentResult>();
+            await foreach (var result in processor.ProcessAsync(part.Samples, CancellationToken.None))
+            {
+                var realStart = ChunkPlanner.MapToRealTime(result.Start.TotalSeconds, part.Chunks);
+                var realEnd = ChunkPlanner.MapToRealTime(result.End.TotalSeconds, part.Chunks);
+                segmentos.Add(new TranscriptionSegmentResult(
+                    realStart,
+                    realEnd,
+                    result.Text.Trim()));
+            }
+
+
+            progress?.Report(new EngineProgress("transcribing", index + 1, totalParts));
+            results[index] = segmentos;
+        }
+        finally
+        {
+            semaphore.Release();
         }
     }
 

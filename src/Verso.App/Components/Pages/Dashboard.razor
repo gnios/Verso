@@ -21,6 +21,7 @@
         <button class="dash-filter @(ViewModel.IsAllFilterActive ? "active" : "")" @onclick="() => ViewModel.SetAllFilterCommand.Execute(null)">Todas</button>
         <button class="dash-filter @(ViewModel.IsProgressFilterActive ? "active" : "")" @onclick="() => ViewModel.SetProgressFilterCommand.Execute(null)">Em andamento</button>
         <button class="dash-filter @(ViewModel.IsDoneFilterActive ? "active" : "")" @onclick="() => ViewModel.SetDoneFilterCommand.Execute(null)">Concluídas</button>
+        <button class="dash-filter @(ViewModel.IsErrorFilterActive ? "active" : "")" @onclick="() => ViewModel.SetErrorFilterCommand.Execute(null)">Com erro</button>
         <input class="dash-search" type="text" placeholder="Buscar por título ou conteúdo…" value="@ViewModel.SearchText" @oninput="OnSearchInput" />
     </div>
     @if (ViewModel.IsEmpty)

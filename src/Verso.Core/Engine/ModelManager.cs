@@ -305,11 +305,17 @@ public sealed class ModelManager
 
         {
 
-            _logger?.LogDebug("Modelo já disponível em {ModelPath} ({SizeBytes} bytes)", modelPath, new FileInfo(modelPath).Length);
+            _logger?.LogInformation("Modelo já disponível em {ModelPath} ({SizeBytes} bytes)", modelPath, new FileInfo(modelPath).Length);
 
             return;
 
         }
+
+        _logger?.LogInformation(
+            "Modelo não encontrado em {ModelPath} — baixando {GgmlType} (~{MinSizeMb} MB)",
+            modelPath,
+            ggmlType,
+            GetMinimumModelSizeBytes(ggmlType) / 1_000_000);
 
 
 
@@ -504,9 +510,14 @@ public sealed class ModelManager
 
         if (IsModelFileValid(modelPath, quality))
         {
-            _logger?.LogDebug("Modelo pt-BR já disponível em {ModelPath} ({SizeBytes} bytes)", modelPath, new FileInfo(modelPath).Length);
+            _logger?.LogInformation("Modelo pt-BR já disponível em {ModelPath} ({SizeBytes} bytes)", modelPath, new FileInfo(modelPath).Length);
             return;
         }
+
+        _logger?.LogInformation(
+            "Modelo pt-BR não encontrado em {ModelPath} — baixando de {Url}",
+            modelPath,
+            PtBrTurboUrl);
 
         var downloadLock = DownloadLocks.GetOrAdd(modelPath, _ => new SemaphoreSlim(1, 1));
         await downloadLock.WaitAsync(cancellationToken);
