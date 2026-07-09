@@ -1,20 +1,24 @@
 name: release
 
-# Pipeline de distribuição Windows do Verso (app WPF + Blazor Hybrid, net10.0-windows).
-# O app é Windows-only (WPF/WebView2 não rodam em Linux), então o runner é windows-latest.
-#
-# Publica DUAS variantes por release (matrix cpu|gpu), ambas single-file (DLLs gerenciadas
-# embutidas no Verso.App.exe — raiz limpa, só o app) e portáteis (dados em <appdir>/data,
-# não em %AppData%):
-#   - cpu: sem runtimes CUDA/Vulkan (~200 MB) — roda em qualquer máquina
-#   - gpu: com runtimes CUDA/Vulkan win-x64 (~960 MB) — aceleração por GPU NVIDIA
-# Ambas removem runtimes Linux/macOS e peso morto (pdb/xml/Metal) antes do zip.
-#
-# Gatilhos:
-#   - push de tag v*.*.*  -> builda as 2 variantes e cria um GitHub Release com os 2 zips
-#   - workflow_dispatch    -> builda e publica artifacts (sem Release), útil para validação
+## Pipeline de distribuição Windows do Verso (app WPF + Blazor Hybrid, net10.0-windows).
+## O app é Windows-only (WPF/WebView2 não rodam em Linux), então o runner é windows-latest.
+##
+## Publica DUAS variantes por release (matrix cpu|gpu), ambas single-file (DLLs gerenciadas
+## embutidas no Verso.App.exe — raiz limpa, só o app) e portáteis (dados em <appdir>/data,
+## não em %AppData%):
+##   - cpu: sem runtimes CUDA/Vulkan (~200 MB) — roda em qualquer máquina
+##   - gpu: com runtimes CUDA/Vulkan win-x64 (~960 MB) — aceleração por GPU NVIDIA
+## Ambas removem runtimes Linux/macOS e peso morto (pdb/xml/Metal) antes do zip.
+##
+## Gatilhos:
+##   - push para main           -> calcula próxima versão (incrementa patch da última tag),
+##                                 builda as 2 variantes, cria a tag, gera GitHub Release
+##   - push de tag v*.*.*       -> builda as 2 variantes e cria GitHub Release com os 2 zips
+##   - workflow_dispatch        -> builda e publica artifacts (sem Release), útil para validação
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*.*.*'
   workflow_dispatch:
@@ -44,10 +48,23 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          # Tag v*.*.* -> version SEM o 'v' (NuGet rejeita 'v0.1.0'); short SHA no dispatch.
+          # Tag v*.*.* -> version SEM o 'v' (NuGet rejeita 'v0.1.0');
+          # Push para main -> auto-incrementa patch da última tag;
+          # Dispatch -> dev version com short SHA.
           if ($env:GITHUB_REF -match 'refs/tags/(v.*)') {
             $tag = $Matches[1]          # v0.1.0
             $ver = $tag.Substring(1)    # 0.1.0
+          } elseif ($env:GITHUB_REF -eq 'refs/heads/main') {
+            $latest = git tag --list 'v*.*.*' --sort=-v:refname | Select-Object -First 1
+            if (-not $latest) {
+              $ver = '0.1.0'
+            } else {
+              $lastVer = $latest.Substring(1)
+              $parts = $lastVer.Split('.')
+              $patch = [int]$parts[2] + 1
+              $ver = "$($parts[0]).$($parts[1]).$patch"
+            }
+            $tag = "v$ver"
           } else {
             $tag = ''
             $ver = "0.0.0-dev+$($env:GITHUB_SHA.Substring(0,7))"
@@ -137,22 +154,52 @@ jobs:
 
   release:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - name: Baixar artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
         with:
-          path: assets
+          fetch-depth: 0
 
       - name: Determinar versão/tag
         id: rel
         shell: bash
         run: |
-          tag="${GITHUB_REF#refs/tags/}"
-          ver="${tag#v}"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            # Push de tag: extrair direto
+            tag="${GITHUB_REF#refs/tags/}"
+            ver="${tag#v}"
+            echo "new_tag=false" >> "$GITHUB_OUTPUT"
+          else
+            # Push para main: auto-incrementar patch da última tag
+            latest=$(git tag --list 'v*.*.*' --sort=-v:refname | head -1)
+            if [ -z "$latest" ]; then
+              ver="0.1.0"
+            else
+              lastVer="${latest#v}"
+              IFS='.' read -r -a parts <<< "$lastVer"
+              ver="${parts[0]}.${parts[1]}.$((parts[2] + 1))"
+            fi
+            tag="v${ver}"
+            echo "new_tag=true" >> "$GITHUB_OUTPUT"
+          fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=$ver" >> "$GITHUB_OUTPUT"
+
+      - name: Criar tag (push para main)
+        if: steps.rel.outputs.new_tag == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.rel.outputs.tag }}"
+          git push origin "${{ steps.rel.outputs.tag }}"
+
+      - name: Baixar artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: assets
 
       - name: Criar GitHub Release
         env:
