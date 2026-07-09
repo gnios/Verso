@@ -110,6 +110,7 @@ input,select,textarea{font-family:inherit;color:inherit}
 .dash-card-progress-label{font-size:11px;color:var(--muted);margin-top:6px}
 .research-section{margin-bottom:28px}
 .research-section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.dash-card-estimate{font-size:11px;color:var(--accent);font-weight:600;margin-top:2px}
 .research-section-head h3{font-size:14px;font-weight:600;color:var(--fg);text-transform:uppercase;letter-spacing:.04em}
 .research-add-btn{padding:4px 10px;font-size:12px;font-weight:500;border-radius:var(--radius);display:flex;align-items:center;gap:4px;color:var(--accent);transition:background .15s}
 .research-add-btn:hover{background:var(--accent-light)}

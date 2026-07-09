@@ -46,8 +46,8 @@ public class Program
             })
             .Build();
         RouteWhisperNativeLogs(_host.Services);
-        _host.Start();
         DbBootstrapper.MigrateAsync(_host.Services).GetAwaiter().GetResult();
+        _host.Start();
 
         try
         {
@@ -81,12 +81,12 @@ public class Program
         logging.SetMinimumLevel(LogLevel.Information);
         logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
         logging.AddFilter("Verso", LogLevel.Information);
+        logging.AddFilter("Whisper.net", LogLevel.Warning);
+        logging.AddFilter("Microsoft.Hosting.Lifetime", LogLevel.Warning);
+        logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
 #if DEBUG
-        logging.SetMinimumLevel(LogLevel.Debug);
-        logging.AddFilter("Verso", LogLevel.Debug);
         logging.AddConsole(options =>
         {
-            // Erros iam para stderr; logs do EF Core iam para stdout — unifica no stdout.
             options.LogToStandardErrorThreshold = LogLevel.None;
         });
         Trace.Listeners.Add(new ConsoleTraceListener(useErrorStream: false));
@@ -111,10 +111,10 @@ public class Program
     private static LogLevel MapWhisperLevel(WhisperLogLevel level) => level switch
     {
         WhisperLogLevel.Debug => LogLevel.Debug,
-        WhisperLogLevel.Info => LogLevel.Information,
+        WhisperLogLevel.Info => LogLevel.Debug,
         WhisperLogLevel.Warning => LogLevel.Warning,
         WhisperLogLevel.Error => LogLevel.Error,
-        _ => LogLevel.Information,
+        _ => LogLevel.Debug,
     };
 
 #if DEBUG

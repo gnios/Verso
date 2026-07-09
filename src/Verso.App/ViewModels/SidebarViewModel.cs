@@ -30,6 +30,9 @@ public partial class SidebarViewModel : ViewModelBase
     private int _doneCount;
 
     [ObservableProperty]
+    private int _errorCount;
+
+    [ObservableProperty]
     private int _unassignedCount;
 
     [ObservableProperty]
@@ -85,6 +88,8 @@ public partial class SidebarViewModel : ViewModelBase
             new LibraryFilter(LibraryStatusFilter.Progress));
         DoneCount = await libraryService.GetCountAsync(
             new LibraryFilter(LibraryStatusFilter.Done));
+        ErrorCount = await libraryService.GetCountAsync(
+            new LibraryFilter(LibraryStatusFilter.Error));
         UnassignedCount = await libraryService.GetCountAsync(
             new LibraryFilter(UnassignedOnly: true));
     }
@@ -112,6 +117,12 @@ public partial class SidebarViewModel : ViewModelBase
         _navigation.NavigateTo(
             ScreenKey.Dashboard,
             new NavigationParameter(StatusFilter: LibraryStatusFilter.Done));
+
+    [RelayCommand]
+    private void NavigateError() =>
+        _navigation.NavigateTo(
+            ScreenKey.Dashboard,
+            new NavigationParameter(StatusFilter: LibraryStatusFilter.Error));
 
     [RelayCommand]
     private void NavigateUnassigned() =>

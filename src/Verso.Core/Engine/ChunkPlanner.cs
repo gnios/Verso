@@ -17,23 +17,24 @@ public sealed record WhisperPart(float[] Samples, IReadOnlyList<ChunkSpan> Chunk
 
 public static class ChunkPlanner
 {
-    // O whisper.net (e o whisper.cpp por baixo) não é seguro para decodificação nativa
-    // concorrente: chamadas paralelas a whisper_init_state/whisper_full_with_state a
-    // partir do mesmo contexto/modelo podem corromper memória nativa e derrubar o
-    // processo com "Internal CLR error"/access violation em pontos aparentemente
-    // aleatórios, muito depois da transcrição já ter "terminado com sucesso" (ver
-    // sandrohanea/whisper.net#341 — issue em aberto, reproduzida até na CI oficial da
-    // lib rodando só em CPU, sem GPU envolvido). Uma tentativa anterior de mitigação
-    // (serializar apenas o primeiro MoveNextAsync de cada worker) não foi sufficiente
-    // na prática. Por isso as partes são sempre decodificadas em série (Paralelismo
-    // = 1); cada decodificação individual usa todos os núcleos disponíveis (o próprio
-    // whisper.cpp paraleliza internamente por thread dentro de uma única chamada),
-    // que é o modo de uso suportado e testado pela biblioteca.
+    // O whisper.net/whisper.cpp não é seguro para decodificação nativa concorrente a
+    // partir do MESMO contexto/modelo (sandrohanea/whisper.net#341). Para paralelismo
+    // usamos contextos independentes (WhisperFactory separado por parte), onde cada
+    // factory carrega o modelo em memória própria. O grau de paralelismo é limitado
+    // pela memória disponível (~1.5GB por instância do LargeV3Turbo).
+    // CPU: não há ganho (whisper.cpp já satura todos os núcleos), mantém 1.
+    // GPU: usando contextos independentes com fábricas próprias, 2 é seguro para
+    // GPUs com ≥4GB.
     public static (int MaxPartes, int Paralelismo, int ThreadsPorJob) CalculateParallelLimits(ExecutionDevice device)
     {
         var threads = Environment.ProcessorCount;
         var maxPartes = Math.Clamp(threads, 4, 8);
-        return (maxPartes, 1, threads);
+        var paralelismo = device switch
+        {
+            ExecutionDevice.Cpu => 1,
+            _ => Math.Min(2, maxPartes), // GPU: 2 instâncias paralelas do modelo
+        };
+        return (maxPartes, paralelismo, threads);
     }
 
     // Agrupa trechos (já sem silêncio) em até maxPartes partes, concatenando os samples

@@ -12,6 +12,14 @@ public interface IWhisperProcessor : IAsyncDisposable
 public interface IWhisperProcessorFactory
 {
     IWhisperProcessor CreateProcessor(string modelPath, string language, int threads);
+    /// <summary>
+    /// Cria um processador com seu próprio WhisperFactory (não compartilhado).
+    /// Necessário para processamento paralelo de partes: cada task precisa de um
+    /// contexto nativo independente, pois whisper.net/whisper.cpp não é thread-safe
+    /// para decodificação concorrente no mesmo factory (sandrohanea/whisper.net#341).
+    /// O processor é dono do factory — ao ser disposto, ambos são liberados.
+    /// </summary>
+    IWhisperProcessor CreateOwnProcessor(string modelPath, string language, int threads);
 }
 
 public sealed class WhisperProcessorFactory(IWhisperFactoryCache factoryCache) : IWhisperProcessorFactory
@@ -27,6 +35,23 @@ public sealed class WhisperProcessorFactory(IWhisperFactoryCache factoryCache) :
             .Build();
 
         return new WhisperProcessorAdapter(processor);
+    }
+
+    public IWhisperProcessor CreateOwnProcessor(string modelPath, string language, int threads)
+    {
+        // Cada processor tem seu próprio WhisperFactory (não cacheado, não compartilhado).
+        // O adapter OwnWhisperProcessorAdapter é dono do factory: ao dispor o processor,
+        // o factory também é disposto. Isso garante que contextos nativos paralelos não
+        // compartilhem estado — whisper.net/whisper.cpp corrompe a heap se dois
+        // processors do mesmo factory decodificarem concorrentemente.
+        var factory = WhisperFactory.FromPath(modelPath);
+        var processor = factory.CreateBuilder()
+            .WithLanguage(language)
+            .WithNoContext()
+            .WithGreedySamplingStrategy()
+            .WithThreads(threads)
+            .Build();
+        return new OwnWhisperProcessorAdapter(factory, processor);
     }
 
     private sealed class WhisperProcessorAdapter(WhisperProcessor processor) : IWhisperProcessor
@@ -51,6 +76,30 @@ public sealed class WhisperProcessorFactory(IWhisperFactoryCache factoryCache) :
             // ponto onde vazamentos/corrupção se manifestam quando o ciclo create/dispose
             // de processors se repete muito; sem ele, cada processor gerencia a própria
             // memória de tokens isoladamente.
+            await foreach (var result in processor.ProcessAsync(samples, CancellationToken.None))
+            {
+                yield return new WhisperSegmentResult(result.Start, result.End, result.Text);
+                processor.Return(result);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Wrapper que é dono tanto do WhisperFactory quanto do WhisperProcessor.
+    /// Usado no caminho paralelo (CreateOwnProcessor): ambos são dispostos juntos.
+    /// </summary>
+    private sealed class OwnWhisperProcessorAdapter(WhisperFactory factory, WhisperProcessor processor) : IWhisperProcessor
+    {
+        public async ValueTask DisposeAsync()
+        {
+            processor.Dispose();
+            factory.Dispose();
+        }
+
+        public async IAsyncEnumerable<WhisperSegmentResult> ProcessAsync(
+            float[] samples,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
             await foreach (var result in processor.ProcessAsync(samples, CancellationToken.None))
             {
                 yield return new WhisperSegmentResult(result.Start, result.End, result.Text);

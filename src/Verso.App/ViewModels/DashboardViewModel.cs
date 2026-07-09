@@ -39,6 +39,7 @@ public partial class DashboardViewModel : ViewModelBase
     public bool IsAllFilterActive => ActiveStatusFilter == LibraryStatusFilter.All;
     public bool IsProgressFilterActive => ActiveStatusFilter == LibraryStatusFilter.Progress;
     public bool IsDoneFilterActive => ActiveStatusFilter == LibraryStatusFilter.Done;
+    public bool IsErrorFilterActive => ActiveStatusFilter == LibraryStatusFilter.Error;
     public bool IsUnassignedFilterActive => UnassignedOnly;
 
     public DashboardViewModel(
@@ -83,9 +84,11 @@ public partial class DashboardViewModel : ViewModelBase
 
     [RelayCommand]
     private void SetProgressFilter() => ActiveStatusFilter = LibraryStatusFilter.Progress;
-
     [RelayCommand]
     private void SetDoneFilter() => ActiveStatusFilter = LibraryStatusFilter.Done;
+
+    [RelayCommand]
+    private void SetErrorFilter() => ActiveStatusFilter = LibraryStatusFilter.Error;
 
     partial void OnUnassignedOnlyChanged(bool value) => _ = LoadAsync();
 

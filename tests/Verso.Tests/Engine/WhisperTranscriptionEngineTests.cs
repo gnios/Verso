@@ -95,6 +95,42 @@ public class WhisperTranscriptionEngineTests : IDisposable
         Assert.Equal(1, cache.LoadCount);
     }
 
+
+    [Fact]
+    public async Task TranscribeAsync_WithMultiplePartsAndGpuDevice_UsesParallelPath()
+    {
+        // Áudio de 5s com silêncio → 3 trechos → 3 partes (maxPartes≥4).
+        // Device=Cuda → paralelismo=2 → caminho paralelo.
+        var wavPath = CreateMultiPartWav();
+        var modelEnsurer = new NoOpModelEnsurer();
+        var factoryCache = new CountingWhisperFactoryCache();
+        var processorFactory = new StubWhisperProcessorFactory(
+        [
+            new WhisperSegmentResult(TimeSpan.Zero, TimeSpan.FromSeconds(0.5), "fala"),
+        ]);
+
+        using var engine = CreateEngine(modelEnsurer, factoryCache, processorFactory);
+
+        var request = new TranscriptionJobRequest(
+            Guid.NewGuid(),
+            wavPath,
+            Language: "pt",
+            Quality: ModelQuality.Standard,
+            Device: ExecutionDevice.Cuda);
+
+        var result = await engine.TranscribeAsync(request, progress: null, CancellationToken.None);
+
+        // 3 partes × 1 segmento cada = 3 segmentos no total
+        Assert.Equal(3, result.Segments.Count);
+        // Segmentos ordenados por tempo
+        for (var i = 1; i < result.Segments.Count; i++)
+            Assert.True(result.Segments[i].StartSeconds >= result.Segments[i - 1].EndSeconds);
+        // Factory cacheado não foi usado pelo caminho paralelo (CreateOwnProcessor bypassa)
+        // mas LoadCount reflete chamadas ao cache (apenas a LoadModelFactory inicial)
+        Assert.Equal(1, factoryCache.LoadCount);
+        Assert.Equal(1, engine.FactoryLoadCount);
+    }
+
     public void Dispose()
     {
         foreach (var path in _tempFiles)
@@ -141,6 +177,35 @@ public class WhisperTranscriptionEngineTests : IDisposable
         for (var i = 0; i < sampleCount; i++)
         {
             var sample = (short)(MathF.Sin(2 * MathF.PI * frequencyHz * i / sampleRate) * short.MaxValue * 0.5f);
+            writer.WriteSample(sample / (float)short.MaxValue);
+        }
+
+        return path;
+    }
+
+    /// <summary>
+    /// Cria WAV de 5s com 3 segmentos de fala intercalados com silêncio (1s fala,
+    /// 1s silêncio × 3). SilenceSplitter produz 3 trechos → 3+ partes → paralelismo
+    /// quando device = GPU.
+    /// </summary>
+    private string CreateMultiPartWav()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"transcriba-multipart-{Guid.NewGuid():N}.wav");
+        _tempFiles.Add(path);
+
+        var sampleRate = AudioLoader.SampleRate;
+        const double totalSeconds = 5.0;
+        var sampleCount = (int)(totalSeconds * sampleRate);
+        var format = new WaveFormat(sampleRate, 16, 1);
+
+        using var writer = new WaveFileWriter(path, format);
+        for (var i = 0; i < sampleCount; i++)
+        {
+            var t = i / (double)sampleRate;
+            // Fala nos intervalos 0-1s, 2-3s, 4-5s; silêncio (0) nos demais
+            var sample = (t % 2 < 1)
+                ? (short)(MathF.Sin(2 * MathF.PI * 440 * i / sampleRate) * short.MaxValue * 0.5f)
+                : (short)0;
             writer.WriteSample(sample / (float)short.MaxValue);
         }
 
@@ -198,6 +263,9 @@ public class WhisperTranscriptionEngineTests : IDisposable
     private sealed class StubWhisperProcessorFactory(IReadOnlyList<WhisperSegmentResult> segments) : IWhisperProcessorFactory
     {
         public IWhisperProcessor CreateProcessor(string modelPath, string language, int threads) =>
+            new StubWhisperProcessor(segments);
+
+        public IWhisperProcessor CreateOwnProcessor(string modelPath, string language, int threads) =>
             new StubWhisperProcessor(segments);
     }
 

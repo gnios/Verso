@@ -81,6 +81,10 @@ public sealed class TranscriptionQueueService : BackgroundService
         if (orphaned.Count == 0)
             return;
 
+        _logger.LogInformation(
+            "Recuperando {Count} transcrição(ões) órfã(s) — status redefinido para Error",
+            orphaned.Count);
+
         foreach (var transcription in orphaned)
         {
             transcription.Status = TranscriptionStatus.Error;
@@ -102,14 +106,26 @@ public sealed class TranscriptionQueueService : BackgroundService
             RaiseStatusChanged(request.TranscriptionId, TranscriptionStatusChanged.InProgress);
             var progress = new Progress<EngineProgress>(e => RaiseProgressChanged(request.TranscriptionId, e.Stage, e.PartIndex, e.TotalParts));
             var stopwatch = Stopwatch.StartNew();
+            _logger.LogInformation(
+                "Transcrevendo {TranscriptionId}: dispositivo={Device}, modelo={Quality}",
+                request.TranscriptionId,
+                request.Device,
+                request.Quality);
             var result = await _engine.TranscribeAsync(request, progress, linkedCts.Token);
             stopwatch.Stop();
+            _logger.LogInformation(
+                "Transcrição {TranscriptionId} concluída em {Seconds:F1}s — persistindo resultados…",
+                request.TranscriptionId,
+                stopwatch.Elapsed.TotalSeconds);
             await PersistSuccessAsync(request, result, stopwatch.Elapsed.TotalSeconds, stoppingToken);
 
             RaiseStatusChanged(request.TranscriptionId, TranscriptionStatusChanged.Done);
         }
         catch (OperationCanceledException) when (linkedCts.IsCancellationRequested && !stoppingToken.IsCancellationRequested)
         {
+            _logger.LogInformation(
+                "Transcrição {TranscriptionId} cancelada pelo usuário",
+                request.TranscriptionId);
             await UpdateStatusAsync(request.TranscriptionId, TranscriptionStatus.Error, "Cancelada", stoppingToken);
             RaiseStatusChanged(request.TranscriptionId, TranscriptionStatusChanged.Error, "Cancelada");
         }
@@ -196,6 +212,13 @@ public sealed class TranscriptionQueueService : BackgroundService
             throw new InvalidOperationException($"Transcrição {request.TranscriptionId} não encontrada.");
 
         await context.SaveChangesAsync(cancellationToken);
+
+        // Atualiza o cache de RTF para refinar estimativas futuras deste modelo+dispositivo
+        if (duration > 0 && processingSeconds > 0)
+        {
+            var actualRtf = processingSeconds / duration;
+            TranscriptionEstimator.RecordRtf(request.Quality, request.Device, actualRtf);
+        }
     }
 
     private async Task UpdateStatusAsync(
@@ -214,7 +237,11 @@ public sealed class TranscriptionQueueService : BackgroundService
                 cancellationToken);
 
         if (updated == 0)
-            throw new InvalidOperationException($"Transcrição {transcriptionId} não encontrada.");
+        {
+            _logger.LogWarning(
+                "Transcrição {TranscriptionId} não encontrada ao atualizar status — pode ter sido excluída.",
+                transcriptionId);
+        }
     }
 
     private void RaiseStatusChanged(

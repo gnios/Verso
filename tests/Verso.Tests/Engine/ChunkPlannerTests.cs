@@ -90,19 +90,29 @@ public class ChunkPlannerTests
         Assert.Equal(6.5, ChunkPlanner.MapToRealTime(2.5, chunks), precision: 6);
     }
 
-    // O whisper.net/whisper.cpp não é seguro para decodificação nativa concorrente
-    // (ver sandrohanea/whisper.net#341); por isso o paralelismo é sempre 1,
-    // independente do dispositivo, e cada decodificação usa todos os núcleos.
-    [Theory]
-    [InlineData(ExecutionDevice.Cpu)]
-    [InlineData(ExecutionDevice.Cuda)]
-    [InlineData(ExecutionDevice.Vulkan)]
-    [InlineData(ExecutionDevice.Auto)]
-    public void CalculateParallelLimits_AlwaysSerializesNativeDecoding(ExecutionDevice device)
+    // CPU: paralelismo é 1 (whisper.cpp já satura todos os núcleos).
+    // GPU: paralelismo é 2 (contextos independentes paralelizáveis).
+    [Fact]
+    public void CalculateParallelLimits_ForCpu_IsSequential()
     {
-        var (_, paralelismo, threadsPorJob) = ChunkPlanner.CalculateParallelLimits(device);
+        var (maxPartes, paralelismo, threadsPorJob) = ChunkPlanner.CalculateParallelLimits(ExecutionDevice.Cpu);
 
         Assert.Equal(1, paralelismo);
         Assert.Equal(Environment.ProcessorCount, threadsPorJob);
+        Assert.InRange(maxPartes, 4, 8);
+    }
+
+    [Theory]
+    [InlineData(ExecutionDevice.Cuda)]
+    [InlineData(ExecutionDevice.Vulkan)]
+    [InlineData(ExecutionDevice.Auto)]
+    public void CalculateParallelLimits_ForGpu_RunsTwoParallelInstances(ExecutionDevice device)
+    {
+        var (maxPartes, paralelismo, threadsPorJob) = ChunkPlanner.CalculateParallelLimits(device);
+
+        // Paralelismo = min(2, maxPartes). Como maxPartes ≥ 4, esperamos 2.
+        Assert.Equal(2, paralelismo);
+        Assert.Equal(Environment.ProcessorCount, threadsPorJob);
+        Assert.InRange(maxPartes, 4, 8);
     }
 }
