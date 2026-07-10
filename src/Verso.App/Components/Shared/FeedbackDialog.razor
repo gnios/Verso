@@ -1,0 +1,243 @@
+@*
+    Diálogo modal para reportar bugs ou sugerir melhorias.
+*@
+@inject FeedbackViewModel ViewModel
+@implements IDisposable
+
+<div class="modal-overlay @(ViewModel.IsOpen ? "open" : "")" @onclick="() => ViewModel.CloseCommand.Execute(null)">
+    <div class="modal" @onclick:stopPropagation="true" style="max-width:520px">
+        <div class="modal-title">Enviar feedback</div>
+
+        <div class="feedback-type" style="display:flex;gap:8px;margin-bottom:16px">
+            <button type="button"
+                    class="feedback-type-btn @(ViewModel.IsBug ? "active" : "")"
+                    @onclick="() => ViewModel.SelectBugCommand.Execute(null)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M15 9l-6 6M9 9l6 6" />
+                </svg>
+                Reportar bug
+            </button>
+            <button type="button"
+                    class="feedback-type-btn @(!ViewModel.IsBug ? "active" : "")"
+                    @onclick="() => ViewModel.SelectFeatureCommand.Execute(null)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
+                    <path d="M12 5v14" />
+                    <path d="M5 12h14" />
+                </svg>
+                Sugerir melhoria
+            </button>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:12px">
+            <div>
+                <label class="field-label">Título</label>
+                <input type="text" class="field-input"
+                       value="@ViewModel.Title"
+                       @oninput="OnTitleInput"
+                       @onkeydown="OnTitleKeyDown"
+                       placeholder="Resumo curto do problema ou sugestão" />
+            </div>
+            <div>
+                <label class="field-label">Descrição</label>
+                <textarea class="field-textarea"
+                          value="@ViewModel.Description"
+                          @oninput="OnDescriptionInput"
+                          placeholder="Descreva detalhadamente o que aconteceu ou o que você gostaria de ver…"
+                          rows="5"></textarea>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(ViewModel.StatusMessage))
+        {
+            <div class="feedback-status @(ViewModel.IsSubmitting ? "info" : ViewModel.IsSuccess ? "success" : "error")">
+                <span>@ViewModel.StatusMessage</span>
+            </div>
+        }
+
+        <div class="modal-actions" style="margin-top:16px">
+            <button type="button" class="modal-cancel" @onclick="() => ViewModel.CloseCommand.Execute(null)">
+                Cancelar
+            </button>
+            <button type="button" class="modal-confirm"
+                    disabled="@(ViewModel.IsSubmitting)"
+                    @onclick="OnSubmitOrClose">
+                @(ViewModel.IsSubmitting ? "Enviando…" : ViewModel.IsSuccess ? "Fechar" : "Enviar")
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .feedback-type {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+    }
+
+    .feedback-type-btn {
+        flex: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 8px 12px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--bg);
+        color: var(--fg-secondary);
+        font-size: 13px;
+        cursor: pointer;
+        transition: background .1s, border-color .1s, color .1s;
+    }
+
+    .feedback-type-btn:hover {
+        background: var(--surface-hover);
+        border-color: var(--border-dark);
+    }
+
+    .feedback-type-btn.active {
+        background: var(--accent-light);
+        border-color: var(--accent);
+        color: var(--accent);
+        font-weight: 600;
+    }
+
+    .field-label {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: .05em;
+        margin-bottom: 4px;
+    }
+
+    .field-input {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--bg);
+        color: var(--fg);
+        font-size: 13px;
+        outline: none;
+        transition: border-color .1s;
+        box-sizing: border-box;
+    }
+
+    .field-input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px var(--accent-light);
+    }
+
+    .field-textarea {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--bg);
+        color: var(--fg);
+        font-size: 13px;
+        outline: none;
+        resize: vertical;
+        font-family: inherit;
+        transition: border-color .1s;
+        box-sizing: border-box;
+    }
+
+    .field-textarea:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px var(--accent-light);
+    }
+
+    .feedback-status {
+        margin-top: 12px;
+        padding: 8px 12px;
+        border-radius: var(--radius);
+        font-size: 13px;
+    }
+
+    .feedback-status.success {
+        background: var(--green-bg, #e6f7e6);
+        color: var(--green, #1a7d1a);
+        border: 1px solid var(--green-border, #b8e6b8);
+    }
+
+    .feedback-status.error {
+        background: var(--red-bg, #fde8e8);
+        color: var(--red);
+        border: 1px solid var(--red-border, #f5c6c6);
+    }
+
+    .feedback-status.info {
+        background: var(--surface-hover, #e8f0fe);
+        color: var(--fg-secondary);
+        border: 1px solid var(--border);
+    }
+
+    .modal-confirm {
+        padding: 6px 16px;
+        border-radius: var(--radius);
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        font-size: 13px;
+        cursor: pointer;
+        font-weight: 500;
+    }
+
+    .modal-confirm:disabled {
+        opacity: .5;
+        cursor: default;
+    }
+
+    .modal-confirm:hover:not(:disabled) {
+        filter: brightness(1.1);
+    }
+</style>
+
+@code {
+    protected override void OnInitialized()
+    {
+        ViewModel.PropertyChanged += OnViewModelChanged;
+    }
+
+    private void OnViewModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) =>
+        InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        ViewModel.PropertyChanged -= OnViewModelChanged;
+    }
+
+    private void OnTitleInput(ChangeEventArgs e)
+    {
+        ViewModel.Title = e.Value?.ToString() ?? "";
+    }
+
+    private async Task OnSubmitOrClose()
+    {
+        if (ViewModel.IsSuccess)
+        {
+            ViewModel.CloseCommand.Execute(null);
+        }
+        else
+        {
+            await ViewModel.SubmitCommand.ExecuteAsync(null);
+        }
+    }
+
+    private async Task OnTitleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !ViewModel.IsSuccess)
+        {
+            await ViewModel.SubmitCommand.ExecuteAsync(null);
+        }
+    }
+
+    private void OnDescriptionInput(ChangeEventArgs e)
+    {
+        ViewModel.Description = e.Value?.ToString() ?? "";
+    }
+}

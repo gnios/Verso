@@ -44,7 +44,10 @@ public sealed class WhisperProcessorFactory(IWhisperFactoryCache factoryCache) :
         // o factory também é disposto. Isso garante que contextos nativos paralelos não
         // compartilhem estado — whisper.net/whisper.cpp corrompe a heap se dois
         // processors do mesmo factory decodificarem concorrentemente.
-        var factory = WhisperFactory.FromPath(modelPath);
+        var gpuDevice = WhisperRuntimeConfigurator.CurrentGpuDevice;
+        var factory = gpuDevice != 0
+            ? WhisperFactory.FromPath(modelPath, new WhisperFactoryOptions { GpuDevice = gpuDevice })
+            : WhisperFactory.FromPath(modelPath);
         var processor = factory.CreateBuilder()
             .WithLanguage(language)
             .WithNoContext()

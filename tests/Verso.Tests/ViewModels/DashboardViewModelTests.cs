@@ -79,7 +79,7 @@ public class DashboardViewModelTests
             new Transcription
             {
                 Id = progressId,
-                Title = "Pesquisa em andamento",
+                Title = "Pasta em andamento",
                 Status = TranscriptionStatus.InProgress,
                 DurationSeconds = 1800,
                 CreatedAt = new DateTime(2025, 4, 28, 12, 0, 0, DateTimeKind.Utc),
@@ -266,7 +266,7 @@ public class DashboardViewModelTests
             await Task.Delay(50);
 
             Assert.True(dashboard.IsUnassignedFilterActive);
-            // A semente do dashboard não associa nenhuma transcrição a uma pesquisa — todas são avulsas.
+            // A semente do dashboard não associa nenhuma transcrição a uma pasta — todas são avulsas.
             Assert.Equal(4, dashboard.Cards.Count);
         }
         finally
@@ -288,7 +288,7 @@ public class DashboardViewModelTests
             await Task.Delay(50);
 
             Assert.Single(dashboard.Cards);
-            Assert.Equal("Pesquisa em andamento", dashboard.Cards[0].Title);
+            Assert.Equal("Pasta em andamento", dashboard.Cards[0].Title);
         }
         finally
         {

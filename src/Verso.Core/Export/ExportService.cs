@@ -13,19 +13,35 @@ public class ExportService(IDbContextFactory<VersoDbContext> dbContextFactory)
         var transcription = await LoadTranscriptionAsync(transcriptionId);
         EnsureHasSegments(transcription);
 
-        var header = TranscriptionTextFormatter.BuildTxtHeader(
-            transcription.Title,
-            transcription.MediaFilePath is null ? null : Path.GetFileName(transcription.MediaFilePath),
-            transcription.Language,
-            transcription.Quality.ToString(),
-            transcription.DurationSeconds);
+        var builder = new StringBuilder();
+        builder.AppendLine("Transcrição");
 
-        var lines = transcription.Segments
-            .OrderBy(s => s.SortOrder)
-            .Select(s => TranscriptionTextFormatter.FormatSegment(s.StartSeconds, s.EndSeconds, s.Text));
+        string? previousSpeaker = null;
+        foreach (var segment in transcription.Segments.OrderBy(s => s.SortOrder))
+        {
+            var speaker = segment.Speaker?.Name;
 
-        var content = header.Concat([""]).Concat(lines);
-        await File.WriteAllLinesAsync(destPath, content, Encoding.UTF8);
+            // Linha em branco entre diálogos de locutores diferentes
+            if (previousSpeaker is not null && speaker != previousSpeaker)
+            {
+                builder.AppendLine();
+            }
+
+            var timestamp = TranscriptionTextFormatter.FormatTxtTimestamp(segment.StartSeconds);
+            if (string.IsNullOrEmpty(speaker))
+            {
+                builder.AppendLine($" — [{timestamp}]");
+            }
+            else
+            {
+                builder.AppendLine($"[{speaker}] — [{timestamp}]");
+            }
+
+            builder.AppendLine(segment.Text.Trim());
+            previousSpeaker = speaker;
+        }
+
+        await File.WriteAllTextAsync(destPath, builder.ToString(), Encoding.UTF8);
     }
 
     public async Task ExportSrtAsync(Guid transcriptionId, string destPath)

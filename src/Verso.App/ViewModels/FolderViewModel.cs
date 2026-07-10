@@ -13,7 +13,7 @@ using Verso.Core.Services;
 
 namespace Verso.App.ViewModels;
 
-public partial class ResearchPageViewModel : ViewModelBase
+public partial class FolderViewModel : ViewModelBase
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly NavigationService _navigation;
@@ -21,7 +21,7 @@ public partial class ResearchPageViewModel : ViewModelBase
     private readonly IConfirmationService _confirmation;
     private readonly MediaStorageService _mediaStorage;
     private readonly TranscriptionQueueService? _queueService;
-    private int _researchId;
+    private int _folderId;
 
     public ObservableCollection<TranscriptionCardViewModel> Transcriptions { get; } = [];
 
@@ -61,7 +61,7 @@ public partial class ResearchPageViewModel : ViewModelBase
     public bool IsProgressFilterActive => ActiveStatusFilter == LibraryStatusFilter.Progress;
     public bool IsDoneFilterActive => ActiveStatusFilter == LibraryStatusFilter.Done;
 
-    public ResearchPageViewModel(
+    public FolderViewModel(
         IServiceScopeFactory scopeFactory,
         NavigationService navigation,
         SidebarViewModel sidebar,
@@ -83,7 +83,7 @@ public partial class ResearchPageViewModel : ViewModelBase
 
     public void Initialize(NavigationParameter? parameter)
     {
-        _researchId = parameter?.ResearchId ?? 0;
+        _folderId = parameter?.FolderId ?? 0;
         _ = LoadAsync();
     }
 
@@ -95,25 +95,25 @@ public partial class ResearchPageViewModel : ViewModelBase
     private void AddTranscription() =>
         _navigation.NavigateTo(
             ScreenKey.Upload,
-            new NavigationParameter(ResearchId: _researchId));
+            new NavigationParameter(FolderId: _folderId));
 
     [RelayCommand]
-    private async Task DeleteResearchAsync()
+    private async Task DeleteFolderAsync()
     {
-        if (_researchId <= 0)
+        if (_folderId <= 0)
         {
             return;
         }
 
         using var scope = _scopeFactory.CreateScope();
-        var researchService = scope.ServiceProvider.GetRequiredService<ResearchService>();
-        var research = await researchService.GetByIdAsync(_researchId);
-        if (research is null)
+        var folderService = scope.ServiceProvider.GetRequiredService<FolderService>();
+        var folder = await folderService.GetByIdAsync(_folderId);
+        if (folder is null)
         {
             return;
         }
 
-        var count = research.Transcriptions.Count;
+        var count = folder.Transcriptions.Count;
         var countMessage = count switch
         {
             0 => "Nenhuma transcrição está associada.",
@@ -122,13 +122,13 @@ public partial class ResearchPageViewModel : ViewModelBase
         };
 
         if (!await _confirmation.ConfirmAsync(
-                "Excluir pesquisa",
-                $"A pesquisa \"{research.Title}\" será excluída. {countMessage} Deseja continuar?"))
+                "Excluir pasta",
+                $"A pasta \"{folder.Title}\" será excluída. {countMessage} Deseja continuar?"))
         {
             return;
         }
 
-        await researchService.DeleteAsync(_researchId);
+        await folderService.DeleteAsync(_folderId);
         await _sidebar.LoadAsync();
         _navigation.NavigateTo(ScreenKey.Dashboard);
     }
@@ -256,7 +256,7 @@ public partial class ResearchPageViewModel : ViewModelBase
 
     private async Task LoadAsync()
     {
-        if (_researchId <= 0)
+        if (_folderId <= 0)
         {
             _allSummaries = [];
             Transcriptions.Clear();
@@ -265,10 +265,10 @@ public partial class ResearchPageViewModel : ViewModelBase
         }
 
         using var scope = _scopeFactory.CreateScope();
-        var researchService = scope.ServiceProvider.GetRequiredService<ResearchService>();
+        var folderService = scope.ServiceProvider.GetRequiredService<FolderService>();
         var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
-        var research = await researchService.GetByIdAsync(_researchId);
-        if (research is null)
+        var folder = await folderService.GetByIdAsync(_folderId);
+        if (folder is null)
         {
             Title = "";
             Description = "";
@@ -278,12 +278,12 @@ public partial class ResearchPageViewModel : ViewModelBase
             return;
         }
 
-        Title = research.Title;
-        Description = research.Description ?? "";
-        Icon = research.Icon;
-        ColorName = research.ColorName;
+        Title = folder.Title;
+        Description = folder.Description ?? "";
+        Icon = folder.Icon;
+        ColorName = folder.ColorName;
 
-        _allSummaries = (await libraryService.GetTranscriptionsForResearchAsync(_researchId)).ToList();
+        _allSummaries = (await libraryService.GetTranscriptionsForFolderAsync(_folderId)).ToList();
         ApplyFilter();
     }
 }

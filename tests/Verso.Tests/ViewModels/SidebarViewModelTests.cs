@@ -14,9 +14,9 @@ namespace Verso.Tests.ViewModels;
 
 public class SidebarViewModelTests
 {
-    private static async Task<(IServiceProvider Provider, string Directory, int ResearchId, Guid TranscriptionId)>
+    private static async Task<(IServiceProvider Provider, string Directory, int FolderId, Guid TranscriptionId)>
         CreateSidebarProviderAsync(FakeConfirmationService? confirmation = null)
-    {
+{
         var (baseProvider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();
         var dbPath = Path.Combine(directory, "verso.db");
 
@@ -33,8 +33,8 @@ public class SidebarViewModelTests
         var provider = services.BuildServiceProvider();
         await DbBootstrapper.MigrateAsync(provider);
 
-        var researchService = provider.GetRequiredService<ResearchService>();
-        var research = await researchService.CreateAsync("Mobilidade urbana", "🚲", "green");
+        var folderService = provider.GetRequiredService<FolderService>();
+        var folder = await folderService.CreateAsync("Mobilidade urbana", "🚲", "green");
         var transcriptionId = Guid.NewGuid();
         await using (var ctx = await TestDbHelper.GetFactory(provider).CreateDbContextAsync())
         {
@@ -43,12 +43,11 @@ public class SidebarViewModelTests
                 Id = transcriptionId,
                 Title = "Entrevista vinculada",
                 Status = TranscriptionStatus.Done,
-                ResearchPageId = research.Id,
+                FolderId = folder.Id,
             });
             await ctx.SaveChangesAsync();
         }
-
-        return (provider, directory, research.Id, transcriptionId);
+        return (provider, directory, folder.Id, transcriptionId);
     }
 
     private static async Task<(IServiceProvider Provider, string Directory)> CreateSidebarProviderAsync()
@@ -87,20 +86,20 @@ public class SidebarViewModelTests
     }
 
     [Fact]
-    public void ToggleExpand_AlternatesResearchExpandedState()
+    public void ToggleExpand_AlternatesFolderExpandedState()
     {
         var services = new ServiceCollection();
         services.AddVersoAppServices();
         var provider = services.BuildServiceProvider();
         var navigation = provider.GetRequiredService<NavigationService>();
-        var research = new ResearchPage
+        var folder = new Folder
         {
             Id = 1,
             Title = "Mobilidade urbana",
             Icon = "📚",
             ColorName = "blue"
         };
-        var item = new SidebarResearchItemViewModel(research, navigation);
+        var item = new SidebarFolderItemViewModel(folder, navigation);
 
         Assert.True(item.IsExpanded);
 
@@ -173,10 +172,10 @@ public class SidebarViewModelTests
     }
 
     [Fact]
-    public async Task DeleteResearch_Confirmed_DissociatesTranscriptionsAndRemovesFromSidebar()
+    public async Task DeleteFolder_Confirmed_DissociatesTranscriptionsAndRemovesFromSidebar()
     {
         var confirmation = new FakeConfirmationService { NextResult = true };
-        var (provider, directory, researchId, transcriptionId) =
+        var (provider, directory, folderId, transcriptionId) =
             await CreateSidebarProviderAsync(confirmation);
 
         try
@@ -184,15 +183,15 @@ public class SidebarViewModelTests
             var sidebar = provider.GetRequiredService<SidebarViewModel>();
             await sidebar.LoadAsync();
 
-            await sidebar.DeleteResearchAsync(researchId);
+            await sidebar.DeleteFolderAsync(folderId);
 
             Assert.Contains("1 transcrição", confirmation.LastMessage ?? "");
-            Assert.DoesNotContain(sidebar.Researches, item => item.Id == researchId);
+            Assert.DoesNotContain(sidebar.Folders, item => item.Id == folderId);
 
             await using var ctx = await TestDbHelper.GetFactory(provider).CreateDbContextAsync();
-            Assert.Null(await ctx.ResearchPages.FindAsync(researchId));
+            Assert.Null(await ctx.Folders.FindAsync(folderId));
             var transcription = await ctx.Transcriptions.SingleAsync(t => t.Id == transcriptionId);
-            Assert.Null(transcription.ResearchPageId);
+            Assert.Null(transcription.FolderId);
         }
         finally
         {
@@ -201,10 +200,10 @@ public class SidebarViewModelTests
     }
 
     [Fact]
-    public async Task DeleteResearch_Cancelled_KeepsResearch()
+    public async Task DeleteFolder_Cancelled_KeepsFolder()
     {
         var confirmation = new FakeConfirmationService { NextResult = false };
-        var (provider, directory, researchId, _) =
+        var (provider, directory, folderId, _) =
             await CreateSidebarProviderAsync(confirmation);
 
         try
@@ -212,11 +211,11 @@ public class SidebarViewModelTests
             var sidebar = provider.GetRequiredService<SidebarViewModel>();
             await sidebar.LoadAsync();
 
-            await sidebar.DeleteResearchAsync(researchId);
+            await sidebar.DeleteFolderAsync(folderId);
 
-            Assert.Contains(sidebar.Researches, item => item.Id == researchId);
+            Assert.Contains(sidebar.Folders, item => item.Id == folderId);
             await using var ctx = await TestDbHelper.GetFactory(provider).CreateDbContextAsync();
-            Assert.NotNull(await ctx.ResearchPages.FindAsync(researchId));
+            Assert.NotNull(await ctx.Folders.FindAsync(folderId));
         }
         finally
         {
@@ -225,21 +224,21 @@ public class SidebarViewModelTests
     }
 
     [Fact]
-    public async Task DeleteResearch_FromOpenResearchPage_NavigatesToDashboard()
+    public async Task DeleteFolder_FromOpenFolderPage_NavigatesToDashboard()
     {
         var confirmation = new FakeConfirmationService { NextResult = true };
-        var (provider, directory, researchId, _) =
+        var (provider, directory, folderId, _) =
             await CreateSidebarProviderAsync(confirmation);
 
         try
         {
             var navigation = provider.GetRequiredService<NavigationService>();
             navigation.NavigateTo(
-                ScreenKey.Research,
-                new NavigationParameter(ResearchId: researchId));
+                ScreenKey.Folder,
+                new NavigationParameter(FolderId: folderId));
             var sidebar = provider.GetRequiredService<SidebarViewModel>();
 
-            await sidebar.DeleteResearchAsync(researchId);
+            await sidebar.DeleteFolderAsync(folderId);
 
             Assert.Equal(ScreenKey.Dashboard, navigation.CurrentScreen);
         }

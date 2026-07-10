@@ -24,7 +24,7 @@ public partial class UploadViewModel : ViewModelBase
     private readonly MediaStorageService _mediaStorage;
     private readonly TranscriptionQueueService _queueService;
 
-    public ObservableCollection<ResearchOptionViewModel> ResearchOptions { get; } = [];
+    public ObservableCollection<FolderOptionViewModel> FolderOptions { get; } = [];
 
     public IconPickerViewModel IconPicker { get; } = new();
 
@@ -79,7 +79,7 @@ public partial class UploadViewModel : ViewModelBase
     private SpeakerModeOptionViewModel? _selectedSpeakerModeOption;
 
     [ObservableProperty]
-    private ResearchOptionViewModel? _selectedResearch;
+    private FolderOptionViewModel? _selectedFolder;
 
     [ObservableProperty]
     private bool _isStarting;
@@ -122,7 +122,7 @@ public partial class UploadViewModel : ViewModelBase
         IconPicker.UseTranscriptionIcons = true;
         IconPicker.AllowNoIcon = false;
         IconPicker.SelectedIcon = IconCatalog.TransIcons[0];
-        _ = LoadFormAsync(parameter?.ResearchId);
+        _ = LoadFormAsync(parameter?.FolderId);
     }
 
     public bool TrySelectFile(string path)
@@ -239,7 +239,7 @@ public partial class UploadViewModel : ViewModelBase
                 Quality,
                 settings.Device,
                 SpeakerMode,
-                SelectedResearch?.Id,
+                SelectedFolder?.Id,
                 durationSeconds,
                 IconPicker.SelectedIcon,
                 ParseTags(TagsText));
@@ -265,11 +265,11 @@ public partial class UploadViewModel : ViewModelBase
 
     partial void OnTitleChanged(string value) => NotifyStartState();
 
-    private async Task LoadFormAsync(int? preselectedResearchId)
+    private async Task LoadFormAsync(int? preselectedFolderId)
     {
         using var scope = _scopeFactory.CreateScope();
         var settingsService = scope.ServiceProvider.GetRequiredService<SettingsService>();
-        var researchService = scope.ServiceProvider.GetRequiredService<ResearchService>();
+        var folderService = scope.ServiceProvider.GetRequiredService<FolderService>();
 
         var settings = await settingsService.GetAsync();
         Language = settings.DefaultLanguage;
@@ -279,22 +279,23 @@ public partial class UploadViewModel : ViewModelBase
         SelectedModelOption = ModelCatalog.Find(Quality);
         SelectedSpeakerModeOption = SpeakerModeOptions.First(option => option.Value == SpeakerMode);
 
-        ResearchOptions.Clear();
-        ResearchOptions.Add(new ResearchOptionViewModel { Id = null, Name = "Nenhuma (avulsa)" });
+        FolderOptions.Clear();
+        FolderOptions.Add(new FolderOptionViewModel { Id = null, Name = "Nenhuma (avulsa)" });
 
-        foreach (var research in await researchService.GetAllAsync())
+        foreach (var folder in await folderService.GetAllAsync())
         {
-            ResearchOptions.Add(new ResearchOptionViewModel
+            FolderOptions.Add(new FolderOptionViewModel
             {
-                Id = research.Id,
-                Name = research.Title,
+                Id = folder.Id,
+                Name = folder.Title,
             });
         }
 
-        SelectedResearch = preselectedResearchId is int researchId
-            ? ResearchOptions.FirstOrDefault(option => option.Id == researchId)
-              ?? ResearchOptions[0]
-            : ResearchOptions[0];
+        SelectedFolder = preselectedFolderId is int folderId
+            ? FolderOptions.FirstOrDefault(option => option.Id == folderId)
+              ?? FolderOptions[0]
+            : FolderOptions[0];
+
     }
 
     private void ClearSelectedFile()

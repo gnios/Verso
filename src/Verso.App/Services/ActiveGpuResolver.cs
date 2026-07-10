@@ -14,9 +14,10 @@ namespace Verso.App.Services;
 /// - CUDA: o whisper.net usa o dispositivo CUDA 0. Consultamos o <c>nvidia-smi</c>
 ///   (presente em máquinas com driver NVIDIA) para listar as GPUs NVIDIA por índice;
 ///   a primeira (device 0) é a que o CUDA efetivamente usará.
-/// - Vulkan: não há enumeração de dispositivos Vulkan sem um binding Vulkan, então
-///   usamos a primeira GPU DEDICADA detectada via WMI (GpuDetector) como a candidata
-///   mais provável — Vulkan prefere adaptadores discretos quando disponíveis.
+/// - Vulkan: selecionamos ativamente a GPU dedicada (dGPU) via
+///   <c>WhisperFactoryOptions.GpuDevice</c>, resolvendo seu índice no backend Vulkan
+///   através de WMI (<c>VulkanDeviceIndexResolver</c>). A GPU listada aqui é a que
+///   o Verso força o whisper.net a usar.
 ///
 /// Tudo é best-effort: se nvidia-smi/WMI não estiverem disponíveis, devolvemos null
 /// sem lançar, e a UI explica o que faltou.
@@ -83,11 +84,11 @@ public sealed class ActiveGpuResolver
             "deve ter caído para CPU — confirme o runtime em uso.",
             null);
     }
-
     private ActiveGpuInfo ResolveVulkan()
     {
-        // Vulkan não é enumerável sem binding; assumimos a primeira dedicada (preferida
-        // pelo Vulkan) ou, na falta, a primeira placa qualquer do WMI.
+        // Determinamos o índice da GPU dedicada via VulkanDeviceIndexResolver (WMI em
+        // ordem nativa) e passamos como GpuDevice ao WhisperFactoryOptions — o que
+        // força o whisper.net/ggml_vulkan a usar a placa dedicada.
         var gpus = _gpuDetector.Detect();
         var candidate = gpus.FirstOrDefault(g => g.IsDedicated) ?? gpus.FirstOrDefault();
         if (candidate is null)
@@ -100,11 +101,11 @@ public sealed class ActiveGpuResolver
         }
 
         var note = candidate.IsDedicated
-            ? "Vulkan usa o primeiro adaptador compatível; a GPU dedicada acima é a " +
-              "candidata mais provável. Para forçar outra, troque a GPU preferida do " +
-              "Verso.App em Configurações do Windows → Sistema → Tela → Gráficos."
+            ? $"GPU dedicada selecionada ativamente. Para usar a integrada em vez desta, " +
+              "troque a GPU preferida do Verso.App em Configurações do Windows → Sistema → " +
+              "Tela → Gráficos."
             : "Apenas uma GPU (provavelmente integrada) foi detectada. Vulkan a usará.";
-        return new ActiveGpuInfo(candidate.Name, "WMI (adaptador dedicado)", note, candidate);
+        return new ActiveGpuInfo(candidate.Name, "WMI (adaptador dedicado, selecionado via GpuDevice)", note, candidate);
     }
 
     /// <summary>

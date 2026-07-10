@@ -1,5 +1,6 @@
 using Verso.Core.Data.Entities;
 using Whisper.net.LibraryLoader;
+using Whisper.net;
 
 namespace Verso.Core.Engine;
 
@@ -78,8 +79,17 @@ public static class WhisperRuntimeInspector
         WhisperRuntimeConfigurator.Configure(device);
         try
         {
-            using var factory = Whisper.net.WhisperFactory.FromPath(modelPath);
-            return RuntimeOptions.LoadedLibrary;
+            var gpuDevice = WhisperRuntimeConfigurator.CurrentGpuDevice;
+            if (gpuDevice != 0)
+            {
+                using var factory = WhisperFactory.FromPath(modelPath, new WhisperFactoryOptions { GpuDevice = gpuDevice });
+                return RuntimeOptions.LoadedLibrary;
+            }
+            else
+            {
+                using var factory = WhisperFactory.FromPath(modelPath);
+                return RuntimeOptions.LoadedLibrary;
+            }
         }
         catch
         {
@@ -87,7 +97,6 @@ public static class WhisperRuntimeInspector
             return RuntimeOptions.LoadedLibrary;
         }
     }
-
     /// <summary>String legível da ordem de preferência para um dispositivo (para a UI).</summary>
     public static string DescribeRuntimeOrder(ExecutionDevice device) =>
         string.Join(" → ", WhisperRuntimeConfigurator.ResolveRuntimeOrder(device).Select(GetRuntimeLabel));

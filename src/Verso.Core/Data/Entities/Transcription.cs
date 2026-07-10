@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations.Schema;
 namespace Verso.Core.Data.Entities;
 
 public class Transcription
@@ -16,8 +17,9 @@ public class Transcription
     public ModelQuality Quality { get; set; }
     public ExecutionDevice Device { get; set; }
     public SpeakerMode SpeakerMode { get; set; }
-    public int? ResearchPageId { get; set; }
-    public ResearchPage? ResearchPage { get; set; }
+    [Column("ResearchPageId")]
+    public int? FolderId { get; set; }
+    public Folder? Folder { get; set; }
     public List<Segment> Segments { get; set; } = [];
     public List<Speaker> Speakers { get; set; } = [];
     public List<Tag> Tags { get; set; } = [];

@@ -72,7 +72,7 @@ public class LibraryServiceTests
     }
 
     [Fact]
-    public async Task GetTranscriptions_FiltersUnassignedOnly_ReturnsOnlyTranscriptionsWithoutResearch()
+    public async Task GetTranscriptions_FiltersUnassignedOnly_ReturnsOnlyTranscriptionsWithoutFolder()
     {
         var (provider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();
         try
@@ -80,8 +80,8 @@ public class LibraryServiceTests
             var factory = TestDbHelper.GetFactory(provider);
             await using (var ctx = await factory.CreateDbContextAsync())
             {
-                var research = new ResearchPage { Title = "Mobilidade", Icon = "🚲", ColorName = "green" };
-                ctx.ResearchPages.Add(research);
+                var folder = new Folder { Title = "Mobilidade", Icon = "🚲", ColorName = "green" };
+                ctx.Folders.Add(folder);
                 await ctx.SaveChangesAsync();
 
                 ctx.Transcriptions.AddRange(
@@ -91,15 +91,15 @@ public class LibraryServiceTests
                         Title = "Avulsa",
                         Status = TranscriptionStatus.Done,
                         CreatedAt = DateTime.UtcNow,
-                        ResearchPageId = null,
+                        FolderId = null,
                     },
                     new Transcription
                     {
                         Id = Guid.NewGuid(),
-                        Title = "Da pesquisa",
+                        Title = "Da pasta",
                         Status = TranscriptionStatus.Done,
                         CreatedAt = DateTime.UtcNow,
-                        ResearchPageId = research.Id,
+                        FolderId = folder.Id,
                     });
                 await ctx.SaveChangesAsync();
             }

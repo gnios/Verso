@@ -5,7 +5,7 @@ namespace Verso.Core.Data;
 
 public class VersoDbContext(DbContextOptions<VersoDbContext> options) : DbContext(options)
 {
-    public DbSet<ResearchPage> ResearchPages => Set<ResearchPage>();
+    public DbSet<Folder> Folders => Set<Folder>();
     public DbSet<Transcription> Transcriptions => Set<Transcription>();
     public DbSet<Segment> Segments => Set<Segment>();
     public DbSet<Speaker> Speakers => Set<Speaker>();
@@ -14,10 +14,10 @@ public class VersoDbContext(DbContextOptions<VersoDbContext> options) : DbContex
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<ResearchPage>()
+        modelBuilder.Entity<Folder>()
             .HasMany(r => r.Transcriptions)
-            .WithOne(t => t.ResearchPage)
-            .HasForeignKey(t => t.ResearchPageId)
+            .WithOne(t => t.Folder)
+            .HasForeignKey(t => t.FolderId)
             .OnDelete(DeleteBehavior.SetNull);
 
         modelBuilder.Entity<Transcription>()

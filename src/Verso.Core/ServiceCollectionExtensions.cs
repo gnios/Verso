@@ -10,7 +10,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddVersoServices(this IServiceCollection services)
     {
         services.AddScoped<LibraryService>();
-        services.AddScoped<ResearchService>();
+        services.AddScoped<FolderService>();
         services.AddSingleton<MediaStorageService>();
         services.AddScoped<SpeakerService>();
         services.AddSingleton<SegmentEditingService>();

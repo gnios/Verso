@@ -110,9 +110,9 @@
                 </select>
             </div>
             <div>
-                <label class="upload-label">Pesquisa</label>
-                <select class="upload-select" value="@(ViewModel.SelectedResearch?.Id?.ToString() ?? "")" @onchange="OnResearchChanged">
-                    @foreach (var option in ViewModel.ResearchOptions)
+                <label class="upload-label">Pasta</label>
+                <select class="upload-select" value="@(ViewModel.SelectedFolder?.Id?.ToString() ?? "")" @onchange="OnFolderChanged">
+                    @foreach (var option in ViewModel.FolderOptions)
                     {
                         <option value="@(option.Id?.ToString() ?? "")">@option.Name</option>
                     }
@@ -202,14 +202,14 @@
         }
     }
 
-    private void OnResearchChanged(ChangeEventArgs e)
+    private void OnFolderChanged(ChangeEventArgs e)
     {
         var idText = e.Value?.ToString();
         var id = string.IsNullOrEmpty(idText) ? (int?)null : int.Parse(idText);
-        var option = ViewModel.ResearchOptions.FirstOrDefault(o => o.Id == id);
+        var option = ViewModel.FolderOptions.FirstOrDefault(o => o.Id == id);
         if (option is not null)
         {
-            ViewModel.SelectedResearch = option;
+            ViewModel.SelectedFolder = option;
         }
     }
     private void OnTitleInput(ChangeEventArgs e) =>

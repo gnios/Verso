@@ -35,7 +35,7 @@ namespace Verso.Core.Data.Migrations
                     b.ToTable("TranscriptionTag", (string)null);
                 });
 
-            modelBuilder.Entity("Verso.Core.Data.Entities.ResearchPage", b =>
+            modelBuilder.Entity("Verso.Core.Data.Entities.Folder", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -284,15 +284,15 @@ namespace Verso.Core.Data.Migrations
 
             modelBuilder.Entity("Verso.Core.Data.Entities.Transcription", b =>
                 {
-                    b.HasOne("Verso.Core.Data.Entities.ResearchPage", "ResearchPage")
+                    b.HasOne("Verso.Core.Data.Entities.Folder", "Folder")
                         .WithMany("Transcriptions")
                         .HasForeignKey("ResearchPageId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.Navigation("ResearchPage");
+                    b.Navigation("Folder");
                 });
 
-            modelBuilder.Entity("Verso.Core.Data.Entities.ResearchPage", b =>
+            modelBuilder.Entity("Verso.Core.Data.Entities.Folder", b =>
                 {
                     b.Navigation("Transcriptions");
                 });
