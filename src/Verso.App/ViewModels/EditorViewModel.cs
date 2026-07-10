@@ -34,14 +34,14 @@ public partial class EditorViewModel : ViewModelBase
 
     public ObservableCollection<SegmentItemViewModel> Segments { get; } = [];
     public ObservableCollection<TranscriptionCardTagViewModel> Tags { get; } = [];
-    public ObservableCollection<ResearchOptionViewModel> ResearchOptions { get; } = [];
+    public ObservableCollection<FolderOptionViewModel> FolderOptions { get; } = [];
     public ObservableCollection<TagOptionViewModel> TagOptions { get; } = [];
 
     [ObservableProperty]
     private string _newTagInput = "";
 
     [ObservableProperty]
-    private int? _selectedResearchId;
+    private int? _selectedFolderId;
     public IconPickerViewModel IconPicker { get; } = new();
     public SpeakerDropdownViewModel SpeakerDropdown { get; }
     public PlayerBarViewModel PlayerBar { get; }
@@ -67,13 +67,13 @@ public partial class EditorViewModel : ViewModelBase
     partial void OnIconChanged(string? value) => OnPropertyChanged(nameof(HasIcon));
 
     [ObservableProperty]
-    private bool _hasResearchBreadcrumb;
+    private bool _hasFolderBreadcrumb;
 
     [ObservableProperty]
-    private string _researchTitle = "";
+    private string _folderTitle = "";
 
     [ObservableProperty]
-    private int? _researchId;
+    private int? _folderId;
 
     [ObservableProperty]
     private string _metaDate = "";
@@ -86,6 +86,9 @@ public partial class EditorViewModel : ViewModelBase
 
     [ObservableProperty]
     private string _metaSpeakerCount = "";
+
+    [ObservableProperty]
+    private string _metaModel = "";
 
     [ObservableProperty]
     private bool _isIconPickerOpen;
@@ -141,13 +144,13 @@ public partial class EditorViewModel : ViewModelBase
         _navigation.NavigateTo(ScreenKey.Dashboard);
 
     [RelayCommand]
-    private void NavigateResearch()
+    private void NavigateFolder()
     {
-        if (ResearchId is int researchId)
+        if (FolderId is int folderId)
         {
             _navigation.NavigateTo(
-                ScreenKey.Research,
-                new NavigationParameter(ResearchId: researchId));
+                ScreenKey.Folder,
+                new NavigationParameter(FolderId: folderId));
         }
     }
 
@@ -271,7 +274,7 @@ public partial class EditorViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private async Task ChangeResearchAsync(int? researchId)
+    private async Task ChangeFolderAsync(int? folderId)
     {
         if (_transcriptionId == Guid.Empty)
         {
@@ -279,22 +282,22 @@ public partial class EditorViewModel : ViewModelBase
         }
 
         using var scope = _scopeFactory.CreateScope();
-        var researchService = scope.ServiceProvider.GetRequiredService<ResearchService>();
-        await researchService.AssignTranscriptionToResearchAsync(_transcriptionId, researchId);
+        var folderService = scope.ServiceProvider.GetRequiredService<FolderService>();
+        await folderService.AssignTranscriptionToFolderAsync(_transcriptionId, folderId);
 
-        SelectedResearchId = researchId;
-        if (researchId is null)
+        SelectedFolderId = folderId;
+        if (folderId is null)
         {
-            HasResearchBreadcrumb = false;
-            ResearchTitle = "";
-            ResearchId = null;
+            HasFolderBreadcrumb = false;
+            FolderTitle = "";
+            FolderId = null;
         }
         else
         {
-            var option = ResearchOptions.FirstOrDefault(o => o.Id == researchId);
-            HasResearchBreadcrumb = true;
-            ResearchTitle = option?.Name ?? "";
-            ResearchId = researchId;
+            var option = FolderOptions.FirstOrDefault(o => o.Id == folderId);
+            HasFolderBreadcrumb = true;
+            FolderTitle = option?.Name ?? "";
+            FolderId = folderId;
         }
 
         await _sidebar.LoadAsync();
@@ -553,20 +556,20 @@ public partial class EditorViewModel : ViewModelBase
         await _sidebar.LoadAsync();
     }
 
-    private async Task LoadResearchOptionsAsync(int? selectedId)
+    private async Task LoadFolderOptionsAsync(int? selectedId)
     {
         using var scope = _scopeFactory.CreateScope();
-        var researchService = scope.ServiceProvider.GetRequiredService<ResearchService>();
-        var researches = await researchService.GetAllAsync();
+        var folderService = scope.ServiceProvider.GetRequiredService<FolderService>();
+        var folders = await folderService.GetAllAsync();
 
-        ResearchOptions.Clear();
-        ResearchOptions.Add(new ResearchOptionViewModel { Id = null, Name = "Nenhuma pesquisa", Icon = "" });
-        foreach (var r in researches)
+        FolderOptions.Clear();
+        FolderOptions.Add(new FolderOptionViewModel { Id = null, Name = "Nenhuma pasta", Icon = "" });
+        foreach (var f in folders)
         {
-            ResearchOptions.Add(new ResearchOptionViewModel { Id = r.Id, Name = r.Title, Icon = r.Icon });
+            FolderOptions.Add(new FolderOptionViewModel { Id = f.Id, Name = f.Title, Icon = f.Icon });
         }
 
-        SelectedResearchId = selectedId;
+        SelectedFolderId = selectedId;
     }
 
     private async Task LoadTagOptionsAsync()
@@ -612,16 +615,17 @@ public partial class EditorViewModel : ViewModelBase
         Icon = transcription.Icon;
         IconPicker.SelectedIcon = transcription.Icon ?? IconCatalog.TransIcons[0];
 
-        HasResearchBreadcrumb = transcription.ResearchPage is not null;
-        ResearchTitle = transcription.ResearchPage?.Title ?? "";
-        ResearchId = transcription.ResearchPageId;
+        HasFolderBreadcrumb = transcription.Folder is not null;
+        FolderTitle = transcription.Folder?.Title ?? "";
+        FolderId = transcription.FolderId;
 
-        await LoadResearchOptionsAsync(transcription.ResearchPageId);
+        await LoadFolderOptionsAsync(transcription.FolderId);
 
         MetaDate = transcription.CreatedAt.ToString("d MMM yyyy", CultureInfo.GetCultureInfo("pt-BR"));
         MetaDuration = FormatDurationDisplay(transcription.DurationSeconds);
         MetaProcessingTime = FormatProcessingTime(transcription.ProcessingDurationSeconds);
         MetaSpeakerCount = $"{transcription.Speakers.Count} locutor{(transcription.Speakers.Count == 1 ? "" : "es")}";
+        MetaModel = $"{ModelCatalog.Find(transcription.Quality).Label} · {DeviceDisplayName(transcription.Device)}";
 
         Tags.Clear();
         foreach (var tag in transcription.Tags.OrderBy(t => t.Name))
@@ -731,11 +735,11 @@ public partial class EditorViewModel : ViewModelBase
         StatusMessage = "";
         Title = "";
         Icon = null;
-        HasResearchBreadcrumb = false;
-        ResearchTitle = "";
-        ResearchId = null;
-        ResearchOptions.Clear();
-        SelectedResearchId = null;
+        HasFolderBreadcrumb = false;
+        FolderTitle = "";
+        FolderId = null;
+        FolderOptions.Clear();
+        SelectedFolderId = null;
         TagOptions.Clear();
         NewTagInput = "";
         NotifyExportAvailability();
@@ -811,4 +815,13 @@ public partial class EditorViewModel : ViewModelBase
 
         return $"{Math.Round(span.TotalSeconds)}s";
     }
+
+    private static string DeviceDisplayName(ExecutionDevice device) => device switch
+    {
+        ExecutionDevice.Cpu => "CPU",
+        ExecutionDevice.Cuda => "CUDA",
+        ExecutionDevice.Vulkan => "Vulkan",
+        ExecutionDevice.Auto => "Auto",
+        _ => device.ToString(),
+    };
 }

@@ -836,42 +836,42 @@ public class EditorViewModelTests
     }
 
     [Fact]
-    public async Task ChangeResearchCommand_AssignsAndUnassignsTranscription()
+    public async Task ChangeFolderCommand_AssignsAndUnassignsTranscription()
     {
         var (provider, directory, transcriptionId) = await CreateEditorProviderAsync(TranscriptionStatus.Done);
         try
         {
             var editor = await CreateEditorAsync(provider, transcriptionId);
-            Assert.Null(editor.SelectedResearchId);
-            Assert.False(editor.HasResearchBreadcrumb);
+            Assert.Null(editor.SelectedFolderId);
+            Assert.False(editor.HasFolderBreadcrumb);
 
-            var researchService = provider.GetRequiredService<ResearchService>();
-            var page = await researchService.CreateAsync("Tese alpha", "🔬", "green");
+            var folderService = provider.GetRequiredService<FolderService>();
+            var folder = await folderService.CreateAsync("Tese alpha", "🔬", "green");
 
-            // Recarrega para popular ResearchOptions com a nova pesquisa — aguarda a
-            // Task interna (LoadAsync → LoadResearchOptionsAsync) em vez de um Delay fixo.
+            // Recarrega para popular FolderOptions com a nova pasta — aguarda a
+            // Task interna (LoadAsync → LoadFolderOptionsAsync) em vez de um Delay fixo.
             await (Task)typeof(EditorViewModel)
                 .GetMethod("LoadAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
                 .Invoke(editor, null)!;
 
-            await editor.ChangeResearchCommand.ExecuteAsync(page.Id);
+            await editor.ChangeFolderCommand.ExecuteAsync(folder.Id);
 
-            Assert.Equal(page.Id, editor.SelectedResearchId);
-            Assert.True(editor.HasResearchBreadcrumb);
-            Assert.Equal("Tese alpha", editor.ResearchTitle);
+            Assert.Equal(folder.Id, editor.SelectedFolderId);
+            Assert.True(editor.HasFolderBreadcrumb);
+            Assert.Equal("Tese alpha", editor.FolderTitle);
 
             await using var ctx = await TestDbHelper.GetFactory(provider).CreateDbContextAsync();
             var saved = await ctx.Transcriptions.SingleAsync(t => t.Id == transcriptionId);
-            Assert.Equal(page.Id, saved.ResearchPageId);
+            Assert.Equal(folder.Id, saved.FolderId);
 
             // Desatribui.
-            await editor.ChangeResearchCommand.ExecuteAsync(null);
-            Assert.Null(editor.SelectedResearchId);
-            Assert.False(editor.HasResearchBreadcrumb);
+            await editor.ChangeFolderCommand.ExecuteAsync(null);
+            Assert.Null(editor.SelectedFolderId);
+            Assert.False(editor.HasFolderBreadcrumb);
 
             await using var ctx2 = await TestDbHelper.GetFactory(provider).CreateDbContextAsync();
             var saved2 = await ctx2.Transcriptions.SingleAsync(t => t.Id == transcriptionId);
-            Assert.Null(saved2.ResearchPageId);
+            Assert.Null(saved2.FolderId);
         }
         finally
         {

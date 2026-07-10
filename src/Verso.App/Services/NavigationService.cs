@@ -55,9 +55,9 @@ public partial class NavigationService : ObservableObject
         {
             dashboard.Initialize(parameter as NavigationParameter);
         }
-        else if (viewModel is ResearchPageViewModel researchPage)
+        else if (viewModel is FolderViewModel folderPage)
         {
-            researchPage.Initialize(parameter as NavigationParameter);
+            folderPage.Initialize(parameter as NavigationParameter);
         }
         else if (viewModel is UploadViewModel upload)
         {
@@ -74,7 +74,7 @@ public partial class NavigationService : ObservableObject
     private object ResolveViewModel(ScreenKey key) => key switch
     {
         ScreenKey.Dashboard => _services.GetRequiredService<DashboardViewModel>(),
-        ScreenKey.Research => _services.GetRequiredService<ResearchPageViewModel>(),
+        ScreenKey.Folder => _services.GetRequiredService<FolderViewModel>(),
         ScreenKey.Upload => _services.GetRequiredService<UploadViewModel>(),
         ScreenKey.Recording => _services.GetRequiredService<RecordingViewModel>(),
         ScreenKey.Editor => _services.GetRequiredService<EditorViewModel>(),

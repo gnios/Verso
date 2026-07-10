@@ -9,7 +9,15 @@ public interface IWhisperFactoryLoader
 
 public sealed class DefaultWhisperFactoryLoader : IWhisperFactoryLoader
 {
-    public WhisperFactory Load(string modelPath) => WhisperFactory.FromPath(modelPath);
+    public WhisperFactory Load(string modelPath)
+    {
+        var gpuDevice = WhisperRuntimeConfigurator.CurrentGpuDevice;
+        if (gpuDevice != 0)
+        {
+            return WhisperFactory.FromPath(modelPath, new WhisperFactoryOptions { GpuDevice = gpuDevice });
+        }
+        return WhisperFactory.FromPath(modelPath);
+    }
 }
 
 public interface IWhisperFactoryCache : IDisposable

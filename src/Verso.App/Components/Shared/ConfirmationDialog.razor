@@ -1,8 +1,8 @@
 @*
     Diálogo de confirmação genérico (T68), reaproveitando `IConfirmationService`
     (`BlazorConfirmationService`, novo, no lugar do antigo `WpfConfirmationService`/`MessageBox`).
-    Hoje só é usado pelos fluxos de exclusão de `DashboardViewModel`/`ResearchPageViewModel`
-    (`ConfirmAsync("Excluir transcrição"/"Excluir pesquisa", ...)`), mas a interface/serviço não é
+    Hoje só é usado pelos fluxos de exclusão de `DashboardViewModel`/`FolderViewModel`
+    (`ConfirmAsync("Excluir transcrição"/"Excluir pasta", ...)`), mas a interface/serviço não é
     específica de exclusão — qualquer chamador de `IConfirmationService.ConfirmAsync` reaproveita o
     mesmo diálogo.
 

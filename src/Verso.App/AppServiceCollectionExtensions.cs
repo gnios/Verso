@@ -2,6 +2,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Verso.App.Services;
 using Verso.App.ViewModels;
 using Verso.Core.Engine;
+using System.Net.Http;
+using Verso.Core.Services;
 
 namespace Verso.App;
 
@@ -20,13 +22,15 @@ public static class AppServiceCollectionExtensions
         services.AddSingleton<SidebarViewModel>();
         services.AddSingleton<NewPageModalViewModel>();
         services.AddSingleton<ModelDownloadModalViewModel>();
+        services.AddSingleton<FeedbackViewModel>();
+        services.AddSingleton<FeedbackService>(_ => new(new HttpClient()));
         services.AddSingleton<IModelDownloadNotifier, ModelDownloadNotificationService>();
         services.AddSingleton<MainWindowViewModel>();
         services.AddSingleton<GpuDetector>();
         services.AddSingleton<ActiveGpuResolver>();
 
         services.AddTransient<DashboardViewModel>();
-        services.AddTransient<ResearchPageViewModel>();
+        services.AddTransient<FolderViewModel>();
         services.AddTransient<UploadViewModel>();
         services.AddTransient<RecordingViewModel>();
         services.AddTransient<EditorViewModel>();

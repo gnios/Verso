@@ -32,7 +32,7 @@ namespace Verso.Core.Data.Migrations
                     b.ToTable("TranscriptionTag", (string)null);
                 });
 
-            modelBuilder.Entity("Verso.Core.Data.Entities.ResearchPage", b =>
+            modelBuilder.Entity("Verso.Core.Data.Entities.Folder", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -58,7 +58,7 @@ namespace Verso.Core.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("ResearchPages");
+                    b.ToTable("ResearchPages", (string)null);
                 });
 
             modelBuilder.Entity("Verso.Core.Data.Entities.Segment", b =>
@@ -92,7 +92,7 @@ namespace Verso.Core.Data.Migrations
 
                     b.HasIndex("TranscriptionId");
 
-                    b.ToTable("Segments");
+                    b.ToTable("Segments", (string)null);
                 });
 
             modelBuilder.Entity("Verso.Core.Data.Entities.Speaker", b =>
@@ -116,7 +116,7 @@ namespace Verso.Core.Data.Migrations
 
                     b.HasIndex("TranscriptionId");
 
-                    b.ToTable("Speakers");
+                    b.ToTable("Speakers", (string)null);
                 });
 
             modelBuilder.Entity("Verso.Core.Data.Entities.Tag", b =>
@@ -138,7 +138,7 @@ namespace Verso.Core.Data.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Tags");
+                    b.ToTable("Tags", (string)null);
                 });
 
             modelBuilder.Entity("Verso.Core.Data.Entities.Transcription", b =>
@@ -159,6 +159,10 @@ namespace Verso.Core.Data.Migrations
                     b.Property<string>("ErrorMessage")
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("FolderId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("ResearchPageId");
+
                     b.Property<string>("Icon")
                         .HasColumnType("TEXT");
 
@@ -175,9 +179,6 @@ namespace Verso.Core.Data.Migrations
                     b.Property<int>("Quality")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int?>("ResearchPageId")
-                        .HasColumnType("INTEGER");
-
                     b.Property<int>("SpeakerMode")
                         .HasColumnType("INTEGER");
 
@@ -190,11 +191,11 @@ namespace Verso.Core.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ResearchPageId");
+                    b.HasIndex("FolderId");
 
                     b.HasIndex("Status");
 
-                    b.ToTable("Transcriptions");
+                    b.ToTable("Transcriptions", (string)null);
                 });
 
             modelBuilder.Entity("Verso.Core.Data.Entities.UserSettings", b =>
@@ -236,7 +237,7 @@ namespace Verso.Core.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("UserSettings");
+                    b.ToTable("UserSettings", (string)null);
                 });
 
             modelBuilder.Entity("TagTranscription", b =>
@@ -281,15 +282,15 @@ namespace Verso.Core.Data.Migrations
 
             modelBuilder.Entity("Verso.Core.Data.Entities.Transcription", b =>
                 {
-                    b.HasOne("Verso.Core.Data.Entities.ResearchPage", "ResearchPage")
+                    b.HasOne("Verso.Core.Data.Entities.Folder", "Folder")
                         .WithMany("Transcriptions")
-                        .HasForeignKey("ResearchPageId")
+                        .HasForeignKey("FolderId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.Navigation("ResearchPage");
+                    b.Navigation("Folder");
                 });
 
-            modelBuilder.Entity("Verso.Core.Data.Entities.ResearchPage", b =>
+            modelBuilder.Entity("Verso.Core.Data.Entities.Folder", b =>
                 {
                     b.Navigation("Transcriptions");
                 });

@@ -12,12 +12,13 @@ namespace Verso.App.ViewModels;
 public partial class SidebarViewModel : ViewModelBase
 {
     private readonly NavigationService _navigation;
+    private readonly FeedbackViewModel _feedback;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ThemeService _themeService;
     private readonly NewPageModalViewModel _newPageModal;
     private readonly IConfirmationService _confirmation;
 
-    public ObservableCollection<SidebarResearchItemViewModel> Researches { get; } = [];
+    public ObservableCollection<SidebarFolderItemViewModel> Folders { get; } = [];
     public ObservableCollection<SidebarTagItemViewModel> Tags { get; } = [];
 
     [ObservableProperty]
@@ -48,13 +49,15 @@ public partial class SidebarViewModel : ViewModelBase
         IServiceScopeFactory scopeFactory,
         ThemeService themeService,
         NewPageModalViewModel newPageModal,
-        IConfirmationService confirmation)
+        IConfirmationService confirmation,
+        FeedbackViewModel feedback)
     {
         _navigation = navigation;
         _scopeFactory = scopeFactory;
         _themeService = themeService;
         _newPageModal = newPageModal;
         _confirmation = confirmation;
+        _feedback = feedback;
         _themeService.PropertyChanged += OnThemePropertyChanged;
         _ = LoadAsync();
     }
@@ -62,19 +65,19 @@ public partial class SidebarViewModel : ViewModelBase
     public async Task LoadAsync()
     {
         using var scope = _scopeFactory.CreateScope();
-        var researchService = scope.ServiceProvider.GetRequiredService<ResearchService>();
+        var folderService = scope.ServiceProvider.GetRequiredService<FolderService>();
         var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
 
-        var researches = await researchService.GetAllAsync();
+        var folders = await folderService.GetAllAsync();
         var tags = await libraryService.GetTagsAsync();
 
-        Researches.Clear();
-        foreach (var research in researches)
+        Folders.Clear();
+        foreach (var folder in folders)
         {
-            Researches.Add(new SidebarResearchItemViewModel(
-                research,
+            Folders.Add(new SidebarFolderItemViewModel(
+                folder,
                 _navigation,
-                id => _ = DeleteResearchAsync(id)));
+                id => _ = DeleteFolderAsync(id)));
         }
 
         Tags.Clear();
@@ -102,6 +105,10 @@ public partial class SidebarViewModel : ViewModelBase
     private void NavigateSettings() =>
         _navigation.NavigateTo(ScreenKey.Settings);
 
+
+    [RelayCommand]
+    private void OpenFeedback() =>
+        _feedback.Open();
     [RelayCommand]
     private void NavigateAll() =>
         _navigation.NavigateTo(ScreenKey.Dashboard, new NavigationParameter());
@@ -139,7 +146,7 @@ public partial class SidebarViewModel : ViewModelBase
         IsNewMenuOpen = !IsNewMenuOpen;
 
     [RelayCommand]
-    private void NewResearch()
+    private void NewFolder()
     {
         IsNewMenuOpen = false;
         _newPageModal.Open();
@@ -169,17 +176,17 @@ public partial class SidebarViewModel : ViewModelBase
     [RelayCommand]
     private async Task ToggleThemeAsync() => await _themeService.ToggleAsync();
 
-    internal async Task DeleteResearchAsync(int researchId)
+    internal async Task DeleteFolderAsync(int folderId)
     {
         using var scope = _scopeFactory.CreateScope();
-        var researchService = scope.ServiceProvider.GetRequiredService<ResearchService>();
-        var research = await researchService.GetByIdAsync(researchId);
-        if (research is null)
+        var folderService = scope.ServiceProvider.GetRequiredService<FolderService>();
+        var folder = await folderService.GetByIdAsync(folderId);
+        if (folder is null)
         {
             return;
         }
 
-        var count = research.Transcriptions.Count;
+        var count = folder.Transcriptions.Count;
         var countMessage = count switch
         {
             0 => "Nenhuma transcrição está associada.",
@@ -188,17 +195,17 @@ public partial class SidebarViewModel : ViewModelBase
         };
 
         if (!await _confirmation.ConfirmAsync(
-                "Excluir pesquisa",
-                $"A pesquisa \"{research.Title}\" será excluída. {countMessage} Deseja continuar?"))
+                "Excluir pasta",
+                $"A pasta \"{folder.Title}\" será excluída. {countMessage} Deseja continuar?"))
         {
             return;
         }
 
-        await researchService.DeleteAsync(researchId);
+        await folderService.DeleteAsync(folderId);
 
-        if (_navigation.CurrentScreen == ScreenKey.Research
+        if (_navigation.CurrentScreen == ScreenKey.Folder
             && _navigation.NavigationParameter is NavigationParameter parameter
-            && parameter.ResearchId == researchId)
+            && parameter.FolderId == folderId)
         {
             _navigation.NavigateTo(ScreenKey.Dashboard);
         }

@@ -5,16 +5,16 @@ using Verso.Core.Services;
 
 namespace Verso.Tests.Services;
 
-public class ResearchServiceTests
+public class FolderServiceTests
 {
     [Fact]
-    public async Task CreateAsync_PersistsResearchPage()
+    public async Task CreateAsync_PersistsFolder()
     {
         var (provider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();
         try
         {
             var factory = TestDbHelper.GetFactory(provider);
-            var service = new ResearchService(factory);
+            var service = new FolderService(factory);
 
             var created = await service.CreateAsync("Mobilidade urbana", "🚲", "green");
 
@@ -40,7 +40,7 @@ public class ResearchServiceTests
         try
         {
             var factory = TestDbHelper.GetFactory(provider);
-            var service = new ResearchService(factory);
+            var service = new FolderService(factory);
 
             var loaded = await service.GetByIdAsync(9999);
 
@@ -59,7 +59,7 @@ public class ResearchServiceTests
         try
         {
             var factory = TestDbHelper.GetFactory(provider);
-            var service = new ResearchService(factory);
+            var service = new FolderService(factory);
             var created = await service.CreateAsync("Tese vazia", "📚", "blue");
 
             await service.DeleteAsync(created.Id);
@@ -79,7 +79,7 @@ public class ResearchServiceTests
         try
         {
             var factory = TestDbHelper.GetFactory(provider);
-            var service = new ResearchService(factory);
+            var service = new FolderService(factory);
             var page = await service.CreateAsync("Pesquisa com dados", "📚", "purple");
 
             var transcriptionId = Guid.NewGuid();
@@ -90,7 +90,7 @@ public class ResearchServiceTests
                     Id = transcriptionId,
                     Title = "Entrevista vinculada",
                     Status = TranscriptionStatus.Done,
-                    ResearchPageId = page.Id
+                    FolderId = page.Id
                 });
                 await ctx.SaveChangesAsync();
             }
@@ -101,7 +101,7 @@ public class ResearchServiceTests
 
             await using var readCtx = await factory.CreateDbContextAsync();
             var transcription = await readCtx.Transcriptions.SingleAsync(t => t.Id == transcriptionId);
-            Assert.Null(transcription.ResearchPageId);
+            Assert.Null(transcription.FolderId);
             Assert.Equal("Entrevista vinculada", transcription.Title);
         }
         finally
@@ -109,14 +109,15 @@ public class ResearchServiceTests
             TestDbHelper.Cleanup(directory);
         }
     }
+
     [Fact]
-    public async Task AssignTranscriptionToResearchAsync_LinksTranscriptionToResearch()
+    public async Task AssignTranscriptionToFolderAsync_LinksTranscriptionToFolder()
     {
         var (provider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();
         try
         {
             var factory = TestDbHelper.GetFactory(provider);
-            var service = new ResearchService(factory);
+            var service = new FolderService(factory);
             var page = await service.CreateAsync("Pesquisa alvo", "🔬", "green");
 
             var transcriptionId = Guid.NewGuid();
@@ -131,11 +132,11 @@ public class ResearchServiceTests
                 await ctx.SaveChangesAsync();
             }
 
-            await service.AssignTranscriptionToResearchAsync(transcriptionId, page.Id);
+            await service.AssignTranscriptionToFolderAsync(transcriptionId, page.Id);
 
             await using var readCtx = await factory.CreateDbContextAsync();
             var transcription = await readCtx.Transcriptions.SingleAsync(t => t.Id == transcriptionId);
-            Assert.Equal(page.Id, transcription.ResearchPageId);
+            Assert.Equal(page.Id, transcription.FolderId);
         }
         finally
         {
@@ -144,13 +145,13 @@ public class ResearchServiceTests
     }
 
     [Fact]
-    public async Task AssignTranscriptionToResearchAsync_WithNullId_UnlinksTranscription()
+    public async Task AssignTranscriptionToFolderAsync_WithNullId_UnlinksTranscription()
     {
         var (provider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();
         try
         {
             var factory = TestDbHelper.GetFactory(provider);
-            var service = new ResearchService(factory);
+            var service = new FolderService(factory);
             var page = await service.CreateAsync("Pesquisa origem", "📚", "blue");
 
             var transcriptionId = Guid.NewGuid();
@@ -161,16 +162,16 @@ public class ResearchServiceTests
                     Id = transcriptionId,
                     Title = "Vinculada",
                     Status = TranscriptionStatus.Done,
-                    ResearchPageId = page.Id
+                    FolderId = page.Id
                 });
                 await ctx.SaveChangesAsync();
             }
 
-            await service.AssignTranscriptionToResearchAsync(transcriptionId, null);
+            await service.AssignTranscriptionToFolderAsync(transcriptionId, null);
 
             await using var readCtx = await factory.CreateDbContextAsync();
             var transcription = await readCtx.Transcriptions.SingleAsync(t => t.Id == transcriptionId);
-            Assert.Null(transcription.ResearchPageId);
+            Assert.Null(transcription.FolderId);
         }
         finally
         {
@@ -179,13 +180,13 @@ public class ResearchServiceTests
     }
 
     [Fact]
-    public async Task AssignTranscriptionToResearchAsync_WithUnknownResearch_Throws()
+    public async Task AssignTranscriptionToFolderAsync_WithUnknownFolder_Throws()
     {
         var (provider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();
         try
         {
             var factory = TestDbHelper.GetFactory(provider);
-            var service = new ResearchService(factory);
+            var service = new FolderService(factory);
             var transcriptionId = Guid.NewGuid();
             await using (var ctx = await factory.CreateDbContextAsync())
             {
@@ -199,12 +200,11 @@ public class ResearchServiceTests
             }
 
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                service.AssignTranscriptionToResearchAsync(transcriptionId, 9999));
+                service.AssignTranscriptionToFolderAsync(transcriptionId, 9999));
         }
         finally
         {
             TestDbHelper.Cleanup(directory);
         }
     }
-
 }

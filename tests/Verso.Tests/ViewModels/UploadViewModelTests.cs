@@ -19,7 +19,7 @@ namespace Verso.Tests.ViewModels;
 
 public class UploadViewModelTests
 {
-    private static async Task<(IServiceProvider Provider, string Directory, string MediaPath, int ResearchId)>
+    private static async Task<(IServiceProvider Provider, string Directory, string MediaPath, int FolderId)>
         CreateUploadProviderAsync()
     {
         var (baseProvider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();
@@ -39,8 +39,8 @@ public class UploadViewModelTests
         var provider = services.BuildServiceProvider();
         await DbBootstrapper.MigrateAsync(provider);
 
-        var researchService = provider.GetRequiredService<ResearchService>();
-        var research = await researchService.CreateAsync("Mobilidade urbana", "🚲", "green");
+        var folderService = provider.GetRequiredService<FolderService>();
+        var folder = await folderService.CreateAsync("Mobilidade urbana", "🚲", "green");
 
         await using (var ctx = await TestDbHelper.GetFactory(provider).CreateDbContextAsync())
         {
@@ -54,17 +54,17 @@ public class UploadViewModelTests
             await ctx.SaveChangesAsync();
         }
 
-        return (provider, directory, mediaPath, research.Id);
+        return (provider, directory, mediaPath, folder.Id);
     }
 
     private static async Task<UploadViewModel> CreateUploadAsync(
         IServiceProvider provider,
-        int? researchId = null)
+        int? folderId = null)
     {
         var navigation = provider.GetRequiredService<NavigationService>();
         navigation.NavigateTo(
             ScreenKey.Upload,
-            researchId is int id ? new NavigationParameter(ResearchId: id) : null);
+            folderId is int id ? new NavigationParameter(FolderId: id) : null);
 
         var upload = Assert.IsType<UploadViewModel>(navigation.CurrentViewModel);
         await Task.Delay(50);
@@ -134,15 +134,15 @@ public class UploadViewModelTests
     }
 
     [Fact]
-    public async Task Initialize_WithResearchId_PreselectsResearch()
+    public async Task Initialize_WithFolderId_PreselectsFolder()
     {
-        var (provider, directory, _, researchId) = await CreateUploadProviderAsync();
+        var (provider, directory, _, folderId) = await CreateUploadProviderAsync();
         try
         {
-            var upload = await CreateUploadAsync(provider, researchId);
+            var upload = await CreateUploadAsync(provider, folderId);
 
-            Assert.Equal(researchId, upload.SelectedResearch?.Id);
-            Assert.Equal("Mobilidade urbana", upload.SelectedResearch?.Name);
+            Assert.Equal(folderId, upload.SelectedFolder?.Id);
+            Assert.Equal("Mobilidade urbana", upload.SelectedFolder?.Name);
         }
         finally
         {
@@ -153,12 +153,12 @@ public class UploadViewModelTests
     [Fact]
     public async Task StartTranscription_CreatesRecordEnqueuesAndNavigatesToDashboard()
     {
-        var (provider, directory, mediaPath, researchId) = await CreateUploadProviderAsync();
+        var (provider, directory, mediaPath, folderId) = await CreateUploadProviderAsync();
         try
         {
-            var upload = await CreateUploadAsync(provider, researchId);
+            var upload = await CreateUploadAsync(provider, folderId);
             upload.TrySelectFile(mediaPath);
-            upload.SelectedResearch = upload.ResearchOptions.First(option => option.Id == researchId);
+            upload.SelectedFolder = upload.FolderOptions.First(option => option.Id == folderId);
 
             await upload.StartTranscriptionCommand.ExecuteAsync(null);
 
@@ -170,7 +170,7 @@ public class UploadViewModelTests
             await using var ctx = await TestDbHelper.GetFactory(provider).CreateDbContextAsync();
             var transcription = Assert.Single(ctx.Transcriptions);
             Assert.Equal(TranscriptionStatus.InProgress, transcription.Status);
-            Assert.Equal(researchId, transcription.ResearchPageId);
+            Assert.Equal(folderId, transcription.FolderId);
             Assert.Equal("es", transcription.Language);
             Assert.Equal(SpeakerMode.Off, transcription.SpeakerMode);
             Assert.False(string.IsNullOrWhiteSpace(transcription.MediaFilePath));

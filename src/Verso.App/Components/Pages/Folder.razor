@@ -1,21 +1,21 @@
 @*
-    Página de pesquisa/tese (T61), reaproveitando `ResearchPageViewModel` — fiel às classes
+    Página de pasta (antiga pesquisa/tese, T61), reaproveitando `FolderViewModel` — fiel às classes
     `.research-*`/`.page-header`/`.editor-breadcrumb` do protótipo
     (transcriba-v2-icons-transcriptions.html, seção `#screen-research`/`renderResearchPage`).
 
-    `ResearchPageViewModel` é registrado como Transient (ver `AppServiceCollectionExtensions`):
-    cada navegação para `ScreenKey.Research` resolve/Initialize uma instância nova via
+    `FolderViewModel` é registrado como Transient (ver `AppServiceCollectionExtensions`):
+    cada navegação para `ScreenKey.Folder` resolve/Initialize uma instância nova via
     `NavigationService`. Por isso este componente recebe o ViewModel como [Parameter] (via
     `NavigationService.CurrentViewModel`, repassado pela integração central da shell) em vez de
     `@@inject` — o mesmo padrão vale para as demais telas transient (Dashboard, Upload, Editor,
     Settings).
 
-    Exclusão (T68): a versão Avalonia original (`ResearchPageView.axaml`) usava `ContextFlyout`
-    (menu de clique direito) tanto para "Excluir pesquisa" (no ícone do header) quanto para
+    Exclusão (T68): a versão Avalonia original usava `ContextFlyout`
+    (menu de clique direito) tanto para "Excluir pasta" (no ícone do header) quanto para
     "Excluir" por transcrição (no item da lista) — Blazor/HTML não tem um equivalente direto sem
     JS interop extra, então aqui reaproveitamos o mesmo padrão de botão de ação visível ao lado do
     conteúdo já adotado por `TranscriptionCard.razor` (`.dash-card-action`/`-danger`), em vez de
-    introduzir um menu de contexto novo só para isso. Ambos os comandos (`DeleteResearchCommand`/
+    introduzir um menu de contexto novo só para isso. Ambos os comandos (`DeleteFolderCommand`/
     `TranscriptionCardViewModel.DeleteCommand`) já existiam e já chamavam `IConfirmationService` —
     só faltava o wiring na view.
 *@
@@ -33,9 +33,9 @@
                 <h2>@ViewModel.Title</h2>
                 <p>@ViewModel.Description</p>
             </div>
-            <button class="dash-card-action dash-card-action-danger" style="margin-left:auto" title="Excluir pesquisa" @onclick="() => ViewModel.DeleteResearchCommand.Execute(null)">
+            <button class="dash-card-action dash-card-action-danger" style="margin-left:auto" title="Excluir pasta" @onclick="() => ViewModel.DeleteFolderCommand.Execute(null)">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
-                Excluir pesquisa
+                Excluir pasta
             </button>
         </div>
     </div>
@@ -72,10 +72,10 @@
 </section>
 
 @code {
-    private ResearchPageViewModel? _observedViewModel;
+    private FolderViewModel? _observedViewModel;
 
     [Parameter, EditorRequired]
-    public required ResearchPageViewModel ViewModel { get; set; }
+    public required FolderViewModel ViewModel { get; set; }
 
     protected override void OnParametersSet()
     {

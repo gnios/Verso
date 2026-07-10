@@ -1,6 +1,10 @@
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace Verso.Core.Data.Entities;
 
-public class ResearchPage
+// Keep old table name to avoid migration — concept rename only.
+[Table("ResearchPages")]
+public class Folder
 {
     public int Id { get; set; }
     public string Title { get; set; } = "";

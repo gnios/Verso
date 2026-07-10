@@ -6,6 +6,6 @@ namespace Verso.App.Services;
 public sealed record NavigationParameter(
     LibraryStatusFilter? StatusFilter = null,
     int? TagId = null,
-    int? ResearchId = null,
+    int? FolderId = null,
     Guid? TranscriptionId = null,
     bool UnassignedOnly = false);

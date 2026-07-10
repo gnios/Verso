@@ -11,9 +11,9 @@ using Verso.Core.Services;
 namespace Verso.App.ViewModels;
 
 /// <summary>
-/// Modal "Nova pesquisa / tese". A criação de transcrição avulsa (com arquivo, tags, ícone)
+/// Modal "Nova pasta". A criação de transcrição avulsa (com arquivo, tags, ícone)
 /// foi migrada para a tela <see cref="UploadViewModel"/>/<c>Upload.razor</c> — este modal
-/// agora atende apenas a criação de pesquisas, então o modo (<see cref="NewPageMode"/>) e
+/// agora atende apenas a criação de pastas, então o modo (<see cref="NewPageMode"/>) e
 /// todo o fluxo de seleção de arquivo/tags foram removidos (clean cutover).
 /// </summary>
 public partial class NewPageModalViewModel : ViewModelBase
@@ -39,12 +39,12 @@ public partial class NewPageModalViewModel : ViewModelBase
 
     public bool CanConfirm => !string.IsNullOrWhiteSpace(Title) && !IsConfirming;
 
-    public string ModalTitle => "Nova pesquisa / tese";
+    public string ModalTitle => "Nova pasta";
 
     public string ConfirmButtonLabel => IsConfirming ? "Criando…" : "Criar";
 
     public string PreviewTitle =>
-        string.IsNullOrWhiteSpace(Title) ? "Nova pesquisa" : Title;
+        string.IsNullOrWhiteSpace(Title) ? "Nova pasta" : Title;
 
     public string PreviewIcon => IconPicker.SelectedIcon ?? "📝";
 
@@ -110,8 +110,8 @@ public partial class NewPageModalViewModel : ViewModelBase
         try
         {
             using var scope = _scopeFactory.CreateScope();
-            var researchService = scope.ServiceProvider.GetRequiredService<ResearchService>();
-            await researchService.CreateAsync(
+            var folderService = scope.ServiceProvider.GetRequiredService<FolderService>();
+            await folderService.CreateAsync(
                 Title.Trim(),
                 IconPicker.SelectedIcon ?? IconCatalog.PageIcons[0],
                 ColorPicker.SelectedColorName);

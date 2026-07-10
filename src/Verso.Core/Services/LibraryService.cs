@@ -37,10 +37,10 @@ public class LibraryService(IDbContextFactory<VersoDbContext> dbContextFactory)
         return await ApplyFilter(context.Transcriptions.AsQueryable(), filter).CountAsync();
     }
 
-    public async Task<IReadOnlyList<TranscriptionSummary>> GetTranscriptionsForResearchAsync(int researchPageId)
+    public async Task<IReadOnlyList<TranscriptionSummary>> GetTranscriptionsForFolderAsync(int folderId)
     {
         await using var context = await dbContextFactory.CreateDbContextAsync();
-        var query = context.Transcriptions.Where(t => t.ResearchPageId == researchPageId);
+        var query = context.Transcriptions.Where(t => t.FolderId == folderId);
         return await ProjectSummariesAsync(query);
     }
 
@@ -64,7 +64,7 @@ public class LibraryService(IDbContextFactory<VersoDbContext> dbContextFactory)
         ModelQuality quality,
         ExecutionDevice device,
         SpeakerMode speakerMode,
-        int? researchPageId,
+        int? folderId,
         double durationSeconds,
         string? icon = null,
         IEnumerable<string>? tagNames = null)
@@ -81,7 +81,7 @@ public class LibraryService(IDbContextFactory<VersoDbContext> dbContextFactory)
             Quality = quality,
             Device = device,
             SpeakerMode = speakerMode,
-            ResearchPageId = researchPageId,
+            FolderId = folderId,
             DurationSeconds = durationSeconds,
             CreatedAt = DateTime.UtcNow,
         };
@@ -108,7 +108,7 @@ public class LibraryService(IDbContextFactory<VersoDbContext> dbContextFactory)
             .ThenInclude(s => s.Speaker)
             .Include(t => t.Speakers)
             .Include(t => t.Tags)
-            .Include(t => t.ResearchPage)
+            .Include(t => t.Folder)
             .AsNoTracking()
             .FirstOrDefaultAsync(t => t.Id == id);
     }
@@ -359,7 +359,7 @@ public class LibraryService(IDbContextFactory<VersoDbContext> dbContextFactory)
 
         if (filter.UnassignedOnly)
         {
-            query = query.Where(t => t.ResearchPageId == null);
+            query = query.Where(t => t.FolderId == null);
         }
 
         return query;

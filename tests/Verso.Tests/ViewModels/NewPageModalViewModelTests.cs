@@ -53,7 +53,7 @@ public class NewPageModalViewModelTests
     }
 
     [Fact]
-    public async Task Cancel_DoesNotCreateResearch()
+    public async Task Cancel_DoesNotCreateFolder()
     {
         var (provider, directory) = await CreateProviderAsync();
         try
@@ -61,13 +61,13 @@ public class NewPageModalViewModelTests
             var modal = provider.GetRequiredService<NewPageModalViewModel>();
 
             modal.Open();
-            modal.Title = "Pesquisa cancelada";
+            modal.Title = "Pasta cancelada";
             modal.CancelCommand.Execute(null);
 
             Assert.False(modal.IsOpen);
 
             await using var context = await TestDbHelper.GetFactory(provider).CreateDbContextAsync();
-            Assert.Empty(await context.ResearchPages.ToListAsync());
+            Assert.Empty(await context.Folders.ToListAsync());
         }
         finally
         {
@@ -76,7 +76,7 @@ public class NewPageModalViewModelTests
     }
 
     [Fact]
-    public async Task ConfirmAsync_Research_NavigatesToDashboardAndRefreshesSidebar()
+    public async Task ConfirmAsync_Folder_NavigatesToDashboardAndRefreshesSidebar()
     {
         var (provider, directory) = await CreateProviderAsync();
         try
@@ -92,7 +92,7 @@ public class NewPageModalViewModelTests
 
             Assert.False(modal.IsOpen);
             Assert.Equal(ScreenKey.Dashboard, navigation.CurrentScreen);
-            Assert.Contains(sidebar.Researches, r => r.Title == "Mobilidade urbana");
+            Assert.Contains(sidebar.Folders, r => r.Title == "Mobilidade urbana");
         }
         finally
         {

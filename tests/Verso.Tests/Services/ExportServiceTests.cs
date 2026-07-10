@@ -10,7 +10,7 @@ namespace Verso.Tests.Services;
 public class ExportServiceTests
 {
     [Fact]
-    public async Task ExportTxtAsync_WritesHeaderAndSegmentLines()
+    public async Task ExportTxtAsync_SpeakerAndTimestampOnSeparateLineFromText()
     {
         var (provider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();
         var outputPath = Path.Combine(directory, "export.txt");
@@ -24,8 +24,45 @@ public class ExportServiceTests
             await service.ExportTxtAsync(transcriptionId, outputPath);
 
             var lines = await File.ReadAllLinesAsync(outputPath, Encoding.UTF8);
-            Assert.Contains(lines, l => l.StartsWith("Título:", StringComparison.Ordinal));
-            Assert.Contains(lines, l => l.Contains("->") && l.Contains("Olá mundo"));
+            Assert.Equal("Transcrição", lines[0]);
+            Assert.Equal("[Ana] — [00:00]", lines[1]);
+            Assert.Equal("Olá mundo", lines[2]);
+            Assert.Equal("[Ana] — [00:02]", lines[3]);
+            Assert.Equal("Tchau", lines[4]);
+            Assert.Equal(5, lines.Length);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task ExportTxtAsync_PreservesSegmentOrderByTimestamp()
+    {
+        var (provider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();
+        var outputPath = Path.Combine(directory, "export-order.txt");
+
+        try
+        {
+            var factory = TestDbHelper.GetFactory(provider);
+            var transcriptionId = await SeedMultiSpeakerTranscriptionAsync(factory);
+            var service = new ExportService(factory);
+
+            await service.ExportTxtAsync(transcriptionId, outputPath);
+
+            var lines = await File.ReadAllLinesAsync(outputPath, Encoding.UTF8);
+            Assert.Equal("Transcrição", lines[0]);
+            Assert.Equal("[Ana] — [00:00]", lines[1]);
+            Assert.Equal("Bom dia", lines[2]);
+            // Linha em branco entre locutores diferentes
+            Assert.Equal("", lines[3]);
+            Assert.Equal("[Carlos] — [00:03]", lines[4]);
+            Assert.Equal("Olá", lines[5]);
+            Assert.Equal("", lines[6]);
+            Assert.Equal("[Ana] — [00:06]", lines[7]);
+            Assert.Equal("Como vai", lines[8]);
+            Assert.Equal(9, lines.Length);
         }
         finally
         {
@@ -160,6 +197,51 @@ public class ExportServiceTests
                     SortOrder = 1,
                     SpeakerId = speakerId
                 }
+            ]
+        });
+        await ctx.SaveChangesAsync();
+        return transcriptionId;
+    }
+
+    private static async Task<Guid> SeedMultiSpeakerTranscriptionAsync(
+        IDbContextFactory<VersoDbContext> factory)
+    {
+        var transcriptionId = Guid.NewGuid();
+        var anaId = Guid.NewGuid();
+        var carlosId = Guid.NewGuid();
+
+        await using var ctx = await factory.CreateDbContextAsync();
+        ctx.Transcriptions.Add(new Transcription
+        {
+            Id = transcriptionId,
+            Title = "Diálogo",
+            Status = TranscriptionStatus.Done,
+            Language = "pt",
+            Quality = ModelQuality.Standard,
+            DurationSeconds = 30,
+            MediaFilePath = null,
+            Speakers =
+            [
+                new Speaker { Id = anaId, TranscriptionId = transcriptionId, Name = "Ana", ColorHex = "#2eaadc" },
+                new Speaker { Id = carlosId, TranscriptionId = transcriptionId, Name = "Carlos", ColorHex = "#e74c3c" },
+            ],
+            Segments =
+            [
+                new Segment
+                {
+                    Id = Guid.NewGuid(), TranscriptionId = transcriptionId,
+                    StartSeconds = 0, EndSeconds = 3, Text = "Bom dia", SortOrder = 0, SpeakerId = anaId
+                },
+                new Segment
+                {
+                    Id = Guid.NewGuid(), TranscriptionId = transcriptionId,
+                    StartSeconds = 3, EndSeconds = 6, Text = "Olá", SortOrder = 1, SpeakerId = carlosId
+                },
+                new Segment
+                {
+                    Id = Guid.NewGuid(), TranscriptionId = transcriptionId,
+                    StartSeconds = 6, EndSeconds = 9, Text = "Como vai", SortOrder = 2, SpeakerId = anaId
+                },
             ]
         });
         await ctx.SaveChangesAsync();

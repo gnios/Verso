@@ -68,6 +68,7 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     private string _modelRecommendationReason = "";
 
+
     public long DetectedRamGb { get; private set; }
 
     // --- Seção Desenvolvedor: runtime/GPU/logs ---

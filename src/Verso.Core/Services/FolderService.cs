@@ -4,13 +4,13 @@ using Verso.Core.Data.Entities;
 
 namespace Verso.Core.Services;
 
-public class ResearchService(IDbContextFactory<VersoDbContext> dbContextFactory)
+public class FolderService(IDbContextFactory<VersoDbContext> dbContextFactory)
 {
-    public async Task<ResearchPage> CreateAsync(string title, string icon, string colorName)
+    public async Task<Folder> CreateAsync(string title, string icon, string colorName)
     {
         await using var context = await dbContextFactory.CreateDbContextAsync();
 
-        var page = new ResearchPage
+        var page = new Folder
         {
             Title = title,
             Icon = icon,
@@ -18,23 +18,23 @@ public class ResearchService(IDbContextFactory<VersoDbContext> dbContextFactory)
             CreatedAt = DateTime.UtcNow
         };
 
-        context.ResearchPages.Add(page);
+        context.Folders.Add(page);
         await context.SaveChangesAsync();
         return page;
     }
 
-    public async Task<ResearchPage?> GetByIdAsync(int id)
+    public async Task<Folder?> GetByIdAsync(int id)
     {
         await using var context = await dbContextFactory.CreateDbContextAsync();
-        return await context.ResearchPages
+        return await context.Folders
             .Include(r => r.Transcriptions)
             .FirstOrDefaultAsync(r => r.Id == id);
     }
 
-    public async Task<IReadOnlyList<ResearchPage>> GetAllAsync()
+    public async Task<IReadOnlyList<Folder>> GetAllAsync()
     {
         await using var context = await dbContextFactory.CreateDbContextAsync();
-        return await context.ResearchPages
+        return await context.Folders
             .Include(r => r.Transcriptions)
             .OrderByDescending(r => r.CreatedAt)
             .AsNoTracking()
@@ -45,7 +45,7 @@ public class ResearchService(IDbContextFactory<VersoDbContext> dbContextFactory)
     {
         await using var context = await dbContextFactory.CreateDbContextAsync();
 
-        var page = await context.ResearchPages
+        var page = await context.Folders
             .Include(r => r.Transcriptions)
             .FirstOrDefaultAsync(r => r.Id == id);
 
@@ -56,14 +56,14 @@ public class ResearchService(IDbContextFactory<VersoDbContext> dbContextFactory)
 
         foreach (var transcription in page.Transcriptions)
         {
-            transcription.ResearchPageId = null;
+            transcription.FolderId = null;
         }
 
-        context.ResearchPages.Remove(page);
+        context.Folders.Remove(page);
         await context.SaveChangesAsync();
     }
 
-    public async Task AssignTranscriptionToResearchAsync(Guid transcriptionId, int? researchPageId)
+    public async Task AssignTranscriptionToFolderAsync(Guid transcriptionId, int? folderId)
     {
         await using var context = await dbContextFactory.CreateDbContextAsync();
         var transcription = await context.Transcriptions.FindAsync(transcriptionId);
@@ -72,16 +72,16 @@ public class ResearchService(IDbContextFactory<VersoDbContext> dbContextFactory)
             throw new InvalidOperationException($"Transcrição {transcriptionId} não encontrada.");
         }
 
-        if (researchPageId is int id)
+        if (folderId is int id)
         {
-            var exists = await context.ResearchPages.AnyAsync(r => r.Id == id);
+            var exists = await context.Folders.AnyAsync(r => r.Id == id);
             if (!exists)
             {
-                throw new InvalidOperationException($"Pesquisa {id} não encontrada.");
+                throw new InvalidOperationException($"Pasta {id} não encontrada.");
             }
         }
 
-        transcription.ResearchPageId = researchPageId;
+        transcription.FolderId = folderId;
         await context.SaveChangesAsync();
     }
 }

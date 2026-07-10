@@ -9,7 +9,7 @@ using Verso.Core.Data.Entities;
 
 namespace Verso.App.ViewModels;
 
-public partial class SidebarResearchItemViewModel : ViewModelBase
+public partial class SidebarFolderItemViewModel : ViewModelBase
 {
     private readonly NavigationService _navigation;
     private readonly Action<int>? _deleteHandler;
@@ -26,20 +26,20 @@ public partial class SidebarResearchItemViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isExpanded = true;
 
-    public SidebarResearchItemViewModel(
-        ResearchPage research,
+    public SidebarFolderItemViewModel(
+        Folder folder,
         NavigationService navigation,
         Action<int>? deleteHandler = null)
     {
         _navigation = navigation;
         _deleteHandler = deleteHandler;
-        Id = research.Id;
-        Title = TruncateTitle(research.Title);
-        Icon = research.Icon;
-        ColorHex = ColorCatalog.PageColors.FirstOrDefault(c => c.Name == research.ColorName).Hex
+        Id = folder.Id;
+        Title = TruncateTitle(folder.Title);
+        Icon = folder.Icon;
+        ColorHex = ColorCatalog.PageColors.FirstOrDefault(c => c.Name == folder.ColorName).Hex
                    ?? ColorCatalog.PageColors[0].Hex;
-        TranscriptionCount = research.Transcriptions.Count;
-        Transcriptions = research.Transcriptions
+        TranscriptionCount = folder.Transcriptions.Count;
+        Transcriptions = folder.Transcriptions
             .OrderByDescending(t => t.CreatedAt)
             .Select(t => new SidebarTranscriptionItemViewModel(t, navigation))
             .ToList();
@@ -47,7 +47,7 @@ public partial class SidebarResearchItemViewModel : ViewModelBase
 
     [RelayCommand]
     private void Navigate() =>
-        _navigation.NavigateTo(ScreenKey.Research, new NavigationParameter(ResearchId: Id));
+        _navigation.NavigateTo(ScreenKey.Folder, new NavigationParameter(FolderId: Id));
 
     [RelayCommand]
     private void ToggleExpand() => IsExpanded = !IsExpanded;

@@ -47,6 +47,12 @@ public static class TranscriptionTextFormatter
         return $"{(int)time.TotalHours:00}:{time.Minutes:00}:{time.Seconds:00}.{time.Milliseconds:000}";
     }
 
+    public static string FormatTxtTimestamp(double totalSeconds)
+    {
+        var time = TimeSpan.FromSeconds(totalSeconds);
+        return $"{time.Minutes:00}:{time.Seconds:00}";
+    }
+
     public static string BuildCueText(string? speakerName, string text)
     {
         var trimmed = text.Trim();

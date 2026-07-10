@@ -3,7 +3,7 @@ namespace Verso.App.Services;
 public enum ScreenKey
 {
     Dashboard,
-    Research,
+    Folder,
     Upload,
     Recording,
     Editor,

@@ -16,10 +16,10 @@
             <div class="editor-transcript-inner">
                 <div class="editor-breadcrumb">
                     <a href="#" @onclick="() => ViewModel.NavigateDashboardCommand.Execute(null)" @onclick:preventDefault="true">Biblioteca</a>
-                    @if (ViewModel.HasResearchBreadcrumb)
+                    @if (ViewModel.HasFolderBreadcrumb)
                     {
                         @: &nbsp;→&nbsp;
-                        <a href="#" @onclick="() => ViewModel.NavigateResearchCommand.Execute(null)" @onclick:preventDefault="true">@ViewModel.ResearchTitle</a>
+                        <a href="#" @onclick="() => ViewModel.NavigateFolderCommand.Execute(null)" @onclick:preventDefault="true">@ViewModel.FolderTitle</a>
                     }
                     @if (!string.IsNullOrWhiteSpace(ViewModel.Title))
                     {
@@ -52,16 +52,18 @@
                     <span>@ViewModel.MetaDuration</span>
                     <span class="editor-meta-dot"></span>
                     <span>@ViewModel.MetaSpeakerCount</span>
-                    @if (!string.IsNullOrWhiteSpace(ViewModel.MetaProcessingTime))
-                    {
-                        <span class="editor-meta-dot"></span>
-                        <span class="editor-meta-time" title="Tempo que o motor demorou para transcrever">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-                            @ViewModel.MetaProcessingTime
-                        </span>
-                    }
                     <span class="editor-meta-dot"></span>
-                    <ResearchCombobox Options="ViewModel.ResearchOptions" SelectedId="ViewModel.SelectedResearchId" OnSelected="OnResearchSelected" />
+                    <FolderCombobox Options="ViewModel.FolderOptions" SelectedId="ViewModel.SelectedFolderId" OnSelected="OnFolderSelected" />
+                    <span class="editor-meta-dot"></span>
+                    <button type="button" class="editor-meta-export" disabled="@(!ViewModel.CanExport)" @onclick="() => ViewModel.ExportCommand.Execute(null)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+                        Exportar
+                    </button>
+                </div>
+                <div class="editor-submeta">
+                    <span>@ViewModel.MetaModel</span>
+                    <span class="editor-meta-dot"></span>
+                    <span title="@ViewModel.MetaProcessingTime — tempo de transcrição">@ViewModel.MetaProcessingTime</span>
                 </div>
 
                 <div class="editor-tags editor-tags-editable">
@@ -81,12 +83,6 @@
                 }
                 else if (ViewModel.HasSegments)
                 {
-                    <div class="editor-toolbar">
-                        <button type="button" disabled="@(!ViewModel.CanExport)" @onclick="() => ViewModel.ExportCommand.Execute(null)">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
-                            Exportar
-                        </button>
-                    </div>
 
                     <div id="transcript-segments">
                         @foreach (var segment in ViewModel.Segments)
@@ -129,6 +125,7 @@
     </div>
 </div>
 
+
 <style>
     .export-format-list {
         display: flex;
@@ -166,6 +163,43 @@
         font-size: 12px;
         color: var(--muted);
     }
+    
+    .editor-meta-export {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: none;
+        border: none;
+        padding: 0;
+        font: inherit;
+        font-size: 13px;
+        color: var(--muted);
+        cursor: pointer;
+        white-space: nowrap;
+        transition: color .1s;
+    }
+    .editor-meta-export:hover:not(:disabled) {
+        color: var(--fg-secondary);
+    }
+    .editor-meta-export:disabled {
+        opacity: .4;
+        cursor: default;
+    }
+    .editor-meta-export svg {
+        width: 13px;
+        height: 13px;
+    }
+    .editor-submeta {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        opacity: .75;
+    }
+    
 </style>
 
 @code {
@@ -207,8 +241,8 @@
         await ViewModel.AddTagCommand.ExecuteAsync(null);
     }
 
-    private async Task OnResearchSelected(int? researchId) =>
-        await ViewModel.ChangeResearchCommand.ExecuteAsync(researchId);
+    private async Task OnFolderSelected(int? folderId) =>
+        await ViewModel.ChangeFolderCommand.ExecuteAsync(folderId);
 
     private void OnExportOverlayClick() =>
         ViewModel.CloseExportDialogCommand.Execute(null);

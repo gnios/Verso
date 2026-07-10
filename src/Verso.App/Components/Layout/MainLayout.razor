@@ -29,9 +29,9 @@
         {
             <Dashboard ViewModel="dashboardVm" />
         }
-        else if (NavigationService.CurrentScreen == ScreenKey.Research && NavigationService.CurrentViewModel is ResearchPageViewModel researchVm)
+        else if (NavigationService.CurrentScreen == ScreenKey.Folder && NavigationService.CurrentViewModel is FolderViewModel folderVm)
         {
-            <ResearchPage ViewModel="researchVm" />
+            <Folder ViewModel="folderVm" />
         }
         else if (NavigationService.CurrentScreen == ScreenKey.Upload && NavigationService.CurrentViewModel is UploadViewModel uploadVm)
         {
@@ -62,6 +62,7 @@
     <NewPageModal />
     <ModelDownloadModal />
     <ConfirmationDialog />
+    <FeedbackDialog />
 </div>
 
 @code {

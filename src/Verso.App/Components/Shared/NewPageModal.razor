@@ -1,10 +1,10 @@
 @*
-    Modal "Nova pesquisa / tese" (T58), reaproveitando NewPageModalViewModel.
+    Modal "Nova pasta", reaproveitando NewPageModalViewModel.
 
     A criação de transcrição avulsa (com arquivo, tags, ícone e nome) foi migrada para a
     tela Upload (Upload.razor/UploadViewModel), que agora oferece as mesmas opções que
     este modal oferecia no modo transcrição. Este modal atende apenas a criação de
-    pesquisas, então o seletor de modo, o campo de tags e o seletor de arquivo foram
+    pastas, então o seletor de modo, o campo de tags e o seletor de arquivo foram
     removidos (clean cutover) — sobram ícone, cor, preview e título, fiel às classes
     `.modal-overlay`/`.modal`/`.icon-picker-*`/`.color-picker-*`/`.icon-preview` do
     protótipo (transcriba-v2-icons-transcriptions.html).

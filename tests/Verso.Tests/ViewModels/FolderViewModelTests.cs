@@ -12,10 +12,10 @@ using Verso.Tests.Services;
 
 namespace Verso.Tests.ViewModels;
 
-public class ResearchPageViewModelTests
+public class FolderViewModelTests
 {
-    private static async Task<(IServiceProvider Provider, string Directory, int ResearchId, Guid DoneId, Guid ProgressId)>
-        CreateResearchProviderAsync(FakeConfirmationService? confirmation = null)
+    private static async Task<(IServiceProvider Provider, string Directory, int FolderId, Guid DoneId, Guid ProgressId)>
+        CreateFolderProviderAsync(FakeConfirmationService? confirmation = null)
     {
         var (baseProvider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();
         var dbPath = Path.Combine(directory, "verso.db");
@@ -34,16 +34,16 @@ public class ResearchPageViewModelTests
         var provider = services.BuildServiceProvider();
         await DbBootstrapper.MigrateAsync(provider);
 
-        var researchService = provider.GetRequiredService<ResearchService>();
-        var research = await researchService.CreateAsync(
+        var folderService = provider.GetRequiredService<FolderService>();
+        var folder = await folderService.CreateAsync(
             "Mobilidade urbana",
             "🚲",
             "green");
-        research.Description = "Pesquisa sobre transporte sustentável";
+        folder.Description = "Pesquisa sobre transporte sustentável";
         await using (var ctx = await TestDbHelper.GetFactory(provider).CreateDbContextAsync())
         {
-            var page = await ctx.ResearchPages.FindAsync(research.Id);
-            page!.Description = research.Description;
+            var page = await ctx.Folders.FindAsync(folder.Id);
+            page!.Description = folder.Description;
             await ctx.SaveChangesAsync();
         }
 
@@ -59,7 +59,7 @@ public class ResearchPageViewModelTests
                     Icon = "🎤",
                     Status = TranscriptionStatus.Done,
                     DurationSeconds = 2520,
-                    ResearchPageId = research.Id,
+                    FolderId = folder.Id,
                     CreatedAt = new DateTime(2025, 5, 3, 12, 0, 0, DateTimeKind.Utc),
                     Segments =
                     [
@@ -81,7 +81,7 @@ public class ResearchPageViewModelTests
                     Icon = "📝",
                     Status = TranscriptionStatus.InProgress,
                     DurationSeconds = 900,
-                    ResearchPageId = research.Id,
+                    FolderId = folder.Id,
                     CreatedAt = new DateTime(2025, 4, 28, 12, 0, 0, DateTimeKind.Utc),
                     Segments =
                     [
@@ -100,30 +100,30 @@ public class ResearchPageViewModelTests
             await ctx.SaveChangesAsync();
         }
 
-        return (provider, directory, research.Id, doneId, progressId);
+        return (provider, directory, folder.Id, doneId, progressId);
     }
 
-    private static async Task<ResearchPageViewModel> CreateResearchPageAsync(
+    private static async Task<FolderViewModel> CreateFolderPageAsync(
         IServiceProvider provider,
-        int researchId)
+        int folderId)
     {
         var navigation = provider.GetRequiredService<NavigationService>();
         navigation.NavigateTo(
-            ScreenKey.Research,
-            new NavigationParameter(ResearchId: researchId));
+            ScreenKey.Folder,
+            new NavigationParameter(FolderId: folderId));
 
-        var page = Assert.IsType<ResearchPageViewModel>(navigation.CurrentViewModel);
+        var page = Assert.IsType<FolderViewModel>(navigation.CurrentViewModel);
         await Task.Delay(50);
         return page;
     }
 
     [Fact]
-    public async Task NavigationParameter_ResearchId_LoadsHeaderAndTranscriptions()
+    public async Task NavigationParameter_FolderId_LoadsHeaderAndTranscriptions()
     {
-        var (provider, directory, researchId, _, _) = await CreateResearchProviderAsync();
+        var (provider, directory, folderId, _, _) = await CreateFolderProviderAsync();
         try
         {
-            var page = await CreateResearchPageAsync(provider, researchId);
+            var page = await CreateFolderPageAsync(provider, folderId);
 
             Assert.Equal("Mobilidade urbana", page.Title);
             Assert.Equal("Pesquisa sobre transporte sustentável", page.Description);
@@ -141,10 +141,10 @@ public class ResearchPageViewModelTests
     [Fact]
     public async Task StatusFilter_Done_ShowsOnlyCompletedTranscriptions()
     {
-        var (provider, directory, researchId, doneId, progressId) = await CreateResearchProviderAsync();
+        var (provider, directory, folderId, doneId, progressId) = await CreateFolderProviderAsync();
         try
         {
-            var page = await CreateResearchPageAsync(provider, researchId);
+            var page = await CreateFolderPageAsync(provider, folderId);
             Assert.Equal(2, page.Transcriptions.Count);
 
             page.SetDoneFilterCommand.Execute(null);
@@ -162,10 +162,10 @@ public class ResearchPageViewModelTests
     [Fact]
     public async Task StatusFilter_Progress_ShowsOnlyInProgressTranscriptions()
     {
-        var (provider, directory, researchId, _, _) = await CreateResearchProviderAsync();
+        var (provider, directory, folderId, _, _) = await CreateFolderProviderAsync();
         try
         {
-            var page = await CreateResearchPageAsync(provider, researchId);
+            var page = await CreateFolderPageAsync(provider, folderId);
 
             page.SetProgressFilterCommand.Execute(null);
 
@@ -182,10 +182,10 @@ public class ResearchPageViewModelTests
     [Fact]
     public async Task SearchText_FiltersByTitleCaseInsensitive()
     {
-        var (provider, directory, researchId, _, _) = await CreateResearchProviderAsync();
+        var (provider, directory, folderId, _, _) = await CreateFolderProviderAsync();
         try
         {
-            var page = await CreateResearchPageAsync(provider, researchId);
+            var page = await CreateFolderPageAsync(provider, folderId);
 
             page.SearchText = "concluída";
 
@@ -201,10 +201,10 @@ public class ResearchPageViewModelTests
     [Fact]
     public async Task SetAllFilter_AfterFilter_ShowsAllTranscriptions()
     {
-        var (provider, directory, researchId, _, _) = await CreateResearchProviderAsync();
+        var (provider, directory, folderId, _, _) = await CreateFolderProviderAsync();
         try
         {
-            var page = await CreateResearchPageAsync(provider, researchId);
+            var page = await CreateFolderPageAsync(provider, folderId);
             page.SetDoneFilterCommand.Execute(null);
             Assert.Single(page.Transcriptions);
 
@@ -234,14 +234,14 @@ public class ResearchPageViewModelTests
             var scopedProvider = services.BuildServiceProvider();
             await DbBootstrapper.MigrateAsync(scopedProvider);
 
-            var researchService = scopedProvider.GetRequiredService<ResearchService>();
-            var research = await researchService.CreateAsync("Pesquisa vazia", "📚", "blue");
+            var folderService = scopedProvider.GetRequiredService<FolderService>();
+            var folder = await folderService.CreateAsync("Pasta vazia", "📚", "blue");
 
-            var page = await CreateResearchPageAsync(scopedProvider, research.Id);
+            var page = await CreateFolderPageAsync(scopedProvider, folder.Id);
 
             Assert.Empty(page.Transcriptions);
             Assert.True(page.IsEmpty);
-            Assert.Equal("Pesquisa vazia", page.Title);
+            Assert.Equal("Pasta vazia", page.Title);
         }
         finally
         {
@@ -250,19 +250,19 @@ public class ResearchPageViewModelTests
     }
 
     [Fact]
-    public async Task AddTranscription_NavigatesToUploadWithResearchId()
+    public async Task AddTranscription_NavigatesToUploadWithFolderId()
     {
-        var (provider, directory, researchId, _, _) = await CreateResearchProviderAsync();
+        var (provider, directory, folderId, _, _) = await CreateFolderProviderAsync();
         try
         {
-            var page = await CreateResearchPageAsync(provider, researchId);
+            var page = await CreateFolderPageAsync(provider, folderId);
             var navigation = provider.GetRequiredService<NavigationService>();
 
             page.AddTranscriptionCommand.Execute(null);
 
             Assert.Equal(ScreenKey.Upload, navigation.CurrentScreen);
             var parameter = Assert.IsType<NavigationParameter>(navigation.NavigationParameter);
-            Assert.Equal(researchId, parameter.ResearchId);
+            Assert.Equal(folderId, parameter.FolderId);
         }
         finally
         {
@@ -273,10 +273,10 @@ public class ResearchPageViewModelTests
     [Fact]
     public async Task OpenTranscription_NavigatesToEditorWithTranscriptionId()
     {
-        var (provider, directory, researchId, doneId, _) = await CreateResearchProviderAsync();
+        var (provider, directory, folderId, doneId, _) = await CreateFolderProviderAsync();
         try
         {
-            var page = await CreateResearchPageAsync(provider, researchId);
+            var page = await CreateFolderPageAsync(provider, folderId);
             var navigation = provider.GetRequiredService<NavigationService>();
 
             page.Transcriptions[0].OpenCommand.Execute(null);
@@ -294,10 +294,10 @@ public class ResearchPageViewModelTests
     [Fact]
     public async Task NavigateDashboard_NavigatesToDashboard()
     {
-        var (provider, directory, researchId, _, _) = await CreateResearchProviderAsync();
+        var (provider, directory, folderId, _, _) = await CreateFolderProviderAsync();
         try
         {
-            var page = await CreateResearchPageAsync(provider, researchId);
+            var page = await CreateFolderPageAsync(provider, folderId);
             var navigation = provider.GetRequiredService<NavigationService>();
 
             page.NavigateDashboardCommand.Execute(null);
@@ -314,8 +314,8 @@ public class ResearchPageViewModelTests
     public async Task DeleteTranscription_Confirmed_RemovesFromListAndDatabase()
     {
         var confirmation = new FakeConfirmationService { NextResult = true };
-        var (provider, directory, researchId, doneId, _) =
-            await CreateResearchProviderAsync(confirmation);
+        var (provider, directory, folderId, doneId, _) =
+            await CreateFolderProviderAsync(confirmation);
         var mediaStorage = provider.GetRequiredService<MediaStorageService>();
         var mediaPath = Path.Combine(directory, "source.wav");
         await File.WriteAllTextAsync(mediaPath, "audio");
@@ -323,7 +323,7 @@ public class ResearchPageViewModelTests
 
         try
         {
-            var page = await CreateResearchPageAsync(provider, researchId);
+            var page = await CreateFolderPageAsync(provider, folderId);
             await page.DeleteTranscriptionAsync(doneId);
 
             Assert.Equal("Excluir transcrição", confirmation.LastTitle);
@@ -344,12 +344,12 @@ public class ResearchPageViewModelTests
     public async Task DeleteTranscription_Cancelled_KeepsTranscription()
     {
         var confirmation = new FakeConfirmationService { NextResult = false };
-        var (provider, directory, researchId, doneId, _) =
-            await CreateResearchProviderAsync(confirmation);
+        var (provider, directory, folderId, doneId, _) =
+            await CreateFolderProviderAsync(confirmation);
 
         try
         {
-            var page = await CreateResearchPageAsync(provider, researchId);
+            var page = await CreateFolderPageAsync(provider, folderId);
             await page.DeleteTranscriptionAsync(doneId);
 
             Assert.Equal(2, page.Transcriptions.Count);
@@ -363,26 +363,26 @@ public class ResearchPageViewModelTests
     }
 
     [Fact]
-    public async Task DeleteResearch_Confirmed_DissociatesTranscriptionsAndNavigatesToDashboard()
+    public async Task DeleteFolder_Confirmed_DissociatesTranscriptionsAndNavigatesToDashboard()
     {
         var confirmation = new FakeConfirmationService { NextResult = true };
-        var (provider, directory, researchId, doneId, _) =
-            await CreateResearchProviderAsync(confirmation);
+        var (provider, directory, folderId, doneId, _) =
+            await CreateFolderProviderAsync(confirmation);
 
         try
         {
-            var page = await CreateResearchPageAsync(provider, researchId);
+            var page = await CreateFolderPageAsync(provider, folderId);
             var navigation = provider.GetRequiredService<NavigationService>();
 
-            await page.DeleteResearchCommand.ExecuteAsync(null);
+            await page.DeleteFolderCommand.ExecuteAsync(null);
 
             Assert.Contains("2 transcrições", confirmation.LastMessage ?? "");
             Assert.Equal(ScreenKey.Dashboard, navigation.CurrentScreen);
 
             await using var ctx = await TestDbHelper.GetFactory(provider).CreateDbContextAsync();
-            Assert.Null(await ctx.ResearchPages.FindAsync(researchId));
+            Assert.Null(await ctx.Folders.FindAsync(folderId));
             var transcription = await ctx.Transcriptions.SingleAsync(t => t.Id == doneId);
-            Assert.Null(transcription.ResearchPageId);
+            Assert.Null(transcription.FolderId);
             Assert.Equal("Entrevista concluída", transcription.Title);
         }
         finally
@@ -392,24 +392,24 @@ public class ResearchPageViewModelTests
     }
 
     [Fact]
-    public async Task DeleteResearch_Cancelled_KeepsResearchAndStaysOnPage()
+    public async Task DeleteFolder_Cancelled_KeepsFolderAndStaysOnPage()
     {
         var confirmation = new FakeConfirmationService { NextResult = false };
-        var (provider, directory, researchId, _, _) =
-            await CreateResearchProviderAsync(confirmation);
+        var (provider, directory, folderId, _, _) =
+            await CreateFolderProviderAsync(confirmation);
 
         try
         {
-            var page = await CreateResearchPageAsync(provider, researchId);
+            var page = await CreateFolderPageAsync(provider, folderId);
             var navigation = provider.GetRequiredService<NavigationService>();
 
-            await page.DeleteResearchCommand.ExecuteAsync(null);
+            await page.DeleteFolderCommand.ExecuteAsync(null);
 
-            Assert.Equal(ScreenKey.Research, navigation.CurrentScreen);
+            Assert.Equal(ScreenKey.Folder, navigation.CurrentScreen);
             Assert.Equal("Mobilidade urbana", page.Title);
 
             await using var ctx = await TestDbHelper.GetFactory(provider).CreateDbContextAsync();
-            Assert.NotNull(await ctx.ResearchPages.FindAsync(researchId));
+            Assert.NotNull(await ctx.Folders.FindAsync(folderId));
         }
         finally
         {
