@@ -14,8 +14,9 @@ public static class AppServiceCollectionExtensions
         services.AddSingleton<NavigationService>();
         services.AddSingleton<BlazorThemeApplicator>();
         services.AddSingleton<IThemeApplicator>(sp => sp.GetRequiredService<BlazorThemeApplicator>());
-        services.AddSingleton<IFileSaveService, WpfFileSaveService>();
-        services.AddSingleton<IFileOpenService, WpfFileOpenService>();
+        services.AddSingleton<PhotinoWindowAccessor>();
+        services.AddSingleton<IFileSaveService, PhotinoFileSaveService>();
+        services.AddSingleton<IFileOpenService, PhotinoFileOpenService>();
         services.AddSingleton<BlazorConfirmationService>();
         services.AddSingleton<IConfirmationService>(sp => sp.GetRequiredService<BlazorConfirmationService>());
         services.AddSingleton<ThemeService>();

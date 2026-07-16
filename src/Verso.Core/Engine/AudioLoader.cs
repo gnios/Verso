@@ -28,14 +28,6 @@ public sealed class AudioLoader
             return ReadSamples(resampled);
         }
 
-        if (ext == ".mp3")
-        {
-            using var stream = OpenSharedRead(inputPath);
-            using var reader = new Mp3FileReader(stream);
-            var resampled = new WdlResamplingSampleProvider(reader.ToSampleProvider(), SampleRate);
-            return ReadSamples(resampled);
-        }
-
         return LoadSamplesWithFfmpeg(inputPath);
     }
 
