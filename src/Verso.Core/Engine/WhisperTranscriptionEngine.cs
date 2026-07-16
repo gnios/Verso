@@ -82,6 +82,12 @@ public sealed class WhisperTranscriptionEngine : IDisposable
             request.Device,
             request.Quality,
             request.Language);
+        if (request.Device == ExecutionDevice.Vulkan && WhisperRuntimeConfigurator.CurrentGpuDevice != 0)
+        {
+            _logger?.LogInformation(
+                "Vulkan GPU device index: {GpuDevice} (0=iGPU, 1+=dGPU; resolvido por VulkanDeviceEnumerator)",
+                WhisperRuntimeConfigurator.CurrentGpuDevice);
+        }
         _logger?.LogInformation(
             "Runtime Whisper (preferência): {RuntimeOrder}",
             string.Join(" → ", WhisperRuntimeConfigurator.ResolveRuntimeOrder(request.Device)));

@@ -91,7 +91,9 @@ public class ChunkPlannerTests
     }
 
     // CPU: paralelismo é 1 (whisper.cpp já satura todos os núcleos).
-    // GPU: paralelismo é 2 (contextos independentes paralelizáveis).
+    // GPU: paralelismo é 2 para CUDA/Auto (contextos independentes paralelizáveis),
+    //       mas 1 para Vulkan (cada fábrica carrega modelo + buffers staging em VRAM,
+    //       paralelismo >1 causa OOM na maioria das GPUs).
     [Fact]
     public void CalculateParallelLimits_ForCpu_IsSequential()
     {
@@ -104,7 +106,6 @@ public class ChunkPlannerTests
 
     [Theory]
     [InlineData(ExecutionDevice.Cuda)]
-    [InlineData(ExecutionDevice.Vulkan)]
     [InlineData(ExecutionDevice.Auto)]
     public void CalculateParallelLimits_ForGpu_RunsTwoParallelInstances(ExecutionDevice device)
     {
@@ -112,6 +113,17 @@ public class ChunkPlannerTests
 
         // Paralelismo = min(2, maxPartes). Como maxPartes ≥ 4, esperamos 2.
         Assert.Equal(2, paralelismo);
+        Assert.Equal(Environment.ProcessorCount, threadsPorJob);
+        Assert.InRange(maxPartes, 4, 8);
+    }
+
+    [Fact]
+    public void CalculateParallelLimits_ForVulkan_IsSequential()
+    {
+        var (maxPartes, paralelismo, threadsPorJob) = ChunkPlanner.CalculateParallelLimits(ExecutionDevice.Vulkan);
+
+        // Vulkan: paralelismo=1 para evitar OOM (cada fábrica carrega modelo + staging).
+        Assert.Equal(1, paralelismo);
         Assert.Equal(Environment.ProcessorCount, threadsPorJob);
         Assert.InRange(maxPartes, 4, 8);
     }
