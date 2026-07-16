@@ -75,7 +75,12 @@ public sealed class WhisperTranscriptionEngine : IDisposable
         IProgress<EngineProgress>? progress,
         CancellationToken cancellationToken)
     {
-        WhisperRuntimeConfigurator.Configure(request.Device);
+        WhisperRuntimeConfigurator.Configure(request.Device, request.Quality);
+
+        if (WhisperRuntimeConfigurator.VramFallbackReason is { } reason)
+        {
+            _logger?.LogWarning("VRAM insuficiente — fallback para CPU: {Reason}", reason);
+        }
         _logger?.LogInformation(
             "Iniciando transcrição {TranscriptionId}: dispositivo={Device}, modelo={Quality}, idioma={Language}",
             request.TranscriptionId,
@@ -90,7 +95,7 @@ public sealed class WhisperTranscriptionEngine : IDisposable
         }
         _logger?.LogInformation(
             "Runtime Whisper (preferência): {RuntimeOrder}",
-            string.Join(" → ", WhisperRuntimeConfigurator.ResolveRuntimeOrder(request.Device)));
+            string.Join(" → ", WhisperRuntimeInspector.DescribeRuntimeOrder(request.Device)));
 
         Directory.CreateDirectory(_modelsDirectory);
         var modelPath = Path.Combine(_modelsDirectory, ModelManager.GetModelFileName(request.Quality));

@@ -43,6 +43,18 @@ internal static class VulkanDeviceEnumerator
     private const int AppInfoSize = 48;
     private const int CreateInfoSize = 64;
 
+    // VkMemoryHeapFlags
+    private const uint VkMemoryHeapDeviceLocalBit = 0x00000001;
+
+    // Tamanho de VkPhysicalDeviceMemoryProperties (528 bytes em x64):
+    //   uint32_t memoryTypeCount                    →  4 bytes
+    //   padding                                    →  4 bytes
+    //   VkMemoryType memoryTypes[32] (8 bytes/ea)  → 256 bytes
+    //   uint32_t memoryHeapCount                   →  4 bytes
+    //   padding                                    →  4 bytes
+    //   VkMemoryHeap memoryHeaps[16] (16 bytes/ea) → 256 bytes
+    private const int MemoryPropertiesSize = 528;
+
     [DllImport("vulkan-1.dll")]
     private static extern int vkCreateInstance(IntPtr pCreateInfo, IntPtr pAllocator, out IntPtr pInstance);
 
@@ -54,6 +66,9 @@ internal static class VulkanDeviceEnumerator
 
     [DllImport("vulkan-1.dll")]
     private static extern void vkGetPhysicalDeviceProperties(IntPtr physicalDevice, IntPtr pProperties);
+
+    [DllImport("vulkan-1.dll")]
+    private static extern void vkGetPhysicalDeviceMemoryProperties(IntPtr physicalDevice, IntPtr pMemoryProperties);
 
     /// <summary>
     /// Tenta enumerar dispositivos Vulkan. Retorna lista vazia em qualquer falha
@@ -210,6 +225,125 @@ internal static class VulkanDeviceEnumerator
         {
             if (Ptr != IntPtr.Zero)
                 Marshal.FreeHGlobal(Ptr);
+        }
+    }
+
+    /// <summary>
+    /// Consulta a VRAM total (bytes) da GPU dedicada via Vulkan.
+    /// Retorna 0 em qualquer falha (vulkan-1.dll ausente, sem driver, etc.).
+    /// Best-effort: o valor retornado é a soma de todos os heaps com flag
+    /// VK_MEMORY_HEAP_DEVICE_LOCAL_BIT no dispositivo dedicado (DiscreteGpu).
+    /// Não subtrai uso de outras aplicações — pode superestimar o disponível.
+    /// </summary>
+    public static long TryGetDedicatedGpuVramBytes()
+    {
+        if (VramBytesOverride is { } fn)
+            return fn();
+
+        try
+        {
+            return QueryDedicatedGpuVramCore();
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    /// <summary>
+    /// Hook de teste: quando definido, <see cref="TryGetDedicatedGpuVramBytes"/>
+    /// retorna este valor em vez de consultar Vulkan via P/Invoke.
+    /// </summary>
+    internal static Func<long>? VramBytesOverride { get; set; }
+
+    private static long QueryDedicatedGpuVramCore()
+    {
+        AppInfoMemory appInfo = default;
+        CreateInfoMemory createInfo = default;
+        IntPtr instance = IntPtr.Zero;
+        IntPtr propBuffer = IntPtr.Zero;
+        IntPtr memPropsBuffer = IntPtr.Zero;
+
+        try
+        {
+            appInfo = new AppInfoMemory();
+            Marshal.WriteInt32(appInfo.Ptr, 0, VkStructureTypeApplicationInfo);
+            Marshal.WriteIntPtr(appInfo.Ptr, 8, IntPtr.Zero);
+            Marshal.WriteIntPtr(appInfo.Ptr, 16, appInfo.AppNamePtr);
+            Marshal.WriteInt32(appInfo.Ptr, 24, 1);
+            Marshal.WriteIntPtr(appInfo.Ptr, 32, appInfo.EngineNamePtr);
+            Marshal.WriteInt32(appInfo.Ptr, 40, 1);
+            Marshal.WriteInt32(appInfo.Ptr, 44, (int)VkApiVersion1_0);
+
+            createInfo = new CreateInfoMemory();
+            Marshal.WriteInt32(createInfo.Ptr, 0, VkStructureTypeInstanceCreateInfo);
+            Marshal.WriteIntPtr(createInfo.Ptr, 8, IntPtr.Zero);
+            Marshal.WriteIntPtr(createInfo.Ptr, 16, IntPtr.Zero);
+            Marshal.WriteIntPtr(createInfo.Ptr, 24, appInfo.Ptr);
+            Marshal.WriteInt32(createInfo.Ptr, 32, 0);
+            Marshal.WriteIntPtr(createInfo.Ptr, 40, IntPtr.Zero);
+            Marshal.WriteInt32(createInfo.Ptr, 48, 0);
+            Marshal.WriteIntPtr(createInfo.Ptr, 56, IntPtr.Zero);
+
+            if (vkCreateInstance(createInfo.Ptr, IntPtr.Zero, out instance) != VkSuccess)
+                return 0;
+
+            uint count = 0;
+            if (vkEnumeratePhysicalDevices(instance, ref count, null) != VkSuccess || count == 0)
+                return 0;
+
+            var handles = new IntPtr[count];
+            if (vkEnumeratePhysicalDevices(instance, ref count, handles) != VkSuccess)
+                return 0;
+
+            // Localiza GPU dedicada (DiscreteGpu) ou fallback para dispositivo 0
+            propBuffer = Marshal.AllocHGlobal(512);
+            IntPtr? dedicatedHandle = null;
+
+            for (uint i = 0; i < count; i++)
+            {
+                vkGetPhysicalDeviceProperties(handles[i], propBuffer);
+                var deviceType = (VulkanDeviceType)Marshal.ReadInt32(propBuffer, 16);
+                if (deviceType == VulkanDeviceType.DiscreteGpu)
+                {
+                    dedicatedHandle = handles[i];
+                    break;
+                }
+            }
+
+            dedicatedHandle ??= handles[0];
+
+            // Consulta propriedades de memória do dispositivo dedicado
+            memPropsBuffer = Marshal.AllocHGlobal(MemoryPropertiesSize);
+            vkGetPhysicalDeviceMemoryProperties(dedicatedHandle.Value, memPropsBuffer);
+
+            // memoryHeapCount está no offset 264 (ver constantes acima)
+            var heapCount = Marshal.ReadInt32(memPropsBuffer, 264);
+            long totalVram = 0;
+
+            for (int i = 0; i < heapCount; i++)
+            {
+                // VkMemoryHeap: size (uint64) no offset 0, flags (uint32) no offset 8
+                var heapOffset = 272 + i * 16;
+                var flags = (uint)Marshal.ReadInt32(memPropsBuffer, heapOffset + 8);
+                if ((flags & VkMemoryHeapDeviceLocalBit) != 0)
+                {
+                    totalVram += (long)Marshal.ReadInt64(memPropsBuffer, heapOffset);
+                }
+            }
+
+            return totalVram;
+        }
+        finally
+        {
+            if (memPropsBuffer != IntPtr.Zero)
+                Marshal.FreeHGlobal(memPropsBuffer);
+            if (propBuffer != IntPtr.Zero)
+                Marshal.FreeHGlobal(propBuffer);
+            if (instance != IntPtr.Zero)
+                vkDestroyInstance(instance, IntPtr.Zero);
+            createInfo.Dispose();
+            appInfo.Dispose();
         }
     }
 }

@@ -144,4 +144,60 @@ public class WhisperRuntimeConfiguratorTests
 
         Assert.Contains(RuntimeLibrary.Cpu, order);
     }
+
+    [Fact]
+    public void Configure_VulkanWithTinyModel_VramInsufficient_FallsBackToCpu()
+    {
+        VulkanDeviceEnumerator.VramBytesOverride = () => 512_000_000;
+        try
+        {
+            WhisperRuntimeConfigurator.Configure(ExecutionDevice.Vulkan, ModelQuality.Tiny);
+
+            Assert.NotNull(WhisperRuntimeConfigurator.VramFallbackReason);
+            Assert.Contains("VRAM insuficiente", WhisperRuntimeConfigurator.VramFallbackReason);
+            Assert.Contains("Tiny", WhisperRuntimeConfigurator.VramFallbackReason);
+            Assert.Equal(RuntimeLibrary.Cpu, RuntimeOptions.RuntimeLibraryOrder[0]);
+        }
+        finally
+        {
+            VulkanDeviceEnumerator.VramBytesOverride = null;
+        }
+    }
+
+
+    [Fact]
+    public void Configure_CpuDevice_NoVramCheck()
+    {
+        VulkanDeviceEnumerator.VramBytesOverride = () => 512_000_000;
+        try
+        {
+            WhisperRuntimeConfigurator.Configure(ExecutionDevice.Cpu, ModelQuality.Tiny);
+
+            Assert.Null(WhisperRuntimeConfigurator.VramFallbackReason);
+            Assert.Equal(RuntimeLibrary.Cpu, RuntimeOptions.RuntimeLibraryOrder[0]);
+        }
+        finally
+        {
+            VulkanDeviceEnumerator.VramBytesOverride = null;
+        }
+    }
+
+    [Fact]
+    public void Configure_VulkanFallback_RuntimeOrderContainsOnlyCpu()
+    {
+        VulkanDeviceEnumerator.VramBytesOverride = () => 100_000_000;
+        try
+        {
+            WhisperRuntimeConfigurator.Configure(ExecutionDevice.Vulkan, ModelQuality.LargeV3Turbo);
+
+            Assert.Equal(2, RuntimeOptions.RuntimeLibraryOrder.Count);
+            Assert.Contains(RuntimeLibrary.Cpu, RuntimeOptions.RuntimeLibraryOrder);
+            Assert.Contains(RuntimeLibrary.CpuNoAvx, RuntimeOptions.RuntimeLibraryOrder);
+            Assert.DoesNotContain(RuntimeLibrary.Vulkan, RuntimeOptions.RuntimeLibraryOrder);
+        }
+        finally
+        {
+            VulkanDeviceEnumerator.VramBytesOverride = null;
+        }
+    }
 }
