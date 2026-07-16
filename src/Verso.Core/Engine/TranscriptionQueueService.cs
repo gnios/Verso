@@ -263,7 +263,13 @@ public sealed class TranscriptionQueueService : BackgroundService
 
 public static class EngineServiceCollectionExtensions
 {
-    public static IServiceCollection AddVersoEngine(this IServiceCollection services)
+    /// <summary>
+    /// Registra as dependências do motor Whisper (fábrica/processador/gestão de modelo), sem a
+    /// fila de transcrição nem o registro de <see cref="ITranscriptionEngine"/>. Usado tanto pelo
+    /// host in-process (<see cref="AddVersoEngine"/>) quanto pelo processo worker isolado
+    /// (<c>Verso.Worker</c>), que resolve <see cref="WhisperTranscriptionEngine"/> diretamente.
+    /// </summary>
+    public static IServiceCollection AddWhisperEngine(this IServiceCollection services)
     {
         services.AddSingleton<FfmpegLocator>();
         services.AddSingleton<AudioLoader>();
@@ -271,6 +277,12 @@ public static class EngineServiceCollectionExtensions
         services.AddSingleton<IWhisperFactoryCache, WhisperFactoryCache>();
         services.AddSingleton<IWhisperProcessorFactory, WhisperProcessorFactory>();
         services.AddSingleton<WhisperTranscriptionEngine>();
+        return services;
+    }
+
+    public static IServiceCollection AddVersoEngine(this IServiceCollection services)
+    {
+        services.AddWhisperEngine();
         services.AddSingleton<ITranscriptionEngine, WhisperTranscriptionEngineAdapter>();
         services.AddSingleton<TranscriptionQueueService>();
         services.AddHostedService(sp => sp.GetRequiredService<TranscriptionQueueService>());
