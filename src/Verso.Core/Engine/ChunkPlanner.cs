@@ -23,8 +23,11 @@ public static class ChunkPlanner
     // factory carrega o modelo em memória própria. O grau de paralelismo é limitado
     // pela memória disponível (~1.5GB por instância do LargeV3Turbo).
     // CPU: não há ganho (whisper.cpp já satura todos os núcleos), mantém 1.
-    // GPU: usando contextos independentes com fábricas próprias, 2 é seguro para
+    // CUDA: usando contextos independentes com fábricas próprias, 2 é seguro para
     // GPUs com ≥4GB.
+    // Vulkan: cada fábrica carrega o modelo em VRAM (~2.6GB para LargeV3Turbo) mais
+    // buffers de staging Vulkan (~1GB adicionais). Paralelismo >1 exige ≥5GB de VRAM,
+    // o que poucas GPUs oferecem. Mantemos 1 (serial) para evitar OOM no Vulkan.
     public static (int MaxPartes, int Paralelismo, int ThreadsPorJob) CalculateParallelLimits(ExecutionDevice device)
     {
         var threads = Environment.ProcessorCount;
@@ -32,7 +35,8 @@ public static class ChunkPlanner
         var paralelismo = device switch
         {
             ExecutionDevice.Cpu => 1,
-            _ => Math.Min(2, maxPartes), // GPU: 2 instâncias paralelas do modelo
+            ExecutionDevice.Vulkan => 1,
+            _ => Math.Min(2, maxPartes), // CUDA: 2 instâncias paralelas do modelo
         };
         return (maxPartes, paralelismo, threads);
     }
