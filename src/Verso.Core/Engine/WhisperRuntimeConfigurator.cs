@@ -7,8 +7,10 @@ public static class WhisperRuntimeConfigurator
 {
     /// <summary>
     /// Índice do dispositivo GPU para <c>WhisperFactoryOptions.GpuDevice</c>.
-    /// Default 0. Para Vulkan em notebooks híbridos (iGPU+dGPU), usa índice 1
-    /// que é a GPU dedicada na maioria dos sistemas Optimus.
+    /// Default 0. Quando Vulkan é selecionado no Windows, consultamos
+    /// <see cref="VulkanDeviceEnumerator.TryEnumerateDevices"/> para encontrar
+    /// o índice correto da GPU dedicada (dGPU) no backend Vulkan — em notebooks
+    /// Optimus tipicamente é 1 (iGPU=0, dGPU=1), em desktops com só dGPU é 0.
     /// </summary>
     public static int CurrentGpuDevice { get; set; } = 0;
 
@@ -18,9 +20,36 @@ public static class WhisperRuntimeConfigurator
 
         CurrentGpuDevice = device switch
         {
-            ExecutionDevice.Vulkan when OperatingSystem.IsWindows() => 1,
+            ExecutionDevice.Vulkan when OperatingSystem.IsWindows() => ResolveVulkanDeviceIndex(),
             _ => 0,
         };
+    }
+
+    /// <summary>
+    /// Consulta o enumerador Vulkan para obter o índice da GPU dedicada.
+    /// Retorna 0 (default) em qualquer falha — o whisper.cpp fará fallback para
+    /// CPU se device 0 não existir ou não for compatível.
+    /// </summary>
+    private static int ResolveVulkanDeviceIndex()
+    {
+        try
+        {
+            var devices = VulkanDeviceEnumerator.TryEnumerateDevices();
+            if (devices.Count == 0)
+                return 0;
+
+            // Prefere GPU dedicada (NVIDIA/AMD dGPU)
+            var dedicated = devices.FirstOrDefault(d => d.DeviceType == VulkanDeviceType.DiscreteGpu);
+            if (dedicated is not null)
+                return dedicated.Index;
+
+            // Sem GPU dedicada: usa o primeiro dispositivo disponível (pode ser iGPU)
+            return devices[0].Index;
+        }
+        catch
+        {
+            return 0;
+        }
     }
 
     public static List<RuntimeLibrary> ResolveRuntimeOrder(ExecutionDevice device) =>
