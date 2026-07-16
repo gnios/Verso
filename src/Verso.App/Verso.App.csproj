@@ -40,9 +40,37 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Verso.Core\Verso.Core.csproj" />
+    <!--
+      ReferenceOutputAssembly=false: garante apenas a ORDEM de build (Verso.Worker antes de
+      Verso.App), sem referenciar o assembly do worker — TFMs incompatíveis (net10.0 vs
+      net10.0-windows10.0.17763.0) e nenhum código do Verso.App chama o worker in-process.
+      O copy target abaixo (T10/transcricao-cpu-responsiva) leva o executável construído para
+      o output do Verso.App, de onde WorkerExecutableLocator o resolve como sibling.
+    -->
+    <ProjectReference Include="..\Verso.Worker\Verso.Worker.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Assets\verso.ico" />
     <Resource Include="Assets\verso-logo.png" />
   </ItemGroup>
+
+  <!--
+    Copia o output do Verso.Worker (Fase 2/transcricao-cpu-responsiva, R2.1) para o diretório de
+    output do Verso.App em builds de desenvolvimento. WorkerExecutableLocator resolve
+    "Verso.Worker.exe" como sibling de AppContext.BaseDirectory/VersoPaths.AppDirectory — sem
+    esta cópia, builds locais não teriam o worker disponível ao lado do Verso.App.exe.
+  -->
+  <Target Name="CopyVersoWorkerOutput" AfterTargets="Build">
+    <ItemGroup>
+      <_VersoWorkerOutputFiles Include="$(MSBuildThisFileDirectory)..\Verso.Worker\bin\$(Configuration)\net10.0\**\*.*" />
+    </ItemGroup>
+    <Copy
+      SourceFiles="@(_VersoWorkerOutputFiles)"
+      DestinationFolder="$(OutDir)%(RecursiveDir)"
+      SkipUnchangedFiles="true"
+      Condition="'@(_VersoWorkerOutputFiles)' != ''" />
+  </Target>
 </Project>
