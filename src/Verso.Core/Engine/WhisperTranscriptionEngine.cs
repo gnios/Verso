@@ -139,19 +139,15 @@ public sealed class WhisperTranscriptionEngine : IDisposable
 
         LoadModelFactory(modelPath);
 
-        // Mitigação do crash 0x80131506 (causa raiz confirmada via dump em
-        // .crash-dumps/Verso.App.exe.18284.dmp): o WhisperFactory cacheado como
-        // singleton por modelPath era reutilizado para criar/dispor centenas de
-        // WhisperProcessor em sequência, ao longo de MÚLTIPLOS jobs. Esse padrão de
-        // reuso é frágil no whisper.net 1.9.1 — o lifetime nativo do factory acumula
-        // estado inconsistente entre ciclos de create/dispose e termina corrompendo
-        // a heap (sandrohanea/whisper.net#341). Invalide o cache ao fim de cada job
-        // força uma fábrica fresca na próxima transcrição, isolando o lifetime nativo
-        // por job. Dentro de um job a fábrica é reaproveitada entre chunks (necessário
-        // para não recarregar o modelo a cada parte), mas o número de ciclos por job
-        // é limitado (max 8 partes, ver ChunkPlanner) — muito menos que as centenas
-        // acumuladas entre jobs no design anterior.
-        try
+        // Histórico: o crash 0x80131506 (causa raiz confirmada via dump em
+        // .crash-dumps/Verso.App.exe.18284.dmp) era mitigado invalidando o
+        // WhisperFactory cacheado ao fim de cada job, forçando recarga na próxima
+        // transcrição. Essa mitigação foi retirada (R2.4/transcricao-cpu-responsiva):
+        // cada job agora roda em um processo Verso.Worker isolado, então qualquer
+        // corrupção de heap nativa fica confinada àquele processo e não derruba o
+        // Verso.App nem contamina jobs seguintes — o isolamento por processo
+        // substitui o isolamento por invalidação de cache, permitindo reaproveitar a
+        // fábrica (e o modelo já carregado) entre jobs dentro do mesmo worker.
         {
             progress?.Report(new EngineProgress("transcribing", 0, partes.Count));
 
@@ -259,13 +255,6 @@ public sealed class WhisperTranscriptionEngine : IDisposable
                 WhisperRuntimeInspector.LoadedBackend ?? "n/d");
 
             return new TranscriptionResult(ordered);
-        }
-        finally
-        {
-            // Fábrica fresca no próximo job: descarta o WhisperFactory nativo ao fim
-            // desta transcrição. Sem isto, a mesma fábrica acumularia centenas de ciclos
-            // de create/dispose de processor entre jobs, gatilho da corrupção de heap.
-            _factoryCache.Invalidate(modelPath);
         }
     }
 
