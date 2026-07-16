@@ -79,7 +79,7 @@ public sealed class WhisperTranscriptionEngine : IDisposable
 
         if (WhisperRuntimeConfigurator.VramFallbackReason is { } reason)
         {
-            _logger?.LogWarning("VRAM insuficiente — fallback para CPU: {Reason}", reason);
+            _logger?.LogWarning("Fallback para CPU: {Reason}", reason);
         }
         _logger?.LogInformation(
             "Iniciando transcrição {TranscriptionId}: dispositivo={Device}, modelo={Quality}, idioma={Language}",
@@ -87,11 +87,18 @@ public sealed class WhisperTranscriptionEngine : IDisposable
             request.Device,
             request.Quality,
             request.Language);
-        if (request.Device == ExecutionDevice.Vulkan && WhisperRuntimeConfigurator.CurrentGpuDevice != 0)
+        if (request.Device == ExecutionDevice.Vulkan && OperatingSystem.IsWindows())
         {
-            _logger?.LogInformation(
-                "Vulkan GPU device index: {GpuDevice} (0=iGPU, 1+=dGPU; resolvido por VulkanDeviceEnumerator)",
-                WhisperRuntimeConfigurator.CurrentGpuDevice);
+            var devices = VulkanDeviceEnumerator.TryEnumerateDevices();
+            if (devices.Count == 0)
+            {
+                _logger?.LogWarning("Vulkan: nenhum dispositivo físico encontrado (vulkan-1.dll ou driver ausente?)");
+            }
+            else
+            {
+                foreach (var d in devices)
+                    _logger?.LogInformation("Vulkan device[{Index}]: {DeviceType} — {Name}", d.Index, d.DeviceType, d.Name);
+            }
         }
         _logger?.LogInformation(
             "Runtime Whisper (preferência): {RuntimeOrder}",
