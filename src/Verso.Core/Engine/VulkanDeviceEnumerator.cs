@@ -71,11 +71,20 @@ internal static class VulkanDeviceEnumerator
     private static extern void vkGetPhysicalDeviceMemoryProperties(IntPtr physicalDevice, IntPtr pMemoryProperties);
 
     /// <summary>
+    /// Hook de teste: quando definido, <see cref="TryEnumerateDevices"/>
+    /// retorna esta lista em vez de consultar Vulkan via P/Invoke.
+    /// </summary>
+    internal static Func<List<VulkanDeviceInfo>>? DevicesOverride { get; set; }
+
+    /// <summary>
     /// Tenta enumerar dispositivos Vulkan. Retorna lista vazia em qualquer falha
     /// (vulkan-1.dll ausente, sem driver, erro de inicialização, etc.).
     /// </summary>
     public static List<VulkanDeviceInfo> TryEnumerateDevices()
     {
+        if (DevicesOverride is { } fn)
+            return fn();
+
         try
         {
             return EnumerateDevicesCore();
@@ -296,7 +305,9 @@ internal static class VulkanDeviceEnumerator
             if (vkEnumeratePhysicalDevices(instance, ref count, handles) != VkSuccess)
                 return 0;
 
-            // Localiza GPU dedicada (DiscreteGpu) ou fallback para dispositivo 0
+            // Localiza GPU dedicada (DiscreteGpu). Se nenhuma for encontrada,
+            // retorna 0 — a RAM compartilhada da iGPU não é VRAM dedicada e não
+            // deve ser tratada como tal (false-positive na checagem de VRAM).
             propBuffer = Marshal.AllocHGlobal(512);
             IntPtr? dedicatedHandle = null;
 
@@ -311,7 +322,8 @@ internal static class VulkanDeviceEnumerator
                 }
             }
 
-            dedicatedHandle ??= handles[0];
+            if (dedicatedHandle is null)
+                return 0;
 
             // Consulta propriedades de memória do dispositivo dedicado
             memPropsBuffer = Marshal.AllocHGlobal(MemoryPropertiesSize);

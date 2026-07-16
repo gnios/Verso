@@ -24,62 +24,71 @@ public static class WhisperRuntimeConfigurator
     {
         VramFallbackReason = null;
         var order = ResolveRuntimeOrder(device);
+        int? vulkanDeviceIndex = null;
 
-        if (device == ExecutionDevice.Vulkan && quality.HasValue && OperatingSystem.IsWindows())
+        if (device == ExecutionDevice.Vulkan && OperatingSystem.IsWindows())
         {
-            var requiredBytes = EstimateVulkanVramBytes(quality.Value);
-            var availableBytes = VulkanDeviceEnumerator.TryGetDedicatedGpuVramBytes();
-
-            if (availableBytes > 0 && availableBytes < requiredBytes)
+            // Verifica se existe GPU dedicada visível ao Vulkan.
+            // Em notebooks com Optimus, a dGPU pode não estar registrada
+            // no ICD Vulkan (driver incompleto, etc.) — nesse caso,
+            // forçamos CPU para evitar rodar na iGPU silenciosamente.
+            vulkanDeviceIndex = ResolveVulkanDeviceIndex();
+            if (vulkanDeviceIndex is null)
             {
-                // VRAM insuficiente: força CPU antes de Vulkan na ordem de runtime.
-                // whisper.net carrega a primeira lib disponível — com CPU primeiro,
-                // Vulkan nunca será tentado, evitando o OOM no meio da transcrição.
                 VramFallbackReason =
-                    $"VRAM insuficiente detectada: GPU dedicada tem {availableBytes / (1024.0 * 1024.0 * 1024.0):F1} GB, " +
-                    $"modelo {quality.Value} requer ~{requiredBytes / (1024.0 * 1024.0 * 1024.0):F1} GB. " +
-                    "Fallback automático para CPU.";
-                order =
-                [
-                    RuntimeLibrary.Cpu,
-                    RuntimeLibrary.CpuNoAvx,
-                ];
+                    "Nenhuma GPU dedicada (DiscreteGpu) encontrada via Vulkan. " +
+                    "Verifique se o driver NVIDIA está instalado corretamente " +
+                    "e se o Vulkan Runtime está presente. Fallback automático para CPU.";
+                order = [RuntimeLibrary.Cpu, RuntimeLibrary.CpuNoAvx];
+            }
+            else if (quality.HasValue)
+            {
+                // GPU dedicada encontrada — verifica se tem VRAM suficiente
+                var requiredBytes = EstimateVulkanVramBytes(quality.Value);
+                var availableBytes = VulkanDeviceEnumerator.TryGetDedicatedGpuVramBytes();
+
+                if (availableBytes > 0 && availableBytes < requiredBytes)
+                {
+                    VramFallbackReason =
+                        $"VRAM insuficiente detectada: GPU dedicada tem {availableBytes / (1024.0 * 1024.0 * 1024.0):F1} GB, " +
+                        $"modelo {quality.Value} requer ~{requiredBytes / (1024.0 * 1024.0 * 1024.0):F1} GB. " +
+                        "Fallback automático para CPU.";
+                    order = [RuntimeLibrary.Cpu, RuntimeLibrary.CpuNoAvx];
+                }
             }
         }
 
         RuntimeOptions.RuntimeLibraryOrder = order;
-
-        CurrentGpuDevice = device switch
-        {
-            ExecutionDevice.Vulkan when OperatingSystem.IsWindows() && VramFallbackReason is null => ResolveVulkanDeviceIndex(),
-            _ => 0,
-        };
+        CurrentGpuDevice = vulkanDeviceIndex ?? 0;
     }
 
     /// <summary>
     /// Consulta o enumerador Vulkan para obter o índice da GPU dedicada.
-    /// Retorna 0 (default) em qualquer falha — o whisper.cpp fará fallback para
-    /// CPU se device 0 não existir ou não for compatível.
+    /// Retorna <c>null</c> quando nenhuma GPU discreta (DiscreteGpu) é encontrada —
+    /// o chamador deve fazer fallback para CPU nesse caso.
+    /// Retorna 0 (iGPU) apenas em caso de falha inesperada (exceção).
     /// </summary>
-    private static int ResolveVulkanDeviceIndex()
+    private static int? ResolveVulkanDeviceIndex()
     {
         try
         {
             var devices = VulkanDeviceEnumerator.TryEnumerateDevices();
             if (devices.Count == 0)
-                return 0;
+                return null;
 
             // Prefere GPU dedicada (NVIDIA/AMD dGPU)
             var dedicated = devices.FirstOrDefault(d => d.DeviceType == VulkanDeviceType.DiscreteGpu);
             if (dedicated is not null)
                 return dedicated.Index;
 
-            // Sem GPU dedicada: usa o primeiro dispositivo disponível (pode ser iGPU)
-            return devices[0].Index;
+            // Nenhuma GPU dedicada encontrada via Vulkan.
+            // Em notebooks com Optimus, a dGPU pode não estar registrada
+            // no ICD Vulkan se o driver estiver incompleto.
+            return null;
         }
         catch
         {
-            return 0;
+            return 0; // erro inesperado → fallback seguro
         }
     }
 

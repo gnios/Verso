@@ -148,6 +148,8 @@ public class WhisperRuntimeConfiguratorTests
     [Fact]
     public void Configure_VulkanWithTinyModel_VramInsufficient_FallsBackToCpu()
     {
+        var dGpu = new VulkanDeviceInfo(1, VulkanDeviceType.DiscreteGpu, "NVIDIA Test GPU");
+        VulkanDeviceEnumerator.DevicesOverride = () => [dGpu];
         VulkanDeviceEnumerator.VramBytesOverride = () => 512_000_000;
         try
         {
@@ -160,10 +162,10 @@ public class WhisperRuntimeConfiguratorTests
         }
         finally
         {
+            VulkanDeviceEnumerator.DevicesOverride = null;
             VulkanDeviceEnumerator.VramBytesOverride = null;
         }
     }
-
 
     [Fact]
     public void Configure_CpuDevice_NoVramCheck()
@@ -185,6 +187,8 @@ public class WhisperRuntimeConfiguratorTests
     [Fact]
     public void Configure_VulkanFallback_RuntimeOrderContainsOnlyCpu()
     {
+        var dGpu = new VulkanDeviceInfo(1, VulkanDeviceType.DiscreteGpu, "NVIDIA Test GPU");
+        VulkanDeviceEnumerator.DevicesOverride = () => [dGpu];
         VulkanDeviceEnumerator.VramBytesOverride = () => 100_000_000;
         try
         {
@@ -197,7 +201,33 @@ public class WhisperRuntimeConfiguratorTests
         }
         finally
         {
+            VulkanDeviceEnumerator.DevicesOverride = null;
             VulkanDeviceEnumerator.VramBytesOverride = null;
+        }
+    }
+
+    [Fact]
+    public void Configure_Vulkan_NoDedicatedGpu_FallsBackToCpu()
+    {
+        // Simula um notebook onde Vulkan só vê a iGPU (Intel) — a dGPU (MX450)
+        // não está registrada no ICD Vulkan (driver incompleto, etc.)
+        VulkanDeviceEnumerator.DevicesOverride = () =>
+        [
+            new VulkanDeviceInfo(0, VulkanDeviceType.IntegratedGpu, "Intel(R) UHD Graphics"),
+        ];
+        try
+        {
+            WhisperRuntimeConfigurator.Configure(ExecutionDevice.Vulkan, ModelQuality.PtBrTurbo);
+
+            Assert.NotNull(WhisperRuntimeConfigurator.VramFallbackReason);
+            Assert.Contains("Nenhuma GPU dedicada", WhisperRuntimeConfigurator.VramFallbackReason);
+            Assert.Equal(RuntimeLibrary.Cpu, RuntimeOptions.RuntimeLibraryOrder[0]);
+            Assert.DoesNotContain(RuntimeLibrary.Vulkan, RuntimeOptions.RuntimeLibraryOrder);
+            Assert.Equal(0, WhisperRuntimeConfigurator.CurrentGpuDevice);
+        }
+        finally
+        {
+            VulkanDeviceEnumerator.DevicesOverride = null;
         }
     }
 }
