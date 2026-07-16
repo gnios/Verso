@@ -133,7 +133,8 @@ public sealed class WhisperTranscriptionEngine : IDisposable
 
         progress?.Report(new EngineProgress("preparing"));
         var silenceChunks = SilenceSplitter.SplitBySilence(samples);
-        var (maxPartes, paralelismo, threadsPorJob) = ChunkPlanner.CalculateParallelLimits(request.Device);
+        var threadsOverride = TranscriptionThreadsResolver.Resolve(request.MaxTranscriptionThreads);
+        var (maxPartes, paralelismo, threadsPorJob) = ChunkPlanner.CalculateParallelLimits(request.Device, threadsOverride);
         var partes = ChunkPlanner.GroupParts(silenceChunks, maxPartes);
 
         LoadModelFactory(modelPath);
