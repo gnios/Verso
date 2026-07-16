@@ -1,0 +1,215 @@
+using System.Runtime.InteropServices;
+
+namespace Verso.Core.Engine;
+
+/// <summary>Tipos de dispositivo GPU definidos por VkPhysicalDeviceType.</summary>
+internal enum VulkanDeviceType
+{
+    Other = 0,
+    IntegratedGpu = 1,
+    DiscreteGpu = 2,
+    VirtualGpu = 3,
+    Cpu = 4,
+}
+
+/// <summary>Informação de um dispositivo físico Vulkan enumerado.</summary>
+internal sealed record VulkanDeviceInfo(int Index, VulkanDeviceType DeviceType, string Name);
+
+/// <summary>
+/// Enumerador de dispositivos físicos Vulkan via P/Invoke direto na vulkan-1.dll.
+/// Constrói as estruturas VkInstanceCreateInfo em memória não-gerenciada (byte a byte)
+/// para evitar problemas de alinhamento/layout de struct que causaram crashes em
+/// tentativas anteriores com StructLayout marshaling automático.
+///
+/// Apenas o essencial: uma VkInstance minimalista (sem layers/extensions), chamada
+/// vkEnumeratePhysicalDevices + vkGetPhysicalDeviceProperties, lendo deviceType
+/// e deviceName em offsets fixos do VkPhysicalDeviceProperties.
+///
+/// Toda exceção é capturada em <see cref="TryEnumerateDevices"/> — nunca derruba o app.
+/// </summary>
+internal static class VulkanDeviceEnumerator
+{
+    // VK_MAKE_API_VERSION(0, 1, 0, 0)
+    private const uint VkApiVersion1_0 = 4_194_304;
+
+    // VkStructureType
+    private const int VkStructureTypeApplicationInfo = 0;
+    private const int VkStructureTypeInstanceCreateInfo = 1;
+
+    // VkResult
+    private const int VkSuccess = 0;
+
+    // Tamanhos das structs manuais em x64 (conferidos com Marshal.SizeOf via reflection)
+    private const int AppInfoSize = 48;
+    private const int CreateInfoSize = 64;
+
+    [DllImport("vulkan-1.dll")]
+    private static extern int vkCreateInstance(IntPtr pCreateInfo, IntPtr pAllocator, out IntPtr pInstance);
+
+    [DllImport("vulkan-1.dll")]
+    private static extern void vkDestroyInstance(IntPtr instance, IntPtr pAllocator);
+
+    [DllImport("vulkan-1.dll")]
+    private static extern int vkEnumeratePhysicalDevices(IntPtr instance, ref uint pPhysicalDeviceCount, IntPtr[]? pPhysicalDevices);
+
+    [DllImport("vulkan-1.dll")]
+    private static extern void vkGetPhysicalDeviceProperties(IntPtr physicalDevice, IntPtr pProperties);
+
+    /// <summary>
+    /// Tenta enumerar dispositivos Vulkan. Retorna lista vazia em qualquer falha
+    /// (vulkan-1.dll ausente, sem driver, erro de inicialização, etc.).
+    /// </summary>
+    public static List<VulkanDeviceInfo> TryEnumerateDevices()
+    {
+        try
+        {
+            return EnumerateDevicesCore();
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private static List<VulkanDeviceInfo> EnumerateDevicesCore()
+    {
+        AppInfoMemory appInfo = default;
+        CreateInfoMemory createInfo = default;
+        IntPtr instance = IntPtr.Zero;
+        IntPtr propBuffer = IntPtr.Zero;
+
+        try
+        {
+            // --- VkApplicationInfo ---
+            // Offset 0:  sType (int32)              = VK_STRUCTURE_TYPE_APPLICATION_INFO (0)
+            // Offset 4:  padding (4 bytes)
+            // Offset 8:  pNext (IntPtr)             = null
+            // Offset 16: pApplicationName (IntPtr)  = "verso"
+            // Offset 24: applicationVersion (uint32) = 1
+            // Offset 28: padding (4 bytes)
+            // Offset 32: pEngineName (IntPtr)       = "verso"
+            // Offset 40: engineVersion (uint32)      = 1
+            // Offset 44: apiVersion (uint32)         = VK_API_VERSION_1_0
+            appInfo = new AppInfoMemory();
+            Marshal.WriteInt32(appInfo.Ptr, 0, VkStructureTypeApplicationInfo);
+            Marshal.WriteIntPtr(appInfo.Ptr, 8, IntPtr.Zero);
+            Marshal.WriteIntPtr(appInfo.Ptr, 16, appInfo.AppNamePtr);
+            Marshal.WriteInt32(appInfo.Ptr, 24, 1);
+            Marshal.WriteIntPtr(appInfo.Ptr, 32, appInfo.EngineNamePtr);
+            Marshal.WriteInt32(appInfo.Ptr, 40, 1);
+            Marshal.WriteInt32(appInfo.Ptr, 44, (int)VkApiVersion1_0);
+
+            // --- VkInstanceCreateInfo ---
+            // Offset 0:  sType (int32)              = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO (1)
+            // Offset 4:  padding (4 bytes)
+            // Offset 8:  pNext (IntPtr)             = null
+            // Offset 16: flags (IntPtr)             = null
+            // Offset 24: pApplicationInfo (IntPtr)  = &appInfo
+            // Offset 32: enabledLayerCount (uint32)  = 0
+            // Offset 36: padding (4 bytes)
+            // Offset 40: ppEnabledLayerNames (IntPtr) = null
+            // Offset 48: enabledExtensionCount (uint32) = 0
+            // Offset 52: padding (4 bytes)
+            // Offset 56: ppEnabledExtensionNames (IntPtr) = null
+            createInfo = new CreateInfoMemory();
+            Marshal.WriteInt32(createInfo.Ptr, 0, VkStructureTypeInstanceCreateInfo);
+            Marshal.WriteIntPtr(createInfo.Ptr, 8, IntPtr.Zero);
+            Marshal.WriteIntPtr(createInfo.Ptr, 16, IntPtr.Zero);
+            Marshal.WriteIntPtr(createInfo.Ptr, 24, appInfo.Ptr);
+            Marshal.WriteInt32(createInfo.Ptr, 32, 0);
+            Marshal.WriteIntPtr(createInfo.Ptr, 40, IntPtr.Zero);
+            Marshal.WriteInt32(createInfo.Ptr, 48, 0);
+            Marshal.WriteIntPtr(createInfo.Ptr, 56, IntPtr.Zero);
+
+            if (vkCreateInstance(createInfo.Ptr, IntPtr.Zero, out instance) != VkSuccess)
+                return [];
+
+            // Enumerate physical devices
+            uint count = 0;
+            if (vkEnumeratePhysicalDevices(instance, ref count, null) != VkSuccess || count == 0)
+                return [];
+
+            var handles = new IntPtr[count];
+            if (vkEnumeratePhysicalDevices(instance, ref count, handles) != VkSuccess)
+                return [];
+
+            var result = new List<VulkanDeviceInfo>((int)count);
+            propBuffer = Marshal.AllocHGlobal(512);
+
+            for (uint i = 0; i < count; i++)
+            {
+                vkGetPhysicalDeviceProperties(handles[i], propBuffer);
+
+                var deviceType = (VulkanDeviceType)Marshal.ReadInt32(propBuffer, 16);
+                var name = ReadFixedString(propBuffer, 20, 256);
+
+                result.Add(new VulkanDeviceInfo((int)i, deviceType, name));
+            }
+
+            return result;
+        }
+        finally
+        {
+            if (propBuffer != IntPtr.Zero)
+                Marshal.FreeHGlobal(propBuffer);
+
+            if (instance != IntPtr.Zero)
+                vkDestroyInstance(instance, IntPtr.Zero);
+
+            createInfo.Dispose();
+            appInfo.Dispose();
+        }
+    }
+
+    private static string ReadFixedString(IntPtr basePtr, int offset, int maxLength)
+    {
+        var raw = Marshal.PtrToStringAnsi(IntPtr.Add(basePtr, offset), maxLength);
+        if (raw is null) return string.Empty;
+        var nullIdx = raw.IndexOf('\0');
+        return nullIdx >= 0 ? raw[..nullIdx] : raw;
+    }
+
+    /// <summary>
+    /// Gerencia a memória não-gerenciada de VkApplicationInfo + as duas strings ANSI.
+    /// </summary>
+    private ref struct AppInfoMemory
+    {
+        public IntPtr Ptr;
+        public IntPtr AppNamePtr;
+        public IntPtr EngineNamePtr;
+
+        public AppInfoMemory()
+        {
+            Ptr = Marshal.AllocHGlobal(AppInfoSize);
+            AppNamePtr = Marshal.StringToCoTaskMemAnsi("verso");
+            EngineNamePtr = Marshal.StringToCoTaskMemAnsi("verso");
+        }
+
+        public readonly void Dispose()
+        {
+            if (Ptr != IntPtr.Zero)
+                Marshal.FreeHGlobal(Ptr);
+            if (AppNamePtr != IntPtr.Zero)
+                Marshal.FreeCoTaskMem(AppNamePtr);
+            if (EngineNamePtr != IntPtr.Zero)
+                Marshal.FreeCoTaskMem(EngineNamePtr);
+        }
+    }
+
+    /// <summary>Gerencia a memória não-gerenciada de VkInstanceCreateInfo.</summary>
+    private ref struct CreateInfoMemory
+    {
+        public IntPtr Ptr;
+
+        public CreateInfoMemory()
+        {
+            Ptr = Marshal.AllocHGlobal(CreateInfoSize);
+        }
+
+        public readonly void Dispose()
+        {
+            if (Ptr != IntPtr.Zero)
+                Marshal.FreeHGlobal(Ptr);
+        }
+    }
+}

@@ -16,8 +16,8 @@ namespace Verso.App.Services;
 ///   a primeira (device 0) é a que o CUDA efetivamente usará.
 /// - Vulkan: selecionamos ativamente a GPU dedicada (dGPU) via
 ///   <c>WhisperFactoryOptions.GpuDevice</c>, resolvendo seu índice no backend Vulkan
-///   através de WMI (<c>VulkanDeviceIndexResolver</c>). A GPU listada aqui é a que
-///   o Verso força o whisper.net a usar.
+///   através de <c>VulkanDeviceEnumerator.TryEnumerateDevices</c> (P/Invoke na
+///   vulkan-1.dll). A GPU listada aqui é a que o Verso força o whisper.net a usar.
 ///
 /// Tudo é best-effort: se nvidia-smi/WMI não estiverem disponíveis, devolvemos null
 /// sem lançar, e a UI explica o que faltou.
@@ -86,9 +86,10 @@ public sealed class ActiveGpuResolver
     }
     private ActiveGpuInfo ResolveVulkan()
     {
-        // Determinamos o índice da GPU dedicada via VulkanDeviceIndexResolver (WMI em
-        // ordem nativa) e passamos como GpuDevice ao WhisperFactoryOptions — o que
-        // força o whisper.net/ggml_vulkan a usar a placa dedicada.
+        // A GPU dedicada agora é resolvida via VulkanDeviceEnumerator (P/Invoke na
+        // vulkan-1.dll), não mais por WMI + índice hardcoded. O ActiveGpuResolver
+        // apenas mostra qual GPU foi selecionada — o índice real é resolvido em
+        // WhisperRuntimeConfigurator.ResolveVulkanDeviceIndex().
         var gpus = _gpuDetector.Detect();
         var candidate = gpus.FirstOrDefault(g => g.IsDedicated) ?? gpus.FirstOrDefault();
         if (candidate is null)
