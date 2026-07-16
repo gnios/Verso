@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Verso.Core.Catalogs;
 using Verso.Core.Data;
 using Verso.Core.Data.Entities;
+using Verso.Core.Engine.Worker;
 
 namespace Verso.Core.Engine;
 
@@ -283,7 +284,9 @@ public static class EngineServiceCollectionExtensions
     public static IServiceCollection AddVersoEngine(this IServiceCollection services)
     {
         services.AddWhisperEngine();
-        services.AddSingleton<ITranscriptionEngine, WhisperTranscriptionEngineAdapter>();
+        services.AddSingleton<IWorkerExecutableLocator, WorkerExecutableLocator>();
+        services.AddSingleton<IWorkerProcessFactory, WorkerProcessFactory>();
+        services.AddSingleton<ITranscriptionEngine, WorkerProcessTranscriptionEngine>();
         services.AddSingleton<TranscriptionQueueService>();
         services.AddHostedService(sp => sp.GetRequiredService<TranscriptionQueueService>());
         return services;
