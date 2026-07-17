@@ -42,7 +42,11 @@ public sealed class WorkerHost
 
         using var stopListeningCts = new CancellationTokenSource();
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(shutdownToken);
-        var cancelListenTask = ListenForCancelLineAsync(input, linkedCts, stopListeningCts.Token);
+        // Task.Run é obrigatório aqui: Console.In (SyncTextReader) implementa ReadLineAsync como uma
+        // leitura SÍNCRONA e bloqueante por baixo dos panos (comportamento documentado do runtime .NET),
+        // então chamar ListenForCancelLineAsync diretamente bloquearia a própria thread de RunAsync até
+        // chegar uma segunda linha em stdin — travando para sempre antes de TranscribeAsync ser chamado.
+        var cancelListenTask = Task.Run(() => ListenForCancelLineAsync(input, linkedCts, stopListeningCts.Token));
 
         var progress = new SynchronousProgress<EngineProgress>(e =>
             WriteMessage(output, new WorkerProgressMessage(e.Stage, e.PartIndex, e.TotalParts)));
