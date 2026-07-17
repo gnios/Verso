@@ -4,9 +4,9 @@
     "tlc-spec-driven": {
       "name": "tlc-spec-driven",
       "source": "local",
-      "contentHash": "76e50c2dc0ec574d959e54cd084c725eb8b2faaf7638d432dc95045e3d4eec5f",
+      "contentHash": "e3d5c4dec38bff044207b31229fb28114d5fdb79f2c7200f3ec49a13a70024e1",
       "installedAt": "2026-07-04T16:34:44.551Z",
-      "updatedAt": "2026-07-04T16:34:44.589Z",
+      "updatedAt": "2026-07-16T13:25:07.934Z",
       "agents": [
         "cursor",
         "claude-code",

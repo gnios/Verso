@@ -147,7 +147,8 @@ public partial class DashboardViewModel : ViewModelBase
             transcription.MediaFilePath,
             transcription.Language,
             transcription.Quality,
-            settings.Device));
+            settings.Device,
+            settings.MaxTranscriptionThreads));
     }
 
     private void ApplyNavigationParameter(NavigationParameter? parameter)

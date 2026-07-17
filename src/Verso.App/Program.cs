@@ -1,10 +1,14 @@
 using System;
 using System.Diagnostics;
-using System.Windows;
-using Microsoft.AspNetCore.Components.WebView.Wpf;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Photino.Blazor;
+using Verso.App.Components.Layout;
+using Verso.App.Services;
 using Verso.Core;
 using Verso.Core.Data;
 using Verso.Core.Engine;
@@ -15,57 +19,56 @@ namespace Verso.App;
 
 public class Program
 {
-    private static IHost? _host;
+    private static IServiceProvider? _services;
 
     public static IServiceProvider Services =>
-        _host?.Services ?? throw new InvalidOperationException("Host ainda não foi inicializado.");
+        _services ?? throw new InvalidOperationException("Serviços ainda não foram inicializados.");
 
-    [STAThread]
-    public static void Main(string[] args)
+    public static async Task Main(string[] args)
     {
 #if DEBUG
         AttachDebugConsole();
 #endif
 
-        _host = Host.CreateDefaultBuilder(args)
-            .ConfigureLogging(ConfigureLogging)
-            .ConfigureServices(services =>
-            {
-                services.Configure<HostOptions>(options =>
-                {
-                    options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
-                });
-                services.AddWpfBlazorWebView();
+        var appBuilder = PhotinoBlazorAppBuilder.CreateDefault(args);
+        appBuilder.RootComponents.Add<MainLayout>("#app");
+
+        appBuilder.Services.AddLogging(ConfigureLogging);
+        appBuilder.Services.AddVersoDatabase();
+        appBuilder.Services.AddVersoEngine();
+        appBuilder.Services.AddVersoServices();
+        appBuilder.Services.AddVersoAppServices();
+
+        var app = appBuilder.Build();
+        _services = app.Services;
+        app.Services.GetRequiredService<PhotinoWindowAccessor>().Attach(app.MainWindow);
+
+        app.MainWindow
+            .SetTitle("Verso")
+            .SetSize(1280, 800);
 #if DEBUG
-                services.AddBlazorWebViewDeveloperTools();
+        app.MainWindow.SetDevToolsEnabled(true);
 #endif
-                services.AddVersoDatabase();
-                services.AddVersoEngine();
-                services.AddVersoServices();
-                services.AddVersoAppServices();
-            })
-            .Build();
-        RouteWhisperNativeLogs(_host.Services);
-        DbBootstrapper.MigrateAsync(_host.Services).GetAwaiter().GetResult();
-        _host.Start();
+
+        RouteWhisperNativeLogs(app.Services);
+        await DbBootstrapper.MigrateAsync(app.Services);
+
+        var hostedServices = app.Services.GetServices<IHostedService>().ToList();
+        foreach (var hostedService in hostedServices)
+        {
+            await hostedService.StartAsync(CancellationToken.None);
+        }
 
         try
         {
-            var app = new App();
-            // `InitializeComponent()` é gerado a partir do App.xaml e é quem aplica a
-            // propriedade `StartupUri` (definida no XAML) à instância — sem essa chamada
-            // o loop de mensagens do WPF roda (processo fica vivo) mas nenhuma janela é
-            // criada, pois `StartupUri` nunca é atribuída. Normalmente essa chamada é feita
-            // pelo `Main()` autogerado a partir de App.xaml, que não usamos aqui (Main
-            // customizado em Program.cs, ver <StartupObject> no .csproj).
-            app.InitializeComponent();
-            app.Resources["Services"] = _host.Services;
             app.Run();
         }
         finally
         {
-            _host.StopAsync().GetAwaiter().GetResult();
-            _host.Dispose();
+            foreach (var hostedService in hostedServices)
+            {
+                await hostedService.StopAsync(CancellationToken.None);
+            }
         }
     }
 
@@ -93,12 +96,8 @@ public class Program
 #endif
     }
 
-    /// <summary>
-    /// Encaminha os logs nativos do whisper.cpp (via whisper.net LogProvider) para o
-    /// logger em arquivo do app. <see cref="LogProvider.AddLogger"/> recebe o nível
-    /// nativo (WhisperLogLevel) e a mensagem; mapeamos para <see cref="LogLevel"/> e
-    /// escrevemos sob a categoria "Whisper.net" para que apareçam no mesmo arquivo.
-    /// </summary>
+    // Encaminha os logs nativos do whisper.cpp (via whisper.net LogProvider) para o
+    // logger em arquivo do app.
     private static void RouteWhisperNativeLogs(IServiceProvider services)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
@@ -123,6 +122,11 @@ public class Program
 
     private static void AttachDebugConsole()
     {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
         if (AllocConsole())
         {
             Console.OutputEncoding = System.Text.Encoding.UTF8;

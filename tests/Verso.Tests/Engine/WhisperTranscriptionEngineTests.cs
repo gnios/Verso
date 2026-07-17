@@ -32,10 +32,13 @@ public class WhisperTranscriptionEngineTests : IDisposable
     }
 
     [Fact]
-    public async Task TranscribeAsync_CalledTwice_ReloadsFactoryPerJob()
+    public async Task TranscribeAsync_CalledTwice_ReusesFactoryAcrossJobs()
     {
-        // Mitigação do crash 0x80131506: a fábrica é invalidada ao fim de cada job,
-        // forçando recarga na próxima transcrição (lifetime nativo isolado por job).
+        // Isolamento por processo (R2.4/transcricao-cpu-responsiva): cada job de
+        // transcrição roda em um Verso.Worker separado, então a corrupção de heap que
+        // motivava invalidar o cache ao fim de cada job fica confinada àquele
+        // processo. Dentro de um mesmo processo/engine, a fábrica é reaproveitada
+        // entre jobs em vez de recarregada.
         var wavPath = CreateTempWav(seconds: 1, frequencyHz: 440);
         var modelEnsurer = new NoOpModelEnsurer();
         var factoryCache = new CountingWhisperFactoryCache();
@@ -50,12 +53,11 @@ public class WhisperTranscriptionEngineTests : IDisposable
         await engine.TranscribeAsync(request, progress: null, CancellationToken.None);
         await engine.TranscribeAsync(request with { TranscriptionId = Guid.NewGuid() }, progress: null, CancellationToken.None);
 
-        // Cada job recarrega a fábrica (Invalidate ao fim de cada job). Trade-off:
-        // recarregar o modelo a cada transcrição é mais lento, mas isola o lifetime
-        // nativo do WhisperFactory por job — evita acumular centenas de ciclos de
-        // create/dispose de processor na mesma fábrica, que corrompia a heap.
-        Assert.Equal(2, factoryCache.LoadCount);
-        Assert.Equal(2, engine.FactoryLoadCount);
+        // A fábrica é reaproveitada entre jobs (sem invalidação ao fim de cada job):
+        // o isolamento nativo agora vem da fronteira de processo, não de recarregar o
+        // modelo a cada transcrição.
+        Assert.Equal(1, factoryCache.LoadCount);
+        Assert.Equal(1, engine.FactoryLoadCount);
     }
 
     [Fact]

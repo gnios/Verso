@@ -16,7 +16,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<SegmentEditingService>();
         services.AddScoped<SettingsService>();
         services.AddScoped<ExportService>();
-        services.AddSingleton<IMediaPlaybackService, NAudioPlaybackService>();
+        services.AddSingleton<IMediaPlaybackService, LibVlcPlaybackService>();
         return services;
     }
 }

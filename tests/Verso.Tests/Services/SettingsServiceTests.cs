@@ -21,6 +21,7 @@ public class SettingsServiceTests
             Assert.True(settings.IdentifySpeakersDefault);
             Assert.Equal(ExecutionDevice.Auto, settings.Device);
             Assert.False(settings.DarkTheme);
+            Assert.Equal(0, settings.MaxTranscriptionThreads);
         }
         finally
         {

@@ -4,8 +4,10 @@ name: release
 ## O app é Windows-only (WPF/WebView2 não rodam em Linux), então o runner é windows-latest.
 ##
 ## Publica DUAS variantes por release (matrix cpu|gpu), ambas single-file (DLLs gerenciadas
-## embutidas no Verso.App.exe — raiz limpa, só o app) e portáteis (dados em <appdir>/data,
-## não em %AppData%):
+## embutidas no Verso.App.exe/Verso.Worker.exe — raiz limpa, só os dois exes) e portáteis
+## (dados em <appdir>/data, não em %AppData%). Verso.Worker.exe (Fase 2/transcricao-cpu-responsiva,
+## processo separado onde a transcrição real roda) é publicado no MESMO diretório de output do
+## Verso.App, pois WorkerExecutableLocator o resolve como sibling de Verso.App.exe em runtime:
 ##   - cpu: sem runtimes CUDA/Vulkan (~200 MB) — roda em qualquer máquina
 ##   - gpu: com runtimes CUDA/Vulkan win-x64 (~960 MB) — aceleração por GPU NVIDIA
 ## Ambas removem runtimes Linux/macOS e peso morto (pdb/xml/Metal) antes do zip.
@@ -81,6 +83,21 @@ jobs:
           # em runtimes/<rid>/native/ — assim ainda dá para remover runtimes CUDA/Vulkan
           # não desejados antes do zip (variante CPU) sem inchar o exe.
           dotnet publish src/Verso.App/Verso.App.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=false `
+            -p:Version=${{ steps.version.outputs.version }} `
+            -o publish/${{ matrix.variant }}
+
+      - name: Publicar Verso.Worker self-contained (win-x64, single-file)
+        shell: pwsh
+        run: |
+          # Mesmo diretório de output do Verso.App: WorkerExecutableLocator resolve
+          # "Verso.Worker.exe" como sibling de Verso.App.exe em runtime (produção, sem
+          # o copy target de dev-build de Verso.App.csproj, que só roda em `dotnet build`).
+          dotnet publish src/Verso.Worker/Verso.Worker.csproj `
             -c Release `
             -r win-x64 `
             --self-contained true `
