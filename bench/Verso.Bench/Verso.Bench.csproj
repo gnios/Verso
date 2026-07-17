@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Ferramenta de benchmark da Fase 3 (spike CTranslate2). Fora da Verso.sln de propósito:
+         não é produto, não roda no CI. Rodar via: dotnet run no projeto bench/Verso.Bench. -->
+    <RootNamespace>Verso.Bench</RootNamespace>
+    <AssemblyName>Verso.Bench</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Verso.Core/Verso.Core.csproj" />
+  </ItemGroup>
+
+</Project>
