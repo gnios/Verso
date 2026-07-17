@@ -249,7 +249,8 @@ public partial class UploadViewModel : ViewModelBase
                 mediaPath,
                 language,
                 Quality,
-                settings.Device));
+                settings.Device,
+                settings.MaxTranscriptionThreads));
 
             await _services.GetRequiredService<SidebarViewModel>().LoadAsync();
 

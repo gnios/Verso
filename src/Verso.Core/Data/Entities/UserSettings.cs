@@ -12,4 +12,5 @@ public class UserSettings
     public ExecutionDevice Device { get; set; } = ExecutionDevice.Auto;
     public ModelQuality DefaultQuality { get; set; } = ModelQuality.Standard;
     public bool DarkTheme { get; set; }
+    public int MaxTranscriptionThreads { get; set; } // 0 = automático
 }

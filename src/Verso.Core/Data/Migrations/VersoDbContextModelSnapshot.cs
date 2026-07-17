@@ -231,6 +231,9 @@ namespace Verso.Core.Data.Migrations
                     b.Property<bool>("LiveTranscriptionEnabled")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("MaxTranscriptionThreads")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("TEXT");

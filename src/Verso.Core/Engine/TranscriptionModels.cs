@@ -7,7 +7,8 @@ public sealed record TranscriptionJobRequest(
     string MediaFilePath,
     string Language,
     ModelQuality Quality,
-    ExecutionDevice Device);
+    ExecutionDevice Device,
+    int MaxTranscriptionThreads = 0);
 
 public sealed record TranscriptionSegmentResult(
     double StartSeconds,

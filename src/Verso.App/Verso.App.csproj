@@ -1,25 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows10.0.17763.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
-    <UseWPF>true</UseWPF>
     <Version>1.0.0.0</Version>
-    <ApplicationIcon>Assets\verso.ico</ApplicationIcon>
-    <!-- Workaround documentado pela própria Microsoft para Blazor+WPF (dotnet/maui#5861). -->
     <RootNamespace>Verso.App</RootNamespace>
-    <!-- Main custom em Program.cs (Generic Host) — evita conflito com o Main gerado a partir de App.xaml/StartupUri. -->
+    <!-- Main custom em Program.cs (Photino), sem StartupUri/App.xaml. -->
     <StartupObject>Verso.App.Program</StartupObject>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
-    <!--
-      Migração de Avalonia para Blazor Hybrid (AD-005 em .specs/STATE.md), mantida por
-      reaproveitamento do HTML/CSS do protótipo e stack WebView2 madura. NOTA: o diagnóstico
-      original que atribuía o "Internal CLR error (0x80131506)" ao pipeline de composição/Skia
-      do Avalonia estava ERRADO — a causa raiz confirmada via dump (AD-006) é corrupção de
-      heap nativa no whisper.net/whisper.cpp durante a transcrição, em `Verso.Core`.
-      A migração de UI NÃO resolveu esse crash; as mitigações reais estão em
-      `Verso.Core/Engine/WhisperTranscriptionEngine.cs` e `WhisperProcessorFactory.cs`.
-    -->
   </PropertyGroup>
 
   <ItemGroup>
@@ -27,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Wpf" Version="10.0.0" />
+    <PackageReference Include="Photino.Blazor" Version="4.0.13" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -35,14 +22,38 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.9" />
-    <PackageReference Include="System.Management" Version="10.0.9" />
+    <PackageReference Include="System.Management" Version="10.0.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Verso.Core\Verso.Core.csproj" />
+    <!--
+      ReferenceOutputAssembly=false: garante apenas a ORDEM de build (Verso.Worker antes de
+      Verso.App), sem referenciar o assembly do worker — nenhum código do Verso.App chama o
+      worker in-process. O copy target abaixo (T10/transcricao-cpu-responsiva) leva o
+      executável construído para o output do Verso.App, de onde WorkerExecutableLocator o
+      resolve como sibling.
+    -->
+    <ProjectReference Include="..\Verso.Worker\Verso.Worker.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
+    </ProjectReference>
   </ItemGroup>
-  <ItemGroup>
-    <Resource Include="Assets\verso.ico" />
-    <Resource Include="Assets\verso-logo.png" />
-  </ItemGroup>
+
+  <!--
+    Copia o output do Verso.Worker (Fase 2/transcricao-cpu-responsiva, R2.1) para o diretório de
+    output do Verso.App em builds de desenvolvimento. WorkerExecutableLocator resolve
+    "Verso.Worker"/"Verso.Worker.exe" como sibling de AppContext.BaseDirectory/VersoPaths.AppDirectory
+    — sem esta cópia, builds locais não teriam o worker disponível ao lado do Verso.App.
+  -->
+  <Target Name="CopyVersoWorkerOutput" AfterTargets="Build">
+    <ItemGroup>
+      <_VersoWorkerOutputFiles Include="$(MSBuildThisFileDirectory)..\Verso.Worker\bin\$(Configuration)\net10.0\**\*.*" />
+    </ItemGroup>
+    <Copy
+      SourceFiles="@(_VersoWorkerOutputFiles)"
+      DestinationFolder="$(OutDir)%(RecursiveDir)"
+      SkipUnchangedFiles="true"
+      Condition="'@(_VersoWorkerOutputFiles)' != ''" />
+  </Target>
 </Project>

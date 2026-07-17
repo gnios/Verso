@@ -90,17 +90,19 @@ public class ChunkPlannerTests
         Assert.Equal(6.5, ChunkPlanner.MapToRealTime(2.5, chunks), precision: 6);
     }
 
-    // CPU: paralelismo é 1 (whisper.cpp já satura todos os núcleos).
+    // CPU: paralelismo é 1 (whisper.cpp já satura todos os núcleos) e ThreadsPorJob é
+    // metade dos núcleos lógicos (paridade com o buzz: os.cpu_count() // 2), para não
+    // saturar o scheduler e travar a UI.
     // GPU: paralelismo é 2 para CUDA/Auto (contextos independentes paralelizáveis),
     //       mas 1 para Vulkan (cada fábrica carrega modelo + buffers staging em VRAM,
     //       paralelismo >1 causa OOM na maioria das GPUs).
     [Fact]
-    public void CalculateParallelLimits_ForCpu_IsSequential()
+    public void CalculateParallelLimits_ForCpu_IsSequentialAndHalvesThreads()
     {
         var (maxPartes, paralelismo, threadsPorJob) = ChunkPlanner.CalculateParallelLimits(ExecutionDevice.Cpu);
 
         Assert.Equal(1, paralelismo);
-        Assert.Equal(Environment.ProcessorCount, threadsPorJob);
+        Assert.Equal(Math.Max(1, Environment.ProcessorCount / 2), threadsPorJob);
         Assert.InRange(maxPartes, 4, 8);
     }
 
@@ -126,5 +128,34 @@ public class ChunkPlannerTests
         Assert.Equal(1, paralelismo);
         Assert.Equal(Environment.ProcessorCount, threadsPorJob);
         Assert.InRange(maxPartes, 4, 8);
+    }
+
+    // Override explícito (≥ 1) substitui ThreadsPorJob para qualquer device, sem
+    // afetar MaxPartes/Paralelismo (AC1.4).
+    [Theory]
+    [InlineData(ExecutionDevice.Cpu)]
+    [InlineData(ExecutionDevice.Vulkan)]
+    [InlineData(ExecutionDevice.Cuda)]
+    [InlineData(ExecutionDevice.Auto)]
+    public void CalculateParallelLimits_WithOverride_UsesOverrideThreadsOnly(ExecutionDevice device)
+    {
+        var withoutOverride = ChunkPlanner.CalculateParallelLimits(device);
+        var withOverride = ChunkPlanner.CalculateParallelLimits(device, threadsOverride: 3);
+
+        Assert.Equal(3, withOverride.ThreadsPorJob);
+        Assert.Equal(withoutOverride.MaxPartes, withOverride.MaxPartes);
+        Assert.Equal(withoutOverride.Paralelismo, withOverride.Paralelismo);
+    }
+
+    // Override ausente/0/negativo cai no cálculo default (AC1.5).
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void CalculateParallelLimits_WithNonPositiveOverride_FallsBackToDefault(int threadsOverride)
+    {
+        var withoutOverride = ChunkPlanner.CalculateParallelLimits(ExecutionDevice.Cpu);
+        var withOverride = ChunkPlanner.CalculateParallelLimits(ExecutionDevice.Cpu, threadsOverride);
+
+        Assert.Equal(withoutOverride.ThreadsPorJob, withOverride.ThreadsPorJob);
     }
 }

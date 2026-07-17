@@ -28,17 +28,31 @@ public static class ChunkPlanner
     // Vulkan: cada fábrica carrega o modelo em VRAM (~2.6GB para LargeV3Turbo) mais
     // buffers de staging Vulkan (~1GB adicionais). Paralelismo >1 exige ≥5GB de VRAM,
     // o que poucas GPUs oferecem. Mantemos 1 (serial) para evitar OOM no Vulkan.
-    public static (int MaxPartes, int Paralelismo, int ThreadsPorJob) CalculateParallelLimits(ExecutionDevice device)
+    //
+    // ThreadsPorJob (threads nativas por chamada do whisper.cpp): em CPU, usar todos
+    // os núcleos satura o scheduler e trava a UI (WPF/WebView2) — o buzz sempre limita
+    // à metade dos núcleos. Vulkan/CUDA mantêm todos os núcleos: ali as threads cobrem
+    // só o pré/pós-processamento CPU-side, cortá-las reduziria throughput sem ganho
+    // proporcional de responsividade. threadsOverride, quando ≥ 1, substitui o cálculo
+    // para qualquer device (não afeta MaxPartes/Paralelismo).
+    public static (int MaxPartes, int Paralelismo, int ThreadsPorJob) CalculateParallelLimits(
+        ExecutionDevice device,
+        int threadsOverride = 0)
     {
-        var threads = Environment.ProcessorCount;
-        var maxPartes = Math.Clamp(threads, 4, 8);
+        var processorCount = Environment.ProcessorCount;
+        var maxPartes = Math.Clamp(processorCount, 4, 8);
         var paralelismo = device switch
         {
             ExecutionDevice.Cpu => 1,
             ExecutionDevice.Vulkan => 1,
             _ => Math.Min(2, maxPartes), // CUDA: 2 instâncias paralelas do modelo
         };
-        return (maxPartes, paralelismo, threads);
+        var threadsPorJob = threadsOverride >= 1
+            ? threadsOverride
+            : device == ExecutionDevice.Cpu
+                ? Math.Max(1, processorCount / 2)
+                : processorCount;
+        return (maxPartes, paralelismo, threadsPorJob);
     }
 
     // Agrupa trechos (já sem silêncio) em até maxPartes partes, concatenando os samples

@@ -19,6 +19,7 @@
 @inject ThemeService ThemeService
 @inject BlazorThemeApplicator ThemeApplicator
 @inject IJSRuntime JS
+@inject Dispatcher Dispatcher
 
 <div class="app">
     <Sidebar />
@@ -89,6 +90,7 @@
         if (firstRender)
         {
             ThemeApplicator.AttachJsRuntime(JS);
+            UiThread.AttachDispatcher(Dispatcher);
         }
     }
 
