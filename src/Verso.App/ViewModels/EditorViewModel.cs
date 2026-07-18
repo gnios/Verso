@@ -18,24 +18,34 @@ using Verso.Core.Services;
 
 namespace Verso.App.ViewModels;
 
-public partial class EditorViewModel : ViewModelBase
+public partial class EditorViewModel : ViewModelBase, IDisposable
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly NavigationService _navigation;
     private readonly SegmentEditingService _segmentEditing;
     private readonly SidebarViewModel _sidebar;
     private readonly IFileSaveService _fileSaveService;
+    private readonly TranscriptionQueueService? _queueService;
     private Guid _transcriptionId;
     private SegmentItemViewModel? _focusedSegment;
     private int _focusedCaretIndex;
     private TimeSpan _playbackPosition;
     private bool _playbackStarted;
+    private Guid? _highlightedSegmentId;
+    private bool _disposed;
     private IReadOnlyList<Segment> _segmentEntities = [];
 
-    public ObservableCollection<SegmentItemViewModel> Segments { get; } = [];
+    /// <summary>
+    /// Coleção trocada atomicamente via <see cref="ReplaceSegments"/> — evita N× CollectionChanged
+    /// (transcrições com 1k+ segmentos congelavam a UI).
+    /// </summary>
+    public ObservableCollection<SegmentItemViewModel> Segments { get; private set; } = [];
     public ObservableCollection<TranscriptionCardTagViewModel> Tags { get; } = [];
     public ObservableCollection<FolderOptionViewModel> FolderOptions { get; } = [];
     public ObservableCollection<TagOptionViewModel> TagOptions { get; } = [];
+
+    /// <summary>Altura estimada de um item (px) para Virtualize / scroll por índice.</summary>
+    public const double SegmentItemHeightEstimate = 110;
 
     [ObservableProperty]
     private string _newTagInput = "";
@@ -45,6 +55,9 @@ public partial class EditorViewModel : ViewModelBase
     public IconPickerViewModel IconPicker { get; } = new();
     public SpeakerDropdownViewModel SpeakerDropdown { get; }
     public PlayerBarViewModel PlayerBar { get; }
+
+    [ObservableProperty]
+    private bool _isLoading;
 
     [ObservableProperty]
     private bool _isInProgress;
@@ -115,27 +128,34 @@ public partial class EditorViewModel : ViewModelBase
         _fileSaveService = fileSaveService;
         SpeakerDropdown = new SpeakerDropdownViewModel(scopeFactory);
         PlayerBar = new PlayerBarViewModel(serviceProvider.GetRequiredService<IMediaPlaybackService>());
-        PlayerBar.PositionChanged += (_, position) => SetPlaybackPosition(position, markStarted: true);
+        PlayerBar.PositionChanged += OnPlayerBarPositionChanged;
 
         IconPicker.UseTranscriptionIcons = true;
         IconPicker.AllowNoIcon = true;
-        IconPicker.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(IconPickerViewModel.SelectedIcon) && IsIconPickerOpen)
-            {
-                _ = ApplyIconAsync(IconPicker.SelectedIcon);
-            }
-        };
+        IconPicker.PropertyChanged += OnIconPickerPropertyChanged;
 
         if (serviceProvider.GetService<TranscriptionQueueService>() is { } queueService)
         {
-            queueService.StatusChanged += OnQueueStatusChanged;
+            _queueService = queueService;
+            _queueService.StatusChanged += OnQueueStatusChanged;
+        }
+    }
+
+    private void OnPlayerBarPositionChanged(object? sender, TimeSpan position) =>
+        SetPlaybackPosition(position, markStarted: true);
+
+    private void OnIconPickerPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(IconPickerViewModel.SelectedIcon) && IsIconPickerOpen)
+        {
+            _ = ApplyIconAsync(IconPicker.SelectedIcon);
         }
     }
 
     public void Initialize(NavigationParameter? parameter)
     {
         _transcriptionId = parameter?.TranscriptionId ?? Guid.Empty;
+        IsLoading = _transcriptionId != Guid.Empty;
         _ = LoadAsync();
     }
 
@@ -507,11 +527,18 @@ public partial class EditorViewModel : ViewModelBase
             _playbackStarted = true;
         }
 
+        var hadActive = HasActiveSegment;
+        var previousHighlighted = _highlightedSegmentId;
         _playbackPosition = position;
         UpdateActiveSegmentHighlight();
-        OnPropertyChanged(nameof(HasActiveSegment));
-        SpeakerDropdown.NotifyAssignAvailability();
-        SpeakerDropdown.RefreshActiveIndicator();
+
+        // Evita cascata de PropertyChanged/re-render a cada tick do áudio.
+        if (previousHighlighted != _highlightedSegmentId || hadActive != HasActiveSegment)
+        {
+            OnPropertyChanged(nameof(HasActiveSegment));
+            SpeakerDropdown.NotifyAssignAvailability();
+            SpeakerDropdown.RefreshActiveIndicator();
+        }
     }
 
     internal Segment? GetActiveSegmentEntity() =>
@@ -560,34 +587,48 @@ public partial class EditorViewModel : ViewModelBase
     {
         using var scope = _scopeFactory.CreateScope();
         var folderService = scope.ServiceProvider.GetRequiredService<FolderService>();
-        var folders = await folderService.GetAllAsync();
-
-        FolderOptions.Clear();
-        FolderOptions.Add(new FolderOptionViewModel { Id = null, Name = "Nenhuma pasta", Icon = "" });
-        foreach (var f in folders)
+        var folders = await folderService.GetAllAsync().ConfigureAwait(false);
+        if (_disposed)
         {
-            FolderOptions.Add(new FolderOptionViewModel { Id = f.Id, Name = f.Title, Icon = f.Icon });
+            return;
         }
 
-        SelectedFolderId = selectedId;
+        await UiThread.InvokeAsync(() =>
+        {
+            FolderOptions.Clear();
+            FolderOptions.Add(new FolderOptionViewModel { Id = null, Name = "Nenhuma pasta", Icon = "" });
+            foreach (var f in folders)
+            {
+                FolderOptions.Add(new FolderOptionViewModel { Id = f.Id, Name = f.Title, Icon = f.Icon });
+            }
+
+            SelectedFolderId = selectedId;
+        });
     }
 
     private async Task LoadTagOptionsAsync()
     {
         using var scope = _scopeFactory.CreateScope();
         var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
-        var tags = await libraryService.GetTagsAsync();
-
-        TagOptions.Clear();
-        foreach (var t in tags)
+        var tags = await libraryService.GetTagsAsync().ConfigureAwait(false);
+        if (_disposed)
         {
-            TagOptions.Add(new TagOptionViewModel
-            {
-                Id = t.Id,
-                Name = t.Name,
-                ColorName = TagColorCatalog.GetColor(t.Name),
-            });
+            return;
         }
+
+        await UiThread.InvokeAsync(() =>
+        {
+            TagOptions.Clear();
+            foreach (var t in tags)
+            {
+                TagOptions.Add(new TagOptionViewModel
+                {
+                    Id = t.Id,
+                    Name = t.Name,
+                    ColorName = TagColorCatalog.GetColor(t.Name),
+                });
+            }
+        });
     }
 
     private async Task LoadAsync()
@@ -595,21 +636,80 @@ public partial class EditorViewModel : ViewModelBase
         if (_transcriptionId == Guid.Empty)
         {
             ResetState();
+            IsLoading = false;
             return;
         }
 
-        using var scope = _scopeFactory.CreateScope();
-        var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
-        var transcription = await libraryService.GetTranscriptionDetailAsync(_transcriptionId);
-
-        if (transcription is null)
+        IsLoading = true;
+        try
         {
-            return;
-        }
+            // ConfigureAwait(false): montar milhares de VMs fora da UI thread.
+            using var scope = _scopeFactory.CreateScope();
+            var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
+            var transcription = await libraryService.GetTranscriptionDetailAsync(_transcriptionId)
+                .ConfigureAwait(false);
 
+            if (_disposed || transcription is null)
+            {
+                return;
+            }
+
+            IReadOnlyList<Segment> entities = [];
+            List<SegmentItemViewModel> segmentVms = [];
+            if (transcription.Status == TranscriptionStatus.Done)
+            {
+                entities = transcription.Segments.OrderBy(s => s.SortOrder).ToList();
+                segmentVms = new List<SegmentItemViewModel>(entities.Count);
+                foreach (var segment in entities)
+                {
+                    segmentVms.Add(new SegmentItemViewModel(this, segment));
+                }
+            }
+
+            var tagVms = transcription.Tags
+                .OrderBy(t => t.Name)
+                .Select(t => new TranscriptionCardTagViewModel(t.Name, TagColorCatalog.GetColor(t.Name)))
+                .ToList();
+
+            await UiThread.InvokeAsync(() =>
+                ApplyLoadedTranscription(transcription, entities, segmentVms, tagVms));
+
+            if (_disposed)
+            {
+                return;
+            }
+
+            await Task.WhenAll(
+                LoadFolderOptionsAsync(transcription.FolderId),
+                LoadTagOptionsAsync());
+
+            var mediaPath = transcription.Status == TranscriptionStatus.Done
+                ? transcription.MediaFilePath
+                : null;
+            var knownDuration = transcription.DurationSeconds > 0
+                ? TimeSpan.FromSeconds(transcription.DurationSeconds)
+                : (TimeSpan?)null;
+            _ = LoadPlaybackAsync(mediaPath, knownDuration);
+        }
+        finally
+        {
+            if (!_disposed)
+            {
+                IsLoading = false;
+            }
+        }
+    }
+
+    private void ApplyLoadedTranscription(
+        Transcription transcription,
+        IReadOnlyList<Segment> entities,
+        List<SegmentItemViewModel> segmentVms,
+        List<TranscriptionCardTagViewModel> tagVms)
+    {
         SpeakerDropdown.Initialize(this, _transcriptionId);
-        await SpeakerDropdown.LoadSpeakersAsync();
+        SpeakerDropdown.SetSpeakers(transcription.Speakers);
         _playbackStarted = false;
+        _highlightedSegmentId = null;
 
         Title = transcription.Title;
         Icon = transcription.Icon;
@@ -619,8 +719,6 @@ public partial class EditorViewModel : ViewModelBase
         FolderTitle = transcription.Folder?.Title ?? "";
         FolderId = transcription.FolderId;
 
-        await LoadFolderOptionsAsync(transcription.FolderId);
-
         MetaDate = transcription.CreatedAt.ToString("d MMM yyyy", CultureInfo.GetCultureInfo("pt-BR"));
         MetaDuration = FormatDurationDisplay(transcription.DurationSeconds);
         MetaProcessingTime = FormatProcessingTime(transcription.ProcessingDurationSeconds);
@@ -628,12 +726,10 @@ public partial class EditorViewModel : ViewModelBase
         MetaModel = $"{ModelCatalog.Find(transcription.Quality).Label} · {DeviceDisplayName(transcription.Device)}";
 
         Tags.Clear();
-        foreach (var tag in transcription.Tags.OrderBy(t => t.Name))
+        foreach (var tag in tagVms)
         {
-            Tags.Add(new TranscriptionCardTagViewModel(tag.Name, TagColorCatalog.GetColor(tag.Name)));
+            Tags.Add(tag);
         }
-
-        await LoadTagOptionsAsync();
 
         IsInProgress = transcription.Status == TranscriptionStatus.InProgress;
         IsError = transcription.Status == TranscriptionStatus.Error;
@@ -644,32 +740,32 @@ public partial class EditorViewModel : ViewModelBase
             _ => "",
         };
 
-        if (transcription.Status == TranscriptionStatus.Done)
+        _segmentEntities = entities;
+        ReplaceSegments(segmentVms);
+        HasSegments = Segments.Count > 0;
+        NotifyExportAvailability();
+        IsLoading = false;
+    }
+
+    private void ReplaceSegments(IEnumerable<SegmentItemViewModel> items)
+    {
+        Segments = new ObservableCollection<SegmentItemViewModel>(items);
+        OnPropertyChanged(nameof(Segments));
+    }
+
+    private async Task LoadPlaybackAsync(string? mediaPath, TimeSpan? knownDuration)
+    {
+        try
         {
-            _segmentEntities = transcription.Segments.OrderBy(s => s.SortOrder).ToList();
-            Segments.Clear();
-            foreach (var segment in _segmentEntities)
+            await PlayerBar.UnloadAsync();
+            if (!string.IsNullOrWhiteSpace(mediaPath) && !_disposed)
             {
-                Segments.Add(new SegmentItemViewModel(this, segment));
+                await PlayerBar.LoadAsync(mediaPath, knownDuration);
             }
-
-            HasSegments = Segments.Count > 0;
-            NotifyExportAvailability();
-            UpdateActiveSegmentHighlight();
         }
-        else
+        catch (Exception)
         {
-            _segmentEntities = [];
-            Segments.Clear();
-            HasSegments = false;
-            NotifyExportAvailability();
-        }
-
-        await PlayerBar.UnloadAsync();
-        if (transcription.Status == TranscriptionStatus.Done &&
-            !string.IsNullOrWhiteSpace(transcription.MediaFilePath))
-        {
-            await PlayerBar.LoadAsync(transcription.MediaFilePath);
+            // Falha de load do áudio não deve derrubar a tela já aberta.
         }
     }
 
@@ -677,23 +773,34 @@ public partial class EditorViewModel : ViewModelBase
     {
         using var scope = _scopeFactory.CreateScope();
         var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
-        var transcription = await libraryService.GetTranscriptionDetailAsync(_transcriptionId);
+        var transcription = await libraryService.GetTranscriptionDetailAsync(_transcriptionId)
+            .ConfigureAwait(false);
 
-        if (transcription is null)
+        if (transcription is null || _disposed)
         {
             return;
         }
 
-        _segmentEntities = transcription.Segments.OrderBy(s => s.SortOrder).ToList();
-        Segments.Clear();
-        foreach (var segment in _segmentEntities)
+        var entities = transcription.Segments.OrderBy(s => s.SortOrder).ToList();
+        var vms = new List<SegmentItemViewModel>(entities.Count);
+        foreach (var segment in entities)
         {
-            Segments.Add(new SegmentItemViewModel(this, segment));
+            vms.Add(new SegmentItemViewModel(this, segment));
         }
 
-        HasSegments = Segments.Count > 0;
-        NotifyExportAvailability();
-        UpdateActiveSegmentHighlight();
+        await UiThread.InvokeAsync(() =>
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _segmentEntities = entities;
+            ReplaceSegments(vms);
+            HasSegments = Segments.Count > 0;
+            NotifyExportAvailability();
+            UpdateActiveSegmentHighlight();
+        });
     }
 
     partial void OnHasSegmentsChanged(bool value) => NotifyExportAvailability();
@@ -707,13 +814,29 @@ public partial class EditorViewModel : ViewModelBase
     private void UpdateActiveSegmentHighlight()
     {
         var activeId = GetActiveSegmentId();
-        SegmentItemViewModel? activeVm = null;
-        foreach (var segment in Segments)
+        if (activeId == _highlightedSegmentId)
         {
-            segment.IsActive = segment.Id == activeId;
-            if (segment.IsActive)
+            return;
+        }
+
+        if (_highlightedSegmentId is Guid previousId)
+        {
+            var previous = FindSegmentVm(previousId);
+            if (previous is not null)
             {
-                activeVm = segment;
+                previous.IsActive = false;
+            }
+        }
+
+        _highlightedSegmentId = activeId;
+
+        SegmentItemViewModel? activeVm = null;
+        if (activeId is Guid id)
+        {
+            activeVm = FindSegmentVm(id);
+            if (activeVm is not null)
+            {
+                activeVm.IsActive = true;
             }
         }
 
@@ -723,12 +846,39 @@ public partial class EditorViewModel : ViewModelBase
         }
     }
 
+    private SegmentItemViewModel? FindSegmentVm(Guid id)
+    {
+        foreach (var segment in Segments)
+        {
+            if (segment.Id == id)
+            {
+                return segment;
+            }
+        }
+
+        return null;
+    }
+
+    internal int IndexOfSegment(SegmentItemViewModel segment)
+    {
+        for (var i = 0; i < Segments.Count; i++)
+        {
+            if (ReferenceEquals(Segments[i], segment) || Segments[i].Id == segment.Id)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
     private void ResetState()
     {
-        Segments.Clear();
+        ReplaceSegments([]);
         Tags.Clear();
         _segmentEntities = [];
         _playbackStarted = false;
+        _highlightedSegmentId = null;
         IsInProgress = false;
         IsError = false;
         HasSegments = false;
@@ -750,7 +900,7 @@ public partial class EditorViewModel : ViewModelBase
 
     private void ApplyQueueStatusChanged(TranscriptionStatusChangedEventArgs e)
     {
-        if (e.TranscriptionId != _transcriptionId)
+        if (_disposed || e.TranscriptionId != _transcriptionId)
         {
             return;
         }
@@ -765,7 +915,7 @@ public partial class EditorViewModel : ViewModelBase
         IsInProgress = true;
         IsError = false;
         StatusMessage = "Transcrição em andamento…";
-        Segments.Clear();
+        ReplaceSegments([]);
         HasSegments = false;
         NotifyExportAvailability();
         _ = PlayerBar.UnloadAsync();
@@ -825,4 +975,23 @@ public partial class EditorViewModel : ViewModelBase
         ExecutionDevice.Auto => "Auto",
         _ => device.ToString(),
     };
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
+        if (_queueService is not null)
+        {
+            _queueService.StatusChanged -= OnQueueStatusChanged;
+        }
+
+        PlayerBar.PositionChanged -= OnPlayerBarPositionChanged;
+        IconPicker.PropertyChanged -= OnIconPickerPropertyChanged;
+        PlayerBar.Dispose();
+    }
 }

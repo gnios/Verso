@@ -285,7 +285,7 @@ public class DashboardViewModelTests
 
             dashboard.SetProgressFilterCommand.Execute(null);
             dashboard.SearchText = "mobilidade";
-            await Task.Delay(50);
+            await Task.Delay(400); // debounce da busca (300ms) + load
 
             Assert.Single(dashboard.Cards);
             Assert.Equal("Pasta em andamento", dashboard.Cards[0].Title);
@@ -305,7 +305,7 @@ public class DashboardViewModelTests
             var dashboard = await CreateDashboardAsync(provider);
 
             dashboard.SearchText = "termo inexistente xyz";
-            await Task.Delay(50);
+            await Task.Delay(400); // debounce da busca (300ms) + load
 
             Assert.Empty(dashboard.Cards);
             Assert.True(dashboard.IsEmpty);

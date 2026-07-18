@@ -160,9 +160,7 @@
         ViewModel.Folders.CollectionChanged += OnCollectionsChanged;
         ViewModel.Tags.CollectionChanged += OnCollectionsChanged;
 
-        // O construtor do SidebarViewModel já dispara LoadAsync (fire-and-forget) na primeira
-        // resolução do singleton; chamar de novo aqui garante que o primeiro render deste
-        // componente já tenha dados (idempotente — LoadAsync sempre limpa e repopula as coleções).
+        // Único load inicial da sidebar (o ctor do singleton não carrega mais).
         await ViewModel.LoadAsync();
     }
 

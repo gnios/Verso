@@ -1,5 +1,5 @@
 // Interop mínimo para o editor (T64): índice do cursor em textarea/contenteditable
-// e scroll suave até o segmento ativo durante playback.
+// e scroll suave até o segmento ativo durante playback (com suporte a lista virtualizada).
 window.versoEditor = {
     caretIndex: function (element) {
         if (!element) {
@@ -34,6 +34,20 @@ window.versoEditor = {
 
     scrollToSegmentById: function (segmentId) {
         var el = document.querySelector('[data-segment-id="' + segmentId + '"]');
-        window.versoEditor.scrollIntoView(el);
+        if (el) {
+            window.versoEditor.scrollIntoView(el);
+        }
+    },
+
+    // Quando o item está fora do DOM (Virtualize), posiciona o scrollport pelo índice.
+    scrollToSegmentIndex: function (index, itemHeight) {
+        var el = document.querySelector('[data-testid="transcript-segments"]');
+        if (!el || index < 0) {
+            return;
+        }
+
+        var h = itemHeight > 0 ? itemHeight : 110;
+        var top = Math.max(0, (index * h) - (el.clientHeight / 3));
+        el.scrollTo({ top: top, behavior: 'smooth' });
     }
 };

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -11,14 +12,19 @@ using Verso.Core.Services;
 
 namespace Verso.App.ViewModels;
 
-public partial class DashboardViewModel : ViewModelBase
+public partial class DashboardViewModel : ViewModelBase, IDisposable
 {
+    private const int SearchDebounceMs = 300;
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IServiceProvider _serviceProvider;
     private readonly SidebarViewModel _sidebar;
     private readonly IConfirmationService _confirmation;
     private readonly MediaStorageService _mediaStorage;
     private readonly TranscriptionQueueService? _queueService;
+    private CancellationTokenSource? _searchDebounceCts;
+    private bool _suppressAutoLoad;
+    private bool _disposed;
 
     public ObservableCollection<TranscriptionCardViewModel> Cards { get; } = [];
 
@@ -65,7 +71,16 @@ public partial class DashboardViewModel : ViewModelBase
 
     public void Initialize(NavigationParameter? parameter)
     {
-        ApplyNavigationParameter(parameter);
+        _suppressAutoLoad = true;
+        try
+        {
+            ApplyNavigationParameter(parameter);
+        }
+        finally
+        {
+            _suppressAutoLoad = false;
+        }
+
         _ = LoadAsync();
     }
 
@@ -74,10 +89,21 @@ public partial class DashboardViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsAllFilterActive));
         OnPropertyChanged(nameof(IsProgressFilterActive));
         OnPropertyChanged(nameof(IsDoneFilterActive));
-        _ = LoadAsync();
+        if (!_suppressAutoLoad)
+        {
+            _ = LoadAsync();
+        }
     }
 
-    partial void OnSearchTextChanged(string value) => _ = LoadAsync();
+    partial void OnSearchTextChanged(string value)
+    {
+        if (_suppressAutoLoad)
+        {
+            return;
+        }
+
+        _ = DebouncedLoadAsync();
+    }
 
     [RelayCommand]
     private void SetAllFilter() => ActiveStatusFilter = LibraryStatusFilter.All;
@@ -90,7 +116,13 @@ public partial class DashboardViewModel : ViewModelBase
     [RelayCommand]
     private void SetErrorFilter() => ActiveStatusFilter = LibraryStatusFilter.Error;
 
-    partial void OnUnassignedOnlyChanged(bool value) => _ = LoadAsync();
+    partial void OnUnassignedOnlyChanged(bool value)
+    {
+        if (!_suppressAutoLoad)
+        {
+            _ = LoadAsync();
+        }
+    }
 
 
     internal void OpenTranscription(Guid transcriptionId) =>
@@ -176,6 +208,24 @@ public partial class DashboardViewModel : ViewModelBase
 
     }
 
+    private async Task DebouncedLoadAsync()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+        _searchDebounceCts = new CancellationTokenSource();
+        var token = _searchDebounceCts.Token;
+
+        try
+        {
+            await Task.Delay(SearchDebounceMs, token);
+            await LoadAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            // Digitação contínua — aguarda a próxima pausa.
+        }
+    }
+
     private async Task LoadAsync()
     {
         using var scope = _scopeFactory.CreateScope();
@@ -185,6 +235,10 @@ public partial class DashboardViewModel : ViewModelBase
             ? await libraryService.GetTranscriptions(filter)
             : await libraryService.SearchText(SearchText, filter);
 
+        if (_disposed)
+        {
+            return;
+        }
 
         Cards.Clear();
         foreach (var summary in summaries)
@@ -204,6 +258,11 @@ public partial class DashboardViewModel : ViewModelBase
 
     private void ApplyQueueStatusChanged(TranscriptionStatusChangedEventArgs e)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         var card = FindCard(e.TranscriptionId);
         if (card is null)
         {
@@ -241,6 +300,11 @@ public partial class DashboardViewModel : ViewModelBase
 
     private void ApplyQueueProgressChanged(TranscriptionProgressEventArgs e)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         var card = FindCard(e.TranscriptionId);
         if (card is null || !card.IsInProgress)
         {
@@ -280,4 +344,23 @@ public partial class DashboardViewModel : ViewModelBase
             TranscriptionStatusChanged.Error => TranscriptionStatus.Error,
             _ => TranscriptionStatus.InProgress
         };
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+        _searchDebounceCts = null;
+
+        if (_queueService is not null)
+        {
+            _queueService.StatusChanged -= OnQueueStatusChanged;
+            _queueService.ProgressChanged -= OnQueueProgressChanged;
+        }
+    }
 }

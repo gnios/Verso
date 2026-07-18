@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.JSInterop;
 using Verso.Core.Media;
@@ -7,18 +6,18 @@ using Verso.Core.Media;
 namespace Verso.App.Services;
 
 /// <summary>
-/// Implementação de <see cref="IMediaPlaybackService"/> sobre HTML5 <c>&lt;audio&gt;</c>
-/// no WebView (ver <c>wwwroot/js/audio.js</c>). Segue o padrão de attach de
-/// <see cref="BlazorThemeApplicator"/>: <see cref="IJSRuntime"/> só existe no escopo Blazor
-/// e é anexado pelo <c>MainLayout</c> no primeiro render.
+/// Player HTML5 no WebView. A mídia é servida por <see cref="LocalMediaServer"/> (HTTP + Range),
+/// não pelo scheme Photino — que materializa o arquivo inteiro em memória.
+/// O <c>audio.src</c> só é definido no primeiro Play/Seek (lazy), para não atrasar a abertura do Editor.
 /// </summary>
 public sealed class Html5AudioPlaybackService : IMediaPlaybackService, IAsyncDisposable
 {
+    private readonly LocalMediaServer _mediaServer;
     private readonly object _sync = new();
     private IJSRuntime? _jsRuntime;
     private DotNetObjectReference<Html5AudioPlaybackService>? _dotNetRef;
-    private string? _pendingLoadPath;
-    private TaskCompletionSource? _metadataLoaded;
+    private string? _filePath;
+    private bool _srcAttached;
     private bool _isPlaying;
     private float _playbackRate = 1f;
     private int _volume = 100;
@@ -26,6 +25,12 @@ public sealed class Html5AudioPlaybackService : IMediaPlaybackService, IAsyncDis
     private bool _disposed;
 
     public event EventHandler<TimeSpan>? PositionChanged;
+    public event EventHandler<TimeSpan>? DurationChanged;
+
+    public Html5AudioPlaybackService(LocalMediaServer mediaServer)
+    {
+        _mediaServer = mediaServer;
+    }
 
     public TimeSpan Duration
     {
@@ -102,66 +107,62 @@ public sealed class Html5AudioPlaybackService : IMediaPlaybackService, IAsyncDis
         _ = AttachCoreAsync(jsRuntime, _dotNetRef);
     }
 
-    public async Task LoadAsync(string filePath)
+    public void SetKnownDuration(TimeSpan duration)
+    {
+        ObjectDisposedThrowIf();
+        var safe = duration < TimeSpan.Zero ? TimeSpan.Zero : duration;
+        lock (_sync)
+        {
+            // Não sobrescreve metadata real já recebida do <audio>.
+            if (_srcAttached && _duration > TimeSpan.Zero)
+            {
+                return;
+            }
+
+            _duration = safe;
+        }
+
+        DurationChanged?.Invoke(this, safe);
+    }
+
+    public Task LoadAsync(string filePath)
     {
         ObjectDisposedThrowIf();
         ArgumentException.ThrowIfNullOrEmpty(filePath);
 
-        TaskCompletionSource metadata;
         lock (_sync)
         {
-            _duration = TimeSpan.Zero;
+            _filePath = filePath;
+            _srcAttached = false;
             _isPlaying = false;
-            _pendingLoadPath = filePath;
-            _metadataLoaded?.TrySetCanceled();
-            metadata = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            _metadataLoaded = metadata;
+            // Mantém duração conhecida (DB) se já setada; zera só se ainda não houver.
         }
 
-        if (_jsRuntime is null)
-        {
-            return;
-        }
-
-        var url = MediaSchemeHandler.BuildUrl(filePath);
-        await InvokeVoidAsync("versoAudio.load", url).ConfigureAwait(false);
-        await InvokeVoidAsync("versoAudio.setVolume", Volume / 100.0).ConfigureAwait(false);
-        await InvokeVoidAsync("versoAudio.setRate", PlaybackRate).ConfigureAwait(false);
-
-        // Aguarda metadata (equivalente ao Parse do LibVLC) com timeout generoso.
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-        try
-        {
-            await metadata.Task.WaitAsync(timeout.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            // Timeout ou cancel: Duration pode ficar 0; UI ainda funciona após loadedmetadata tardio.
-        }
-
-        lock (_sync)
-        {
-            if (_pendingLoadPath == filePath)
-            {
-                _pendingLoadPath = null;
-            }
-        }
+        // Lazy: não chama versoAudio.load aqui — evita baixar o arquivo ao abrir a transcrição.
+        return Task.CompletedTask;
     }
 
     public async Task UnloadAsync()
     {
         ObjectDisposedThrowIf();
 
+        bool hadSrc;
         lock (_sync)
         {
-            _pendingLoadPath = null;
+            hadSrc = _srcAttached;
+            _filePath = null;
+            _srcAttached = false;
             _duration = TimeSpan.Zero;
             _isPlaying = false;
-            _metadataLoaded?.TrySetCanceled();
-            _metadataLoaded = null;
         }
 
-        await InvokeVoidAsync("versoAudio.unload").ConfigureAwait(false);
+        // Só toca no <audio> se algo foi anexado — evita interop JS ao abrir/trocar tela.
+        if (hadSrc)
+        {
+            await InvokeVoidAsync("versoAudio.unload").ConfigureAwait(false);
+        }
+
+        DurationChanged?.Invoke(this, TimeSpan.Zero);
     }
 
     public void Play()
@@ -172,7 +173,7 @@ public sealed class Html5AudioPlaybackService : IMediaPlaybackService, IAsyncDis
             _isPlaying = true;
         }
 
-        _ = InvokeVoidAsync("versoAudio.play");
+        _ = PlayCoreAsync();
     }
 
     public void Pause()
@@ -189,14 +190,7 @@ public sealed class Html5AudioPlaybackService : IMediaPlaybackService, IAsyncDis
     public void SeekTo(TimeSpan position)
     {
         ObjectDisposedThrowIf();
-
-        var duration = Duration;
-        var clamped = duration > TimeSpan.Zero
-            ? TimeSpan.FromTicks(Math.Clamp(position.Ticks, 0, duration.Ticks))
-            : (position < TimeSpan.Zero ? TimeSpan.Zero : position);
-
-        _ = InvokeVoidAsync("versoAudio.seek", clamped.TotalSeconds);
-        PositionChanged?.Invoke(this, clamped);
+        _ = SeekCoreAsync(position);
     }
 
     [JSInvokable]
@@ -209,11 +203,13 @@ public sealed class Html5AudioPlaybackService : IMediaPlaybackService, IAsyncDis
     [JSInvokable]
     public void OnDurationChanged(double seconds)
     {
+        var duration = TimeSpan.FromSeconds(Math.Max(0, seconds));
         lock (_sync)
         {
-            _duration = TimeSpan.FromSeconds(Math.Max(0, seconds));
-            _metadataLoaded?.TrySetResult();
+            _duration = duration;
         }
+
+        DurationChanged?.Invoke(this, duration);
     }
 
     [JSInvokable]
@@ -256,18 +252,6 @@ public sealed class Html5AudioPlaybackService : IMediaPlaybackService, IAsyncDis
             await jsRuntime.InvokeVoidAsync("versoAudio.bindDotNet", dotNetRef).ConfigureAwait(false);
             await jsRuntime.InvokeVoidAsync("versoAudio.setVolume", Volume / 100.0).ConfigureAwait(false);
             await jsRuntime.InvokeVoidAsync("versoAudio.setRate", PlaybackRate).ConfigureAwait(false);
-
-            string? pending;
-            lock (_sync)
-            {
-                pending = _pendingLoadPath;
-                _pendingLoadPath = null;
-            }
-
-            if (!string.IsNullOrEmpty(pending))
-            {
-                await LoadAsync(pending).ConfigureAwait(false);
-            }
         }
         catch (JSDisconnectedException)
         {
@@ -275,6 +259,92 @@ public sealed class Html5AudioPlaybackService : IMediaPlaybackService, IAsyncDis
         catch (ObjectDisposedException)
         {
         }
+    }
+
+    private async Task PlayCoreAsync()
+    {
+        try
+        {
+            if (!await EnsureSrcAttachedAsync().ConfigureAwait(false))
+            {
+                lock (_sync)
+                {
+                    _isPlaying = false;
+                }
+
+                return;
+            }
+
+            await InvokeVoidAsync("versoAudio.play").ConfigureAwait(false);
+        }
+        catch
+        {
+            lock (_sync)
+            {
+                _isPlaying = false;
+            }
+        }
+    }
+
+    private async Task SeekCoreAsync(TimeSpan position)
+    {
+        try
+        {
+            if (!await EnsureSrcAttachedAsync().ConfigureAwait(false))
+            {
+                return;
+            }
+
+            var duration = Duration;
+            var clamped = duration > TimeSpan.Zero
+                ? TimeSpan.FromTicks(Math.Clamp(position.Ticks, 0, duration.Ticks))
+                : (position < TimeSpan.Zero ? TimeSpan.Zero : position);
+
+            await InvokeVoidAsync("versoAudio.seek", clamped.TotalSeconds).ConfigureAwait(false);
+            PositionChanged?.Invoke(this, clamped);
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    private async Task<bool> EnsureSrcAttachedAsync()
+    {
+        string? path;
+        bool alreadyAttached;
+        lock (_sync)
+        {
+            path = _filePath;
+            alreadyAttached = _srcAttached;
+        }
+
+        if (string.IsNullOrEmpty(path))
+        {
+            return false;
+        }
+
+        if (alreadyAttached)
+        {
+            return true;
+        }
+
+        if (!_mediaServer.IsRunning)
+        {
+            return false;
+        }
+
+        var url = _mediaServer.BuildUrl(path);
+        await InvokeVoidAsync("versoAudio.load", url).ConfigureAwait(false);
+        await InvokeVoidAsync("versoAudio.setVolume", Volume / 100.0).ConfigureAwait(false);
+        await InvokeVoidAsync("versoAudio.setRate", PlaybackRate).ConfigureAwait(false);
+
+        lock (_sync)
+        {
+            _srcAttached = true;
+        }
+
+        return true;
     }
 
     private async Task InvokeVoidAsync(string identifier, params object?[] args)

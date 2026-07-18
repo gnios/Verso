@@ -10,8 +10,8 @@
 *@
 @implements IDisposable
 
-<div class="dash-card" @onclick="() => ViewModel.OpenCommand.Execute(null)">
-    <div class="dash-card-title">@ViewModel.StatusIcon@(string.IsNullOrEmpty(ViewModel.StatusIcon) ? "" : " ")@ViewModel.Icon @ViewModel.Title</div>
+<div class="dash-card" data-testid="transcription-card" data-transcription-id="@ViewModel.Id" @onclick="() => ViewModel.OpenCommand.Execute(null)">
+    <div class="dash-card-title" data-testid="transcription-card-title">@ViewModel.StatusIcon@(string.IsNullOrEmpty(ViewModel.StatusIcon) ? "" : " ")@ViewModel.Icon @ViewModel.Title</div>
     <div class="dash-card-preview">@ViewModel.Preview</div>
     <div class="tags-row">
         @foreach (var tag in ViewModel.Tags)
