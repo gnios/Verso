@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Verso audio probe</title>
+  <style>
+    body { font: 14px/1.4 system-ui, sans-serif; padding: 24px; }
+    button { margin-right: 8px; padding: 8px 12px; }
+    #log { white-space: pre-wrap; margin-top: 16px; font-family: ui-monospace, monospace; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Audio probe</h1>
+  <p>Simula o player HTML5 do Verso contra o LocalMediaServer.</p>
+  <button id="btn-prepare" data-testid="btn-prepare">Prepare (sem src)</button>
+  <button id="btn-load" data-testid="btn-load">Load src</button>
+  <button id="btn-play" data-testid="btn-play">Play</button>
+  <div id="status" data-testid="status">idle</div>
+  <div id="log" data-testid="log"></div>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const mediaUrl = params.get('mediaUrl') || '';
+    const audio = document.createElement('audio');
+    audio.preload = 'metadata';
+    document.body.appendChild(audio);
+
+    const status = document.getElementById('status');
+    const logEl = document.getElementById('log');
+    const events = [];
+
+    function log(msg) {
+      events.push({ t: performance.now(), msg });
+      logEl.textContent = events.map(e => `${e.t.toFixed(0)}ms ${e.msg}`).join('\n');
+    }
+
+    window.__versoProbe = {
+      mediaUrl,
+      events,
+      readyState: () => audio.readyState,
+      duration: () => audio.duration,
+      currentSrc: () => audio.currentSrc,
+    };
+
+    document.getElementById('btn-prepare').onclick = () => {
+      status.textContent = 'prepared';
+      log('prepare: path known, src not set');
+    };
+
+    document.getElementById('btn-load').onclick = () => {
+      status.textContent = 'loading-src';
+      log('load: setting src');
+      audio.src = mediaUrl;
+      audio.load();
+    };
+
+    document.getElementById('btn-play').onclick = async () => {
+      status.textContent = 'playing';
+      log('play');
+      try { await audio.play(); } catch (e) { log('play-error ' + e); }
+    };
+
+    audio.addEventListener('loadedmetadata', () => {
+      status.textContent = 'metadata';
+      log('loadedmetadata duration=' + audio.duration);
+    });
+    audio.addEventListener('canplay', () => log('canplay'));
+    audio.addEventListener('playing', () => {
+      status.textContent = 'playing';
+      log('playing');
+    });
+
+    status.textContent = 'ready';
+    log('harness ready mediaUrl=' + (mediaUrl ? 'yes' : 'no'));
+  </script>
+</body>
+</html>

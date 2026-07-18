@@ -8,8 +8,8 @@
 *@
 @implements IDisposable
 
-<div class="player-bar">
-    <button type="button" class="player-btn player-btn-main" title="@(ViewModel.IsPlaying ? "Pausar" : "Reproduzir")" @onclick="() => ViewModel.TogglePlayCommand.Execute(null)">
+<div class="player-bar" data-testid="player-bar">
+    <button type="button" class="player-btn player-btn-main" data-testid="player-play" title="@(ViewModel.IsPlaying ? "Pausar" : "Reproduzir")" @onclick="() => ViewModel.TogglePlayCommand.Execute(null)">
         @if (ViewModel.IsPlaying)
         {
             <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>

@@ -59,7 +59,7 @@ public partial class SidebarViewModel : ViewModelBase
         _confirmation = confirmation;
         _feedback = feedback;
         _themeService.PropertyChanged += OnThemePropertyChanged;
-        _ = LoadAsync();
+        // LoadAsync fica a cargo do Sidebar.razor (OnInitializedAsync) para evitar load duplo no startup.
     }
 
     public async Task LoadAsync()

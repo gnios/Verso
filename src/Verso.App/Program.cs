@@ -48,11 +48,15 @@ public class Program
         _services = app.Services;
         app.Services.GetRequiredService<PhotinoWindowAccessor>().Attach(app.MainWindow);
 
+        // HTTP local com Range — NÃO usar RegisterCustomSchemeHandler para áudio:
+        // o Photino materializa o Stream inteiro em memória (IntPtr + numBytes).
+        var mediaServer = app.Services.GetRequiredService<LocalMediaServer>();
+        mediaServer.Start();
+
         app.MainWindow
             .SetTitle("Verso")
             .SetSize(1280, 800)
-            .Center()
-            .RegisterCustomSchemeHandler(MediaSchemeHandler.Scheme, MediaSchemeHandler.Handle);
+            .Center();
 #if DEBUG
         app.MainWindow.SetDevToolsEnabled(true);
 #endif
@@ -89,6 +93,8 @@ public class Program
             {
                 await hostedService.StopAsync(CancellationToken.None);
             }
+
+            await mediaServer.DisposeAsync();
         }
     }
 

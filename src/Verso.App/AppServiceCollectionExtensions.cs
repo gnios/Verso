@@ -1,4 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Verso.App.Services;
 using Verso.App.ViewModels;
 using Verso.Core.Engine;
@@ -15,6 +17,12 @@ public static class AppServiceCollectionExtensions
         services.AddSingleton<NavigationService>();
         services.AddSingleton<BlazorThemeApplicator>();
         services.AddSingleton<IThemeApplicator>(sp => sp.GetRequiredService<BlazorThemeApplicator>());
+        services.AddSingleton<LocalMediaServer>(sp =>
+        {
+            var logger = sp.GetService<ILogger<LocalMediaServer>>()
+                ?? NullLogger<LocalMediaServer>.Instance;
+            return new LocalMediaServer(logger);
+        });
         services.AddSingleton<Html5AudioPlaybackService>();
         services.AddSingleton<IMediaPlaybackService>(sp => sp.GetRequiredService<Html5AudioPlaybackService>());
         services.AddSingleton<PhotinoWindowAccessor>();

@@ -13,7 +13,7 @@ using Verso.Core.Services;
 
 namespace Verso.App.ViewModels;
 
-public partial class FolderViewModel : ViewModelBase
+public partial class FolderViewModel : ViewModelBase, IDisposable
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly NavigationService _navigation;
@@ -22,6 +22,7 @@ public partial class FolderViewModel : ViewModelBase
     private readonly MediaStorageService _mediaStorage;
     private readonly TranscriptionQueueService? _queueService;
     private int _folderId;
+    private bool _disposed;
 
     public ObservableCollection<TranscriptionCardViewModel> Transcriptions { get; } = [];
 
@@ -295,6 +296,11 @@ public partial class FolderViewModel : ViewModelBase
 
     private void ApplyQueueStatusChanged(TranscriptionStatusChangedEventArgs e)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         var card = Transcriptions.FirstOrDefault(t => t.Id == e.TranscriptionId);
         var summary = _allSummaries.FirstOrDefault(s => s.Id == e.TranscriptionId);
 
@@ -355,6 +361,11 @@ public partial class FolderViewModel : ViewModelBase
 
     private void ApplyQueueProgressChanged(TranscriptionProgressEventArgs e)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         var card = Transcriptions.FirstOrDefault(t => t.Id == e.TranscriptionId);
         if (card is null || !card.IsInProgress)
         {
@@ -380,4 +391,20 @@ public partial class FolderViewModel : ViewModelBase
             TranscriptionStatusChanged.Error => TranscriptionStatus.Error,
             _ => TranscriptionStatus.InProgress
         };
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
+        if (_queueService is not null)
+        {
+            _queueService.StatusChanged -= OnQueueStatusChanged;
+            _queueService.ProgressChanged -= OnQueueProgressChanged;
+        }
+    }
 }

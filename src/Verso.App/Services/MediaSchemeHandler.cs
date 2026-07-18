@@ -5,9 +5,9 @@ using Verso.Core;
 namespace Verso.App.Services;
 
 /// <summary>
-/// Scheme customizado <c>versomedia://</c> para o Photino/WebView servir arquivos de
-/// <see cref="VersoPaths.MediaDirectory"/> ao elemento HTML5 <c>&lt;audio&gt;</c>.
-/// URL: <c>versomedia://local/?path={Uri.EscapeDataString(fullPath)}</c>.
+/// Validação/MIME de paths sob <see cref="VersoPaths.MediaDirectory"/> e helpers do
+/// antigo scheme <c>versomedia://</c>. O playback real usa <see cref="LocalMediaServer"/>
+/// (HTTP + Range): o Photino custom-scheme materializa o Stream inteiro em memória.
 /// </summary>
 public static class MediaSchemeHandler
 {
@@ -21,7 +21,7 @@ public static class MediaSchemeHandler
     }
 
     /// <summary>
-    /// Handler para <c>PhotinoWindow.RegisterCustomSchemeHandler</c>.
+    /// Handler legado para <c>PhotinoWindow.RegisterCustomSchemeHandler</c> (não usar para áudio grande).
     /// Retorna <c>null</c> (e contentType vazio) se o path for inválido ou estiver fora de media/.
     /// </summary>
     public static Stream? Handle(object sender, string scheme, string url, out string contentType)

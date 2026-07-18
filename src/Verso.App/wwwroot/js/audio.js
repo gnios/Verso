@@ -8,8 +8,10 @@ window.versoAudio = (function () {
 
     var dotNetRef = null;
     var loaded = false;
+    var throttleTimer = null;
+    var THROTTLE_MS = 100;
 
-    function notifyPosition() {
+    function emitPosition() {
         if (!dotNetRef) {
             return;
         }
@@ -17,9 +19,32 @@ window.versoAudio = (function () {
         dotNetRef.invokeMethodAsync('OnPositionChanged', seconds);
     }
 
-    audio.addEventListener('timeupdate', notifyPosition);
+    // timeupdate: coalesce; seek/ended/metadata: force (UI precisa refletir na hora).
+    function notifyPosition(force) {
+        if (force) {
+            if (throttleTimer !== null) {
+                clearTimeout(throttleTimer);
+                throttleTimer = null;
+            }
+            emitPosition();
+            return;
+        }
+
+        if (throttleTimer !== null) {
+            return;
+        }
+
+        throttleTimer = setTimeout(function () {
+            throttleTimer = null;
+            emitPosition();
+        }, THROTTLE_MS);
+    }
+
+    audio.addEventListener('timeupdate', function () {
+        notifyPosition(false);
+    });
     audio.addEventListener('ended', function () {
-        notifyPosition();
+        notifyPosition(true);
         if (dotNetRef) {
             dotNetRef.invokeMethodAsync('OnEnded');
         }
@@ -29,7 +54,7 @@ window.versoAudio = (function () {
             var duration = isFinite(audio.duration) ? audio.duration : 0;
             dotNetRef.invokeMethodAsync('OnDurationChanged', duration);
         }
-        notifyPosition();
+        notifyPosition(true);
     });
 
     return {
@@ -73,7 +98,7 @@ window.versoAudio = (function () {
             } catch (e) {
                 // currentTime pode falhar se metadata ainda não carregou
             }
-            notifyPosition();
+            notifyPosition(true);
         },
 
         setVolume: function (volume01) {

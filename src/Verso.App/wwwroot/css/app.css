@@ -58,7 +58,7 @@ input,select,textarea{font-family:inherit;color:inherit}
 .sidebar-spacer{flex:1}
 .sidebar-footer{border-top:1px solid var(--border);padding:4px 0}
 
-.content{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative}
+.content{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden;position:relative}
 .screen{display:none;flex:1;overflow-y:auto;padding:40px 56px 32px}
 .screen.active{display:flex;flex-direction:column;animation:fadeIn .2s ease-out}
 .screen-header{margin-bottom:28px}
@@ -183,8 +183,17 @@ html.dark .rec-btn-record.recording{background:#e4e4e3}
 .speaker-c{color:var(--green)}
 
 /* Editor */
-.editor-shell{display:flex;flex-direction:column;flex:1;overflow:hidden}
-.editor-transcript{flex:1;overflow-y:auto;padding:28px 56px 24px}
+.editor-screen{padding:0!important;overflow:hidden!important;min-height:0}
+.editor-shell{display:flex;flex-direction:column;flex:1;min-height:0;height:100%;overflow:hidden}
+.editor-loading{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:48px 24px}
+.editor-loading-bar{width:min(220px,60%);height:3px;background:var(--border);border-radius:2px;overflow:hidden;position:relative}
+.editor-loading-bar-fill{width:40%;height:100%;background:var(--accent);border-radius:2px;position:absolute;top:0;bottom:0;animation:model-download-indeterminate 1.2s ease-in-out infinite}
+.editor-loading-text{margin:0;font-size:13px;color:var(--muted)}
+/* Cadeia flex com min-height:0 + height:0 no scrollport: sem isso o Virtualize
+   acha viewport infinito e monta TODOS os SegmentItem (freeze com 1k+ segs). */
+.editor-transcript{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;padding:28px 56px 0}
+.editor-transcript-header{flex-shrink:0;max-width:700px;width:100%;margin:0 auto;padding-bottom:8px}
+.transcript-segments-scroll{flex:1 1 0;min-height:0;height:0;overflow-y:auto;max-width:700px;width:100%;margin:0 auto;padding-bottom:24px}
 .editor-transcript-inner{max-width:700px;margin:0 auto}
 .editor-breadcrumb{font-size:12px;color:var(--muted);margin-bottom:6px}
 .editor-breadcrumb a{color:var(--accent);text-decoration:none}
