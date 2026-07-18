@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using Verso.Core.Export;
-using Verso.Core.Media;
 using Verso.Core.Services;
 
 namespace Verso.Core;
@@ -16,7 +15,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<SegmentEditingService>();
         services.AddScoped<SettingsService>();
         services.AddScoped<ExportService>();
-        services.AddSingleton<IMediaPlaybackService, LibVlcPlaybackService>();
+        // IMediaPlaybackService é registrado no Verso.App (Html5AudioPlaybackService).
         return services;
     }
 }

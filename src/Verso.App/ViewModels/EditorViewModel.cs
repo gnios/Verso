@@ -758,6 +758,7 @@ public partial class EditorViewModel : ViewModelBase
         if (e.Status is TranscriptionStatusChanged.Done or TranscriptionStatusChanged.Error)
         {
             _ = LoadAsync();
+            _ = _sidebar.LoadAsync();
             return;
         }
 

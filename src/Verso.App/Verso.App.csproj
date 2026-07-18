@@ -13,6 +13,18 @@
     <InternalsVisibleTo Include="Verso.Tests" />
   </ItemGroup>
 
+  <!--
+    Photino.Blazor serve a UI via PhysicalFileProvider em
+    <BaseDirectory>/wwwroot (não pelo pipeline de Static Web Assets do ASP.NET).
+    Sem CopyToOutputDirectory a janela abre em branco — index.html/css/js nunca
+    chegam ao output.
+  -->
+  <ItemGroup>
+    <Content Update="wwwroot\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Photino.Blazor" Version="4.0.13" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />

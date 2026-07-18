@@ -74,11 +74,17 @@ public partial class TranscriptionCardViewModel : ViewModelBase
         "transcribing" => ProgressPercent is int p
             ? $"Transcrevendo… {p}%"
             : "Transcrevendo…",
-        "done" => "Concluído",
+        // "done" do motor = Whisper terminou; persistência ainda pode estar em andamento.
+        "done" or "saving" => "Salvando resultados…",
         _ => "Em andamento…"
     };
 
-    partial void OnProgressPercentChanged(int? value) => OnPropertyChanged(nameof(ProgressLabel));
+    partial void OnProgressPercentChanged(int? value)
+    {
+        OnPropertyChanged(nameof(ProgressLabel));
+        OnPropertyChanged(nameof(ProgressWidth));
+        OnPropertyChanged(nameof(IsProgressIndeterminate));
+    }
     partial void OnProgressStageChanged(string value)
     {
         OnPropertyChanged(nameof(ProgressLabel));

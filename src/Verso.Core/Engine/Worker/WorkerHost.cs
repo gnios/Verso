@@ -68,14 +68,15 @@ public sealed class WorkerHost
             stopListeningCts.Cancel();
         }
 
-        try
-        {
-            await cancelListenTask;
-        }
-        catch (OperationCanceledException)
-        {
-        }
-
+        // Não aguarda cancelListenTask de forma bloqueante: sua leitura pendente em Console.In
+        // (ver ListenForCancelLineAsync) só desbloqueia com uma nova linha ou EOF real de stdin —
+        // stopListeningCts.Cancel() acima NÃO interrompe uma leitura síncrona já em andamento
+        // (limitação conhecida de Console.In/SyncTextReader). O processo pai deve fechar seu lado
+        // de escrita do stdin (dando EOF) assim que ler nosso resultado/erro — ver
+        // WorkerProcessTranscriptionEngine —, mas não faz sentido este processo, que já terminou
+        // seu trabalho e está saindo, ficar pendurado esperando essa tarefa secundária: o
+        // encerramento do processo (Environment.Exit implícito ao retornar de Main) derruba
+        // qualquer thread/task remanescente sem efeitos colaterais observáveis.
         return exitCode;
     }
 
@@ -114,7 +115,16 @@ public sealed class WorkerHost
 
             if (message is WorkerCancelMessage)
             {
-                jobCancellation.Cancel();
+                try
+                {
+                    jobCancellation.Cancel();
+                }
+                catch (ObjectDisposedException)
+                {
+                    // RunAsync já retornou (job concluído/errou antes do cancel chegar) e
+                    // descartou o CancellationTokenSource — não há mais nada a cancelar.
+                }
+
                 return;
             }
         }
