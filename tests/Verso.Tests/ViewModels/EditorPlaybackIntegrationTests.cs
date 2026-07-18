@@ -28,8 +28,9 @@ public class EditorPlaybackIntegrationTests
         services.AddVersoDatabase(dbPath);
         services.AddVersoEngine();
         services.AddVersoServices();
-        services.AddSingleton<IMediaPlaybackService>(playback);
         services.AddVersoAppServices();
+        // Depois do App: sobrescreve Html5AudioPlaybackService pelo fake de teste.
+        services.AddSingleton<IMediaPlaybackService>(playback);
 
         var provider = services.BuildServiceProvider();
         await DbBootstrapper.MigrateAsync(provider);

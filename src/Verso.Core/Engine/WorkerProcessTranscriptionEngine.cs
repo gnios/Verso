@@ -87,6 +87,23 @@ public sealed class WorkerProcessTranscriptionEngine : ITranscriptionEngine
                 break;
         }
 
+        // Fecha o lado de escrita do stdin do worker assim que terminamos de ler a saída dele.
+        // Sem isso, o loop de escuta de "cancel" do worker (WorkerHost.ListenForCancelLineAsync)
+        // fica bloqueado para sempre numa leitura síncrona de Console.In que NÃO respeita
+        // CancellationToken (o token só é observado antes de iniciar a leitura, nunca durante) —
+        // o processo filho nunca chamaria `return exitCode`, e o WaitForExitAsync abaixo ficaria
+        // pendurado indefinidamente (deadlock: pai espera o filho sair, filho espera EOF em stdin
+        // que só o pai pode fornecer). Fechar aqui dá ao filho um EOF real, desbloqueando-o.
+        try
+        {
+            process.StandardInput.Close();
+        }
+        catch
+        {
+            // Melhor esforço — se o pipe já tiver sido fechado (ex.: cancelamento concorrente
+            // já em andamento via HandleCancellationAsync), ignora.
+        }
+
         var exitCode = await process.WaitForExitAsync(CancellationToken.None);
 
         if (errorMessage is not null)

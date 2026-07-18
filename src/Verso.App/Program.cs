@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -24,7 +23,13 @@ public class Program
     public static IServiceProvider Services =>
         _services ?? throw new InvalidOperationException("Serviços ainda não foram inicializados.");
 
-    public static async Task Main(string[] args)
+    // Photino/WebView2 no Windows exigem STA. `async Task Main` quebra [STAThread]
+    // (a continuação sai da thread STA) — entrada síncrona + GetAwaiter().GetResult().
+    [STAThread]
+    public static void Main(string[] args) =>
+        MainAsync(args).GetAwaiter().GetResult();
+
+    private static async Task MainAsync(string[] args)
     {
 #if DEBUG
         AttachDebugConsole();
@@ -45,12 +50,27 @@ public class Program
 
         app.MainWindow
             .SetTitle("Verso")
-            .SetSize(1280, 800);
+            .SetSize(1280, 800)
+            .Center()
+            .RegisterCustomSchemeHandler(MediaSchemeHandler.Scheme, MediaSchemeHandler.Handle);
 #if DEBUG
         app.MainWindow.SetDevToolsEnabled(true);
 #endif
 
+        AppDomain.CurrentDomain.UnhandledException += (_, error) =>
+        {
+            try
+            {
+                app.MainWindow.ShowMessage("Erro fatal", error.ExceptionObject?.ToString() ?? "(sem detalhes)");
+            }
+            catch
+            {
+                // Ignora falha ao mostrar diálogo se a janela já morreu.
+            }
+        };
+
         RouteWhisperNativeLogs(app.Services);
+        UiThread.AttachLogger(app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("UiThread"));
         await DbBootstrapper.MigrateAsync(app.Services);
 
         var hostedServices = app.Services.GetServices<IHostedService>().ToList();
@@ -76,7 +96,17 @@ public class Program
     // <appdir>/data/logs) é a única janela persistente do que ocorre por trás —
     // engine, fila de transcrição, downloads, erros nativos do whisper.cpp. O app é
     // portátil: logs ao lado do exe, não em %AppData%. O console só é anexado em #if
-    // DEBUG (AttachDebugConsole abre uma janela de console a parte).
+    // DEBUG (AttachDebugConsole abre uma janela de console a parte), usando o mesmo
+    // formato de linha única do arquivo (AddVersoConsoleLogger) — NÃO o provider padrão
+    // Microsoft.Extensions.Logging.Console (formato multi-linha "info: Namespace[0]").
+    //
+    // IMPORTANTE: não adicionar Trace.Listeners.Add(new ConsoleTraceListener(...)) aqui.
+    // Isso já foi feito antes e capturou, além dos nossos logs, todo o tracing INTERNO do
+    // Photino/Blazor (System.Diagnostics.Trace.WriteLine de coisas como
+    // `Photino.NET: "Verso".SendWebMessage(__bwv:[...blob base64...])` a cada render do
+    // WebView) — ruído irrelevante e ininteligível que afoga qualquer log real da
+    // aplicação. Trace/Debug.WriteLine da nossa própria base (ver UiThread.cs) devem ir
+    // para o ILogger normal, não para Trace.Listeners.
     private static void ConfigureLogging(ILoggingBuilder logging)
     {
         logging.ClearProviders();
@@ -88,11 +118,7 @@ public class Program
         logging.AddFilter("Microsoft.Hosting.Lifetime", LogLevel.Warning);
         logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
 #if DEBUG
-        logging.AddConsole(options =>
-        {
-            options.LogToStandardErrorThreshold = LogLevel.None;
-        });
-        Trace.Listeners.Add(new ConsoleTraceListener(useErrorStream: false));
+        logging.AddVersoConsoleLogger();
 #endif
     }
 

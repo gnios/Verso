@@ -225,6 +225,7 @@ public sealed class WhisperTranscriptionEngine : IDisposable
 
                 var results = new List<TranscriptionSegmentResult>[partes.Count];
                 var semaphore = new SemaphoreSlim(paralelismo);
+                var completedParts = 0;
                 var tasks = new Task[partes.Count];
 
                 for (var index = 0; index < partes.Count; index++)
@@ -234,7 +235,7 @@ public sealed class WhisperTranscriptionEngine : IDisposable
                         partes[idx], idx, partes.Count, modelPath,
                         request.Language, threadsPorJob,
                         progress, semaphore, cancellationToken,
-                        results);
+                        results, () => Interlocked.Increment(ref completedParts));
                 }
 
                 await Task.WhenAll(tasks);
@@ -272,7 +273,8 @@ public sealed class WhisperTranscriptionEngine : IDisposable
         IProgress<EngineProgress>? progress,
         SemaphoreSlim semaphore,
         CancellationToken cancellationToken,
-        List<TranscriptionSegmentResult>[] results)
+        List<TranscriptionSegmentResult>[] results,
+        Func<int> incrementCompleted)
     {
         await semaphore.WaitAsync(cancellationToken);
         try
@@ -299,8 +301,10 @@ public sealed class WhisperTranscriptionEngine : IDisposable
                     result.Text.Trim()));
             }
 
-
-            progress?.Report(new EngineProgress("transcribing", index + 1, totalParts));
+            // Contagem de partes concluídas (não o índice): a última parte a terminar
+            // pode ter índice N-1 e, se reportássemos index+1, a UI saltaria a 100% cedo.
+            var completed = incrementCompleted();
+            progress?.Report(new EngineProgress("transcribing", completed, totalParts));
             results[index] = segmentos;
         }
         finally

@@ -18,6 +18,7 @@
 @inject NavigationService NavigationService
 @inject ThemeService ThemeService
 @inject BlazorThemeApplicator ThemeApplicator
+@inject Html5AudioPlaybackService AudioPlayback
 @inject IJSRuntime JS
 @inject Dispatcher Dispatcher
 
@@ -90,6 +91,7 @@
         if (firstRender)
         {
             ThemeApplicator.AttachJsRuntime(JS);
+            AudioPlayback.AttachJsRuntime(JS);
             UiThread.AttachDispatcher(Dispatcher);
         }
     }

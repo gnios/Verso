@@ -124,6 +124,7 @@ public class TranscriptionQueueServiceTests
         Assert.Contains(received, e => e.Stage == "loading");
         Assert.Contains(received, e => e.Stage == "transcribing" && e.PartIndex == 1 && e.TotalParts == 3);
         Assert.Contains(received, e => e.Percent == 67);
+        Assert.Contains(received, e => e.Stage == "saving");
         Assert.All(received, e => Assert.Equal(transcriptionId, e.TranscriptionId));
     }
 

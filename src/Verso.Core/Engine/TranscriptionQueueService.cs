@@ -59,17 +59,22 @@ public sealed class TranscriptionQueueService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Escapa do SynchronizationContext do host (Photino/Blazor STA): sem isso,
+        // continuations da fila podem rodar na UI thread e travar o front em 100%
+        // enquanto PersistSuccessAsync grava no SQLite.
+        await Task.Yield();
+
         try
         {
-            await RecoverOrphanedJobsAsync(stoppingToken);
+            await RecoverOrphanedJobsAsync(stoppingToken).ConfigureAwait(false);
         }
         finally
         {
             _startupCompleted.TrySetResult();
         }
 
-        await foreach (var request in _channel.Reader.ReadAllAsync(stoppingToken))
-            await ProcessJobAsync(request, stoppingToken);
+        await foreach (var request in _channel.Reader.ReadAllAsync(stoppingToken).ConfigureAwait(false))
+            await ProcessJobAsync(request, stoppingToken).ConfigureAwait(false);
     }
 
     private async Task RecoverOrphanedJobsAsync(CancellationToken cancellationToken)
@@ -103,22 +108,30 @@ public sealed class TranscriptionQueueService : BackgroundService
 
         try
         {
-            await UpdateStatusAsync(request.TranscriptionId, TranscriptionStatus.InProgress, null, stoppingToken);
+            await UpdateStatusAsync(request.TranscriptionId, TranscriptionStatus.InProgress, null, stoppingToken)
+                .ConfigureAwait(false);
             RaiseStatusChanged(request.TranscriptionId, TranscriptionStatusChanged.InProgress);
-            var progress = new Progress<EngineProgress>(e => RaiseProgressChanged(request.TranscriptionId, e.Stage, e.PartIndex, e.TotalParts));
+            // Progress síncrono (sem capturar SyncContext): System.Progress<T> postaria
+            // no contexto da UI e poderia serializar/bloquear atualizações de status.
+            var progress = new SynchronousProgress<EngineProgress>(e =>
+                RaiseProgressChanged(request.TranscriptionId, e.Stage, e.PartIndex, e.TotalParts));
             var stopwatch = Stopwatch.StartNew();
             _logger.LogInformation(
                 "Transcrevendo {TranscriptionId}: dispositivo={Device}, modelo={Quality}",
                 request.TranscriptionId,
                 request.Device,
                 request.Quality);
-            var result = await _engine.TranscribeAsync(request, progress, linkedCts.Token);
+            var result = await _engine.TranscribeAsync(request, progress, linkedCts.Token)
+                .ConfigureAwait(false);
             stopwatch.Stop();
             _logger.LogInformation(
                 "Transcrição {TranscriptionId} concluída em {Seconds:F1}s — persistindo resultados…",
                 request.TranscriptionId,
                 stopwatch.Elapsed.TotalSeconds);
-            await PersistSuccessAsync(request, result, stopwatch.Elapsed.TotalSeconds, stoppingToken);
+            // Whisper terminou; ainda falta gravar segmentos — UI não deve parecer “pronta”.
+            RaiseProgressChanged(request.TranscriptionId, "saving", null, null);
+            await PersistSuccessAsync(request, result, stopwatch.Elapsed.TotalSeconds, stoppingToken)
+                .ConfigureAwait(false);
 
             RaiseStatusChanged(request.TranscriptionId, TranscriptionStatusChanged.Done);
         }
@@ -260,6 +273,15 @@ public sealed class TranscriptionQueueService : BackgroundService
         int? partIndex,
         int? totalParts) =>
         ProgressChanged?.Invoke(this, new TranscriptionProgressEventArgs(transcriptionId, stage, partIndex, totalParts));
+
+    /// <summary>
+    /// <see cref="IProgress{T}"/> síncrono — não captura <see cref="SynchronizationContext"/>,
+    /// ao contrário de <see cref="Progress{T}"/>.
+    /// </summary>
+    private sealed class SynchronousProgress<T>(Action<T> callback) : IProgress<T>
+    {
+        public void Report(T value) => callback(value);
+    }
 }
 
 public static class EngineServiceCollectionExtensions

@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Verso.App.Services;
 using Verso.App.ViewModels;
 using Verso.Core.Engine;
+using Verso.Core.Media;
 using System.Net.Http;
 using Verso.Core.Services;
 
@@ -14,6 +15,8 @@ public static class AppServiceCollectionExtensions
         services.AddSingleton<NavigationService>();
         services.AddSingleton<BlazorThemeApplicator>();
         services.AddSingleton<IThemeApplicator>(sp => sp.GetRequiredService<BlazorThemeApplicator>());
+        services.AddSingleton<Html5AudioPlaybackService>();
+        services.AddSingleton<IMediaPlaybackService>(sp => sp.GetRequiredService<Html5AudioPlaybackService>());
         services.AddSingleton<PhotinoWindowAccessor>();
         services.AddSingleton<IFileSaveService, PhotinoFileSaveService>();
         services.AddSingleton<IFileOpenService, PhotinoFileOpenService>();

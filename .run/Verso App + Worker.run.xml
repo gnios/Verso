@@ -1,0 +1,32 @@
+<component name="ProjectRunConfigurationManager">
+  <!--
+    Integração App↔Worker na transcrição:
+    O Verso.Worker NÃO é um serviço paralelo — o Verso.App o spawna como processo filho
+    (stdio NDJSON) ao iniciar um job. Por isso esta config sobe o App com
+    AUTO_ATTACH_CHILDREN: o debugger do Rider entra no Worker automaticamente quando
+    a transcrição começa.
+
+    Não use Compound com App+Worker em paralelo: o Worker avulso fica bloqueado em stdin
+    e o App spawna OUTRA instância na transcrição (você depuraria o processo errado).
+  -->
+  <configuration default="true" name="Verso App + Worker" type="DotNetProject" factoryName=".NET Project">
+    <option name="EXE_PATH" value="$PROJECT_DIR$/src/Verso.App/bin/Debug/net10.0/Verso.App.exe" />
+    <option name="PROGRAM_PARAMETERS" value="" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/src/Verso.App/bin/Debug/net10.0" />
+    <option name="PASS_PARENT_ENVS" value="1" />
+    <option name="USE_EXTERNAL_CONSOLE" value="0" />
+    <option name="USE_MONO" value="0" />
+    <option name="RUNTIME_ARGUMENTS" value="" />
+    <option name="PROJECT_PATH" value="$PROJECT_DIR$/src/Verso.App/Verso.App.csproj" />
+    <option name="PROJECT_EXE_PATH_TRACKING" value="1" />
+    <option name="PROJECT_ARGUMENTS_TRACKING" value="1" />
+    <option name="PROJECT_WORKING_DIRECTORY_TRACKING" value="1" />
+    <option name="PROJECT_KIND" value="DotNetCore" />
+    <option name="PROJECT_TFM" value="net10.0" />
+    <option name="AUTO_ATTACH_CHILDREN" value="true" />
+    <option name="ENV_FILE_PATHS" value="" />
+    <method v="2">
+      <option name="Build" />
+    </method>
+  </configuration>
+</component>

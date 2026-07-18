@@ -221,12 +221,14 @@ public partial class DashboardViewModel : ViewModelBase
         {
             card.ErrorMessage = e.ErrorMessage;
             ClearProgress(card);
+            _ = _sidebar.LoadAsync();
         }
         else if (e.Status == TranscriptionStatusChanged.Done)
         {
             card.ErrorMessage = null;
             ClearProgress(card);
             _ = LoadAsync();
+            _ = _sidebar.LoadAsync();
         }
         else if (e.Status == TranscriptionStatusChanged.Queued)
         {
@@ -240,13 +242,16 @@ public partial class DashboardViewModel : ViewModelBase
     private void ApplyQueueProgressChanged(TranscriptionProgressEventArgs e)
     {
         var card = FindCard(e.TranscriptionId);
-        if (card is null)
+        if (card is null || !card.IsInProgress)
         {
             return;
         }
 
         card.ProgressStage = e.Stage;
-        card.ProgressPercent = e.Percent;
+        // Em "saving"/"done" o motor já terminou: mantém 100% sem parecer concluído no rótulo.
+        card.ProgressPercent = e.Stage is "saving" or "done"
+            ? 100
+            : e.Percent;
     }
 
     private static void ClearProgress(TranscriptionCardViewModel card)
