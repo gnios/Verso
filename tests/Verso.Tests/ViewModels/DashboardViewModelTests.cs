@@ -382,6 +382,103 @@ public class DashboardViewModelTests
     }
 
     [Fact]
+    public async Task InProgressCard_ExposesCancelCommand()
+    {
+        var (provider, directory, _, _, _) = await CreateDashboardProviderAsync();
+        try
+        {
+            var dashboard = await CreateDashboardAsync(provider);
+            var progressCard = dashboard.Cards.First(card => card.IsInProgress);
+
+            Assert.True(progressCard.CanCancel);
+            Assert.True(progressCard.CancelCommand.CanExecute(null));
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task CancelCommand_RequestsQueueCancel_AndShowsCancelling()
+    {
+        var (provider, directory, _, _, _) = await CreateDashboardProviderAsync();
+        try
+        {
+            var dashboard = await CreateDashboardAsync(provider);
+            var progressCard = dashboard.Cards.First(card => card.IsInProgress);
+
+            progressCard.CancelCommand.Execute(null);
+
+            Assert.True(progressCard.IsCancelling);
+            Assert.Equal("Cancelando…", progressCard.ProgressLabel);
+            Assert.False(progressCard.CanCancel);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task StatusChanged_Cancelada_ShowsCancelledBadgeAndEnablesRetry()
+    {
+        var (provider, directory, _, _, _) = await CreateDashboardProviderAsync();
+        try
+        {
+            var dashboard = await CreateDashboardAsync(provider);
+            var queue = provider.GetRequiredService<TranscriptionQueueService>();
+            var progressCard = dashboard.Cards.First(card => card.IsInProgress);
+
+            progressCard.CancelCommand.Execute(null);
+            RaiseStatusChanged(queue, progressCard.Id, TranscriptionStatusChanged.Error, "Cancelada");
+
+            Assert.True(progressCard.IsError);
+            Assert.Equal("Cancelada", progressCard.ErrorMessage);
+            Assert.Equal("Cancelada", progressCard.StatusLabel);
+            Assert.True(progressCard.CanRetry);
+            Assert.False(progressCard.IsCancelling);
+            Assert.False(progressCard.CanCancel);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task RetryCommand_AfterCancelada_ResetsStatusToInProgress()
+    {
+        var (provider, directory, _, errorId, _) = await CreateDashboardProviderAsync();
+        try
+        {
+            await using (var ctx = await TestDbHelper.GetFactory(provider).CreateDbContextAsync())
+            {
+                var transcription = await ctx.Transcriptions.SingleAsync(t => t.Id == errorId);
+                transcription.ErrorMessage = "Cancelada";
+                await ctx.SaveChangesAsync();
+            }
+
+            var dashboard = await CreateDashboardAsync(provider);
+            var cancelledCard = Assert.Single(dashboard.Cards, card => card.Id == errorId);
+
+            Assert.Equal("Cancelada", cancelledCard.StatusLabel);
+            Assert.True(cancelledCard.CanRetry);
+
+            cancelledCard.RetryCommand.Execute(null);
+            await Task.Delay(100);
+
+            Assert.True(cancelledCard.IsInProgress);
+            Assert.Null(cancelledCard.ErrorMessage);
+            Assert.True(cancelledCard.CanCancel);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
     public async Task RetryCommand_ResetsStatusToInProgress()
     {
         var (provider, directory, _, errorId, doneId) = await CreateDashboardProviderAsync();
@@ -407,6 +504,34 @@ public class DashboardViewModelTests
         }
     }
 
+    [Fact]
+    public async Task Load_RestoresProgressSnapshotFromQueue_AfterViewModelRecreated()
+    {
+        var (provider, directory, _, _, _) = await CreateDashboardProviderAsync();
+        try
+        {
+            var firstDashboard = await CreateDashboardAsync(provider);
+            var progressCard = firstDashboard.Cards.First(card => card.IsInProgress);
+            var queue = provider.GetRequiredService<TranscriptionQueueService>();
+
+            RaiseProgressChanged(queue, progressCard.Id, "transcribing", 2, 4);
+            firstDashboard.Dispose();
+
+            var reloaded = await CreateDashboardAsync(provider);
+            var restored = Assert.Single(reloaded.Cards, card => card.Id == progressCard.Id);
+
+            Assert.True(restored.IsInProgress);
+            Assert.Equal("transcribing", restored.ProgressStage);
+            Assert.Equal(50, restored.ProgressPercent);
+            Assert.False(restored.IsProgressIndeterminate);
+            Assert.Contains("50%", restored.ProgressLabel);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
     private static void RaiseStatusChanged(
         TranscriptionQueueService queue,
         Guid transcriptionId,
@@ -417,6 +542,19 @@ public class DashboardViewModelTests
             "RaiseStatusChanged",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         raiseMethod!.Invoke(queue, [transcriptionId, status, errorMessage]);
+    }
+
+    private static void RaiseProgressChanged(
+        TranscriptionQueueService queue,
+        Guid transcriptionId,
+        string stage,
+        int? partIndex,
+        int? totalParts)
+    {
+        var raiseMethod = typeof(TranscriptionQueueService).GetMethod(
+            "RaiseProgressChanged",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        raiseMethod!.Invoke(queue, [transcriptionId, stage, partIndex, totalParts]);
     }
 
     [Fact]
