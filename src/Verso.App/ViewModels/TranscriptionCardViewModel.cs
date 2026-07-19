@@ -18,11 +18,12 @@ public partial class TranscriptionCardViewModel : ViewModelBase
     private readonly Action<Guid>? _retryHandler;
     private readonly Action<Guid>? _deleteHandler;
     private readonly Action<Guid>? _cancelHandler;
+    private readonly string _previewText;
 
     public Guid Id { get; }
     public string Title { get; }
     public string Icon { get; }
-    public string Preview { get; }
+    public string Preview => IsInProgress ? ProgressLabel : _previewText;
     public IReadOnlyList<TranscriptionCardTagViewModel> Tags { get; }
     public string Date { get; }
     public string Duration { get; }
@@ -61,6 +62,7 @@ public partial class TranscriptionCardViewModel : ViewModelBase
     public bool IsInProgress => Status == TranscriptionStatus.InProgress;
     public bool IsDone => Status == TranscriptionStatus.Done;
     public bool IsError => Status == TranscriptionStatus.Error;
+    public bool ShowDate => IsDone;
     public string StatusIcon => Status switch
     {
         TranscriptionStatus.InProgress => "⏳",
@@ -94,10 +96,12 @@ public partial class TranscriptionCardViewModel : ViewModelBase
         OnPropertyChanged(nameof(ProgressLabel));
         OnPropertyChanged(nameof(ProgressWidth));
         OnPropertyChanged(nameof(IsProgressIndeterminate));
+        OnPropertyChanged(nameof(Preview));
     }
     partial void OnProgressStageChanged(string value)
     {
         OnPropertyChanged(nameof(ProgressLabel));
+        OnPropertyChanged(nameof(Preview));
         UpdateEstimatedTime();
     }
 
@@ -105,6 +109,7 @@ public partial class TranscriptionCardViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(CanCancel));
         OnPropertyChanged(nameof(ProgressLabel));
+        OnPropertyChanged(nameof(Preview));
     }
 
     public void ApplyProgress(TranscriptionProgressEventArgs e)
@@ -139,6 +144,8 @@ public partial class TranscriptionCardViewModel : ViewModelBase
         Icon = string.IsNullOrWhiteSpace(summary.Icon) ? "📝" : summary.Icon;
         Quality = summary.Quality;
         Device = summary.Device;
+        _previewText = summary.Preview ?? "";
+        Date = summary.Date.ToString("d MMM yyyy", CultureInfo.GetCultureInfo("pt-BR"));
 
         Tags = summary.Tags
             .Select(tag => new TranscriptionCardTagViewModel(tag, TagColorCatalog.GetColor(tag)))
@@ -146,8 +153,8 @@ public partial class TranscriptionCardViewModel : ViewModelBase
 
         Status = summary.Status;
         ErrorMessage = summary.ErrorMessage;
-        Duration = FormatDurationDisplay(summary.DurationSeconds);
         DurationSeconds = summary.DurationSeconds;
+        Duration = FormatAudioDurationLabel(summary.DurationSeconds);
         UpdateEstimatedTime();
     }
 
@@ -160,11 +167,13 @@ public partial class TranscriptionCardViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsInProgress));
         OnPropertyChanged(nameof(IsDone));
         OnPropertyChanged(nameof(IsError));
+        OnPropertyChanged(nameof(ShowDate));
         OnPropertyChanged(nameof(CanRetry));
         OnPropertyChanged(nameof(CanCancel));
         OnPropertyChanged(nameof(ShowProgress));
         OnPropertyChanged(nameof(IsProgressIndeterminate));
         OnPropertyChanged(nameof(ProgressLabel));
+        OnPropertyChanged(nameof(Preview));
         UpdateEstimatedTime();
     }
 
@@ -179,6 +188,7 @@ public partial class TranscriptionCardViewModel : ViewModelBase
         if (DurationSeconds <= 0 || !IsInProgress || !TranscriptionEstimator.IsLearned(Quality, Device))
         {
             EstimatedTimeLabel = null;
+            OnPropertyChanged(nameof(EstimatedTimeLabel));
             return;
         }
 
@@ -187,12 +197,12 @@ public partial class TranscriptionCardViewModel : ViewModelBase
         var total = Math.Max(1, (int)estimatedSeconds);
 
         EstimatedTimeLabel = total < 60
-            ? $"Estimativa: ~{total}s"
-            : $"Estimativa: ~{total / 60}min {total % 60}s";
+            ? $"Estimativa · ~{total}s"
+            : $"Estimativa · ~{total / 60}min {total % 60}s";
 
         OnPropertyChanged(nameof(EstimatedTimeLabel));
-        OnPropertyChanged(nameof(ProgressLabel));
     }
+
     [RelayCommand]
     private void Open() => _openHandler(Id);
 
@@ -218,11 +228,16 @@ public partial class TranscriptionCardViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(CanDelete))]
     private void Delete() => _deleteHandler?.Invoke(Id);
 
-    private static string FormatDurationDisplay(double seconds)
+    private static string FormatAudioDurationLabel(double seconds)
     {
         if (seconds <= 0)
-            return "—";
+            return "Áudio · —";
 
+        return $"Áudio · {FormatDurationDisplay(seconds)}";
+    }
+
+    private static string FormatDurationDisplay(double seconds)
+    {
         var duration = TimeSpan.FromSeconds(seconds);
         if (duration.TotalHours >= 1)
             return $"{(int)duration.TotalHours}h {duration.Minutes}min";
