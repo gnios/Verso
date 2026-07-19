@@ -28,6 +28,11 @@ public partial class UploadViewModel : ViewModelBase
 
     public IconPickerViewModel IconPicker { get; } = new();
 
+    public bool HasIcon => !string.IsNullOrWhiteSpace(Icon);
+    public string? Icon => IconPicker.SelectedIcon;
+
+    [ObservableProperty]
+    private bool _isIconPickerOpen;
 
     public IReadOnlyList<LanguageOptionViewModel> LanguageOptions { get; } =
     [
@@ -37,9 +42,6 @@ public partial class UploadViewModel : ViewModelBase
     ];
 
     public IReadOnlyList<ModelOptionViewModel> ModelOptions { get; } = ModelCatalog.All;
-
-    /// <summary>Perfil padrão sugerido nos cartões (Equilibrado).</summary>
-    public ModelOptionViewModel DefaultRecommendedModel { get; } = ModelCatalog.Find(ModelQuality.Standard);
 
     public IReadOnlyList<SpeakerModeOptionViewModel> SpeakerModeOptions { get; } =
     [
@@ -81,7 +83,11 @@ public partial class UploadViewModel : ViewModelBase
     private SpeakerModeOptionViewModel? _selectedSpeakerModeOption;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SelectedFolderId))]
     private FolderOptionViewModel? _selectedFolder;
+
+    /// <summary>Id da pasta selecionada — usado pelo FolderCombobox (mesmo padrão do Editor).</summary>
+    public int? SelectedFolderId => SelectedFolder?.Id;
 
     [ObservableProperty]
     private bool _isStarting;
@@ -109,6 +115,14 @@ public partial class UploadViewModel : ViewModelBase
         _navigation = navigation;
         _mediaStorage = mediaStorage;
         _queueService = queueService;
+        IconPicker.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(IconPickerViewModel.SelectedIcon))
+            {
+                OnPropertyChanged(nameof(Icon));
+                OnPropertyChanged(nameof(HasIcon));
+            }
+        };
     }
 
     public void Initialize(NavigationParameter? parameter)
@@ -119,10 +133,24 @@ public partial class UploadViewModel : ViewModelBase
         IsStarting = false;
         Title = "";
         TagsText = "";
+        IsIconPickerOpen = false;
         IconPicker.UseTranscriptionIcons = true;
-        IconPicker.AllowNoIcon = false;
+        IconPicker.AllowNoIcon = true;
         IconPicker.SelectedIcon = IconCatalog.TransIcons[0];
+        OnPropertyChanged(nameof(Icon));
+        OnPropertyChanged(nameof(HasIcon));
         _ = LoadFormAsync(parameter?.FolderId);
+    }
+
+    [RelayCommand]
+    private void ToggleIconPicker() => IsIconPickerOpen = !IsIconPickerOpen;
+
+    [RelayCommand]
+    private void CloseIconPicker()
+    {
+        IsIconPickerOpen = false;
+        OnPropertyChanged(nameof(Icon));
+        OnPropertyChanged(nameof(HasIcon));
     }
 
     public bool TrySelectFile(string path)
@@ -267,7 +295,7 @@ public partial class UploadViewModel : ViewModelBase
         SelectedSpeakerModeOption = SpeakerModeOptions.First(option => option.Value == SpeakerMode);
 
         FolderOptions.Clear();
-        FolderOptions.Add(new FolderOptionViewModel { Id = null, Name = "Nenhuma (avulsa)" });
+        FolderOptions.Add(new FolderOptionViewModel { Id = null, Name = "Nenhuma pasta", Icon = "" });
 
         foreach (var folder in await folderService.GetAllAsync())
         {
@@ -275,6 +303,7 @@ public partial class UploadViewModel : ViewModelBase
             {
                 Id = folder.Id,
                 Name = folder.Title,
+                Icon = folder.Icon,
             });
         }
 

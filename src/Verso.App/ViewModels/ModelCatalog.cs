@@ -23,7 +23,7 @@ public static class ModelCatalog
             ModelQuality.Standard,
             "Equilibrado",
             "~466 MB",
-            "Recomendado para a maioria das entrevistas",
+            "Bom para a maioria das entrevistas",
             "Tempo médio",
             "Funciona bem na maioria das entrevistas, aulas e notas de campo."),
         new(
