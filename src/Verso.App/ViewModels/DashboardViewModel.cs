@@ -183,6 +183,9 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
             settings.MaxTranscriptionThreads));
     }
 
+    internal void CancelTranscription(Guid transcriptionId) =>
+        _queueService?.Cancel(transcriptionId);
+
     private void ApplyNavigationParameter(NavigationParameter? parameter)
     {
         if (parameter is null)
@@ -243,11 +246,14 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         Cards.Clear();
         foreach (var summary in summaries)
         {
-            Cards.Add(new TranscriptionCardViewModel(
+            var card = new TranscriptionCardViewModel(
                 summary,
                 OpenTranscription,
                 id => _ = RetryTranscriptionAsync(id),
-                id => _ = DeleteTranscriptionAsync(id)));
+                id => _ = DeleteTranscriptionAsync(id),
+                CancelTranscription);
+            RestoreProgress(card);
+            Cards.Add(card);
         }
 
         IsEmpty = Cards.Count == 0;
@@ -279,19 +285,19 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         if (e.Status == TranscriptionStatusChanged.Error)
         {
             card.ErrorMessage = e.ErrorMessage;
-            ClearProgress(card);
+            card.ClearProgress();
             _ = _sidebar.LoadAsync();
         }
         else if (e.Status == TranscriptionStatusChanged.Done)
         {
             card.ErrorMessage = null;
-            ClearProgress(card);
+            card.ClearProgress();
             _ = LoadAsync();
             _ = _sidebar.LoadAsync();
         }
         else if (e.Status == TranscriptionStatusChanged.Queued)
         {
-            ClearProgress(card);
+            card.ClearProgress();
         }
     }
 
@@ -311,17 +317,19 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        card.ProgressStage = e.Stage;
-        // Em "saving"/"done" o motor já terminou: mantém 100% sem parecer concluído no rótulo.
-        card.ProgressPercent = e.Stage is "saving" or "done"
-            ? 100
-            : e.Percent;
+        card.ApplyProgress(e);
     }
 
-    private static void ClearProgress(TranscriptionCardViewModel card)
+    private void RestoreProgress(TranscriptionCardViewModel card)
     {
-        card.ProgressPercent = null;
-        card.ProgressStage = "";
+        if (!card.IsInProgress
+            || _queueService is null
+            || !_queueService.TryGetLatestProgress(card.Id, out var progress))
+        {
+            return;
+        }
+
+        card.ApplyProgress(progress);
     }
 
     private TranscriptionCardViewModel? FindCard(Guid transcriptionId)

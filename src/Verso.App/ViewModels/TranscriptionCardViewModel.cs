@@ -17,6 +17,7 @@ public partial class TranscriptionCardViewModel : ViewModelBase
     private readonly Action<Guid> _openHandler;
     private readonly Action<Guid>? _retryHandler;
     private readonly Action<Guid>? _deleteHandler;
+    private readonly Action<Guid>? _cancelHandler;
 
     public Guid Id { get; }
     public string Title { get; }
@@ -32,11 +33,16 @@ public partial class TranscriptionCardViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(RetryCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CancelCommand))]
     private TranscriptionStatus _status;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(RetryCommand))]
     private string? _errorMessage;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CancelCommand))]
+    private bool _isCancelling;
 
     [ObservableProperty]
     private int? _progressPercent;
@@ -48,6 +54,7 @@ public partial class TranscriptionCardViewModel : ViewModelBase
     {
         TranscriptionStatus.InProgress => "Em andamento",
         TranscriptionStatus.Done => "Concluída",
+        TranscriptionStatus.Error when ErrorMessage == "Cancelada" => "Cancelada",
         _ => "Erro"
     };
 
@@ -63,11 +70,14 @@ public partial class TranscriptionCardViewModel : ViewModelBase
 
     public bool CanRetry => IsError && _retryHandler is not null;
     public bool CanDelete => _deleteHandler is not null;
+    public bool CanCancel => IsInProgress && !IsCancelling && _cancelHandler is not null;
 
     public bool ShowProgress => IsInProgress;
     public bool IsProgressIndeterminate => IsInProgress && ProgressPercent is null;
     public int ProgressWidth => ProgressPercent ?? 0;
-    public string ProgressLabel => ProgressStage switch
+    public string ProgressLabel => IsCancelling
+        ? "Cancelando…"
+        : ProgressStage switch
     {
         "loading" => "Carregando modelo…",
         "preparing" => "Preparando áudio…",
@@ -91,15 +101,38 @@ public partial class TranscriptionCardViewModel : ViewModelBase
         UpdateEstimatedTime();
     }
 
+    partial void OnIsCancellingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanCancel));
+        OnPropertyChanged(nameof(ProgressLabel));
+    }
+
+    public void ApplyProgress(TranscriptionProgressEventArgs e)
+    {
+        ProgressStage = e.Stage;
+        // Em "saving"/"done" o motor já terminou: mantém 100% sem parecer concluído no rótulo.
+        ProgressPercent = e.Stage is "saving" or "done"
+            ? 100
+            : e.Percent;
+    }
+
+    public void ClearProgress()
+    {
+        ProgressPercent = null;
+        ProgressStage = "";
+    }
+
     public TranscriptionCardViewModel(
         TranscriptionSummary summary,
         Action<Guid> openHandler,
         Action<Guid>? retryHandler = null,
-        Action<Guid>? deleteHandler = null)
+        Action<Guid>? deleteHandler = null,
+        Action<Guid>? cancelHandler = null)
     {
         _openHandler = openHandler;
         _retryHandler = retryHandler;
         _deleteHandler = deleteHandler;
+        _cancelHandler = cancelHandler;
 
         Id = summary.Id;
         Title = summary.Title;
@@ -112,6 +145,7 @@ public partial class TranscriptionCardViewModel : ViewModelBase
             .ToList();
 
         Status = summary.Status;
+        ErrorMessage = summary.ErrorMessage;
         Duration = FormatDurationDisplay(summary.DurationSeconds);
         DurationSeconds = summary.DurationSeconds;
         UpdateEstimatedTime();
@@ -119,11 +153,15 @@ public partial class TranscriptionCardViewModel : ViewModelBase
 
     partial void OnStatusChanged(TranscriptionStatus value)
     {
+        if (value != TranscriptionStatus.InProgress)
+            IsCancelling = false;
+
         OnPropertyChanged(nameof(StatusLabel));
         OnPropertyChanged(nameof(IsInProgress));
         OnPropertyChanged(nameof(IsDone));
         OnPropertyChanged(nameof(IsError));
         OnPropertyChanged(nameof(CanRetry));
+        OnPropertyChanged(nameof(CanCancel));
         OnPropertyChanged(nameof(ShowProgress));
         OnPropertyChanged(nameof(IsProgressIndeterminate));
         OnPropertyChanged(nameof(ProgressLabel));
@@ -133,6 +171,7 @@ public partial class TranscriptionCardViewModel : ViewModelBase
     partial void OnErrorMessageChanged(string? value)
     {
         OnPropertyChanged(nameof(CanRetry));
+        OnPropertyChanged(nameof(StatusLabel));
     }
 
     private void UpdateEstimatedTime()
@@ -164,6 +203,16 @@ public partial class TranscriptionCardViewModel : ViewModelBase
         {
             _retryHandler(Id);
         }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanCancel))]
+    private void Cancel()
+    {
+        if (_cancelHandler is null)
+            return;
+
+        IsCancelling = true;
+        _cancelHandler(Id);
     }
 
     [RelayCommand(CanExecute = nameof(CanDelete))]

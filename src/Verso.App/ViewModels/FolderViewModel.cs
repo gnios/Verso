@@ -225,6 +225,9 @@ public partial class FolderViewModel : ViewModelBase, IDisposable
             settings.MaxTranscriptionThreads));
     }
 
+    internal void CancelTranscription(Guid transcriptionId) =>
+        _queueService?.Cancel(transcriptionId);
+
     /// <summary>Filtra _allSummaries por status + busca e reconstrói a lista de cards exibida.</summary>
     private void ApplyFilter()
     {
@@ -248,11 +251,14 @@ public partial class FolderViewModel : ViewModelBase, IDisposable
         Transcriptions.Clear();
         foreach (var summary in filtered)
         {
-            Transcriptions.Add(new TranscriptionCardViewModel(
+            var card = new TranscriptionCardViewModel(
                 summary,
                 OpenTranscription,
                 retryHandler: id => _ = RetryTranscriptionAsync(id),
-                deleteHandler: id => _ = DeleteTranscriptionAsync(id)));
+                deleteHandler: id => _ = DeleteTranscriptionAsync(id),
+                cancelHandler: CancelTranscription);
+            RestoreProgress(card);
+            Transcriptions.Add(card);
         }
 
         IsEmpty = Transcriptions.Count == 0;
@@ -336,16 +342,16 @@ public partial class FolderViewModel : ViewModelBase, IDisposable
             if (e.Status == TranscriptionStatusChanged.Error)
             {
                 card.ErrorMessage = e.ErrorMessage;
-                ClearProgress(card);
+                card.ClearProgress();
             }
             else if (e.Status == TranscriptionStatusChanged.Done)
             {
                 card.ErrorMessage = null;
-                ClearProgress(card);
+                card.ClearProgress();
             }
             else if (e.Status == TranscriptionStatusChanged.Queued)
             {
-                ClearProgress(card);
+                card.ClearProgress();
             }
         }
 
@@ -372,16 +378,19 @@ public partial class FolderViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        card.ProgressStage = e.Stage;
-        card.ProgressPercent = e.Stage is "saving" or "done"
-            ? 100
-            : e.Percent;
+        card.ApplyProgress(e);
     }
 
-    private static void ClearProgress(TranscriptionCardViewModel card)
+    private void RestoreProgress(TranscriptionCardViewModel card)
     {
-        card.ProgressPercent = null;
-        card.ProgressStage = "";
+        if (!card.IsInProgress
+            || _queueService is null
+            || !_queueService.TryGetLatestProgress(card.Id, out var progress))
+        {
+            return;
+        }
+
+        card.ApplyProgress(progress);
     }
 
     private static TranscriptionStatus MapQueueStatus(TranscriptionStatusChanged status) =>
