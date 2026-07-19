@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Runtime.Versioning;
-using Verso.App.Services;
 
 namespace Verso.App.Services;
 
@@ -22,7 +20,6 @@ namespace Verso.App.Services;
 /// Tudo é best-effort: se nvidia-smi/WMI não estiverem disponíveis, devolvemos null
 /// sem lançar, e a UI explica o que faltou.
 /// </summary>
-[SupportedOSPlatform("windows")]
 public sealed class ActiveGpuResolver
 {
     private readonly GpuDetector _gpuDetector;
@@ -116,7 +113,8 @@ public sealed class ActiveGpuResolver
     /// </summary>
     internal IReadOnlyList<NvidiaGpu> QueryNvidiaSmi()
     {
-        if (!OperatingSystem.IsWindows())
+        // nvidia-smi existe no Windows e no Linux com driver NVIDIA; macOS não.
+        if (OperatingSystem.IsMacOS())
         {
             return Array.Empty<NvidiaGpu>();
         }

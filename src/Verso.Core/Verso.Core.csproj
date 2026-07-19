@@ -5,10 +5,15 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <!--
-      Default true: builds locais de dev incluem CUDA/Vulkan.
+      Default true: builds locais de dev incluem aceleração GPU da plataforma.
       Release CPU do CI passa -p:VersoIncludeGpuRuntimes=false.
+      RID vazio (dev) assume Windows CUDA/Vulkan; publish linux/osx escolhe pacotes do RID.
     -->
     <VersoIncludeGpuRuntimes Condition="'$(VersoIncludeGpuRuntimes)' == ''">true</VersoIncludeGpuRuntimes>
+    <_VersoRid>$(RuntimeIdentifier)</_VersoRid>
+    <_VersoGpuWin Condition="'$(VersoIncludeGpuRuntimes)' == 'true' AND ('$(_VersoRid)' == '' OR $(_VersoRid.StartsWith('win')))">true</_VersoGpuWin>
+    <_VersoGpuLinux Condition="'$(VersoIncludeGpuRuntimes)' == 'true' AND $(_VersoRid.StartsWith('linux'))">true</_VersoGpuLinux>
+    <_VersoGpuMac Condition="'$(VersoIncludeGpuRuntimes)' == 'true' AND ($(_VersoRid.StartsWith('osx')) OR $(_VersoRid.StartsWith('mac')))">true</_VersoGpuMac>
   </PropertyGroup>
 
   <ItemGroup>
@@ -24,13 +29,16 @@
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
     <PackageReference Include="NAudio" Version="2.3.0" />
-    <!-- Pacotes explícitos Windows (sem AllRuntimes: evita OpenVINO/CoreML/Linux). -->
+    <!-- Pacotes por OS (sem AllRuntimes: evita OpenVINO e RIDs mortos). -->
     <PackageReference Include="Whisper.net" Version="1.9.1" />
     <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" />
     <PackageReference Include="Whisper.net.Runtime.NoAvx" Version="1.9.1" />
-    <PackageReference Include="Whisper.net.Runtime.Cuda.Windows" Version="1.9.1" Condition="'$(VersoIncludeGpuRuntimes)' == 'true'" />
-    <PackageReference Include="Whisper.net.Runtime.Cuda12.Windows" Version="1.9.1" Condition="'$(VersoIncludeGpuRuntimes)' == 'true'" />
-    <PackageReference Include="Whisper.net.Runtime.Vulkan" Version="1.9.1" Condition="'$(VersoIncludeGpuRuntimes)' == 'true'" />
+    <PackageReference Include="Whisper.net.Runtime.Cuda.Windows" Version="1.9.1" Condition="'$(_VersoGpuWin)' == 'true'" />
+    <PackageReference Include="Whisper.net.Runtime.Cuda12.Windows" Version="1.9.1" Condition="'$(_VersoGpuWin)' == 'true'" />
+    <PackageReference Include="Whisper.net.Runtime.Vulkan" Version="1.9.1" Condition="'$(_VersoGpuWin)' == 'true' OR '$(_VersoGpuLinux)' == 'true'" />
+    <PackageReference Include="Whisper.net.Runtime.Cuda.Linux" Version="1.9.1" Condition="'$(_VersoGpuLinux)' == 'true'" />
+    <PackageReference Include="Whisper.net.Runtime.Cuda12.Linux" Version="1.9.1" Condition="'$(_VersoGpuLinux)' == 'true'" />
+    <PackageReference Include="Whisper.net.Runtime.CoreML" Version="1.9.1" Condition="'$(_VersoGpuMac)' == 'true'" />
   </ItemGroup>
 
 </Project>

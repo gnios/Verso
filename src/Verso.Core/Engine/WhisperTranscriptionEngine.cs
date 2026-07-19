@@ -87,7 +87,7 @@ public sealed class WhisperTranscriptionEngine : IDisposable
             request.Device,
             request.Quality,
             request.Language);
-        if (request.Device == ExecutionDevice.Vulkan && OperatingSystem.IsWindows())
+        if (request.Device == ExecutionDevice.Vulkan && (OperatingSystem.IsWindows() || OperatingSystem.IsLinux()))
         {
             var devices = VulkanDeviceEnumerator.TryEnumerateDevices();
             if (devices.Count == 0)

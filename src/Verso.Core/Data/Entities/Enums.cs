@@ -21,4 +21,4 @@ public enum ModelQuality
 
 public enum SpeakerMode { Automatic, Off }
 
-public enum ExecutionDevice { Auto, Cpu, Cuda, Vulkan }
+public enum ExecutionDevice { Auto, Cpu, Cuda, Vulkan, CoreMl }

@@ -972,6 +972,7 @@ public partial class EditorViewModel : ViewModelBase, IDisposable
         ExecutionDevice.Cpu => "CPU",
         ExecutionDevice.Cuda => "CUDA",
         ExecutionDevice.Vulkan => "Vulkan",
+        ExecutionDevice.CoreMl => "Core ML",
         ExecutionDevice.Auto => "Auto",
         _ => device.ToString(),
     };

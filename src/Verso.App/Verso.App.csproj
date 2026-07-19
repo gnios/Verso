@@ -7,6 +7,7 @@
     <RootNamespace>Verso.App</RootNamespace>
     <!-- Main custom em Program.cs (Photino), sem StartupUri/App.xaml. -->
     <StartupObject>Verso.App.Program</StartupObject>
+    <ApplicationIcon>Assets\verso.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -53,31 +54,37 @@
   </ItemGroup>
 
   <!--
-    Copia o output do Verso.Worker (Fase 2/transcricao-cpu-responsiva, R2.1) para o diretório de
-    output do Verso.App em builds de desenvolvimento. WorkerExecutableLocator resolve
-    "Verso.Worker"/"Verso.Worker.exe" como sibling de AppContext.BaseDirectory/VersoPaths.AppDirectory
-    — sem esta cópia, builds locais não teriam o worker disponível ao lado do Verso.App.
+    Dev build: copia só o apphost/managed do Worker (NÃO runtimes/ — já vêm do Verso.Core
+    no App e duplicar CUDA enchia o disco / aninhava win-x64\win-x64). Em publish com RID
+    o target PublishVersoWorker abaixo cuida do sibling self-contained.
   -->
-  <Target Name="CopyVersoWorkerOutput" AfterTargets="Build">
+  <Target Name="CopyVersoWorkerOutput" AfterTargets="Build" Condition="'$(RuntimeIdentifier)' == ''">
+    <PropertyGroup>
+      <_WorkerOutDir>$(MSBuildThisFileDirectory)..\Verso.Worker\bin\$(Configuration)\net10.0\</_WorkerOutDir>
+    </PropertyGroup>
     <ItemGroup>
-      <_VersoWorkerOutputFiles Include="$(MSBuildThisFileDirectory)..\Verso.Worker\bin\$(Configuration)\net10.0\**\*.*" />
+      <_VersoWorkerOutputFiles Include="$(_WorkerOutDir)Verso.Worker.exe" />
+      <_VersoWorkerOutputFiles Include="$(_WorkerOutDir)Verso.Worker" />
+      <_VersoWorkerOutputFiles Include="$(_WorkerOutDir)Verso.Worker.dll" />
+      <_VersoWorkerOutputFiles Include="$(_WorkerOutDir)Verso.Worker.deps.json" />
+      <_VersoWorkerOutputFiles Include="$(_WorkerOutDir)Verso.Worker.runtimeconfig.json" />
+      <_VersoWorkerOutputFiles Include="$(_WorkerOutDir)Verso.Worker.pdb" />
     </ItemGroup>
     <Copy
       SourceFiles="@(_VersoWorkerOutputFiles)"
-      DestinationFolder="$(OutDir)%(RecursiveDir)"
+      DestinationFolder="$(OutDir)"
       SkipUnchangedFiles="true"
-      Condition="'@(_VersoWorkerOutputFiles)' != ''" />
+      Condition="Exists('%(Identity)')" />
   </Target>
 
   <!--
-    Publish single-file: o copy de Build acima traz o bin framework-dependent, não o
-    Verso.Worker.exe self-contained. Republica o Worker no mesmo PublishDir com os
-    mesmos flags, para `dotnet publish` do App já deixar o sibling pronto (CI e local).
+    Publish: Worker vai para PublishDir/engine/. LayoutPayloadDirectory move wwwroot/runtimes/nativos
+    do App para a mesma pasta — raiz fica só Verso.App(.exe).
   -->
   <Target Name="PublishVersoWorker" AfterTargets="Publish" Condition="'$(RuntimeIdentifier)' != ''">
     <PropertyGroup>
       <_WorkerProject>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\Verso.Worker\Verso.Worker.csproj'))</_WorkerProject>
-      <_WorkerPublishDir>$([System.IO.Path]::GetFullPath('$(PublishDir)'))</_WorkerPublishDir>
+      <_WorkerPublishDir>$([System.IO.Path]::GetFullPath('$(PublishDir)'))engine</_WorkerPublishDir>
       <_WorkerSelfContained Condition="'$(SelfContained)' == ''">true</_WorkerSelfContained>
       <_WorkerSelfContained Condition="'$(SelfContained)' != ''">$(SelfContained)</_WorkerSelfContained>
       <_WorkerPublishSingleFile Condition="'$(PublishSingleFile)' == ''">true</_WorkerPublishSingleFile>
@@ -87,6 +94,22 @@
       <_WorkerGpuRuntimes Condition="'$(VersoIncludeGpuRuntimes)' == ''">true</_WorkerGpuRuntimes>
       <_WorkerGpuRuntimes Condition="'$(VersoIncludeGpuRuntimes)' != ''">$(VersoIncludeGpuRuntimes)</_WorkerGpuRuntimes>
     </PropertyGroup>
+    <MakeDir Directories="$(_WorkerPublishDir)" />
     <Exec Command="dotnet publish &quot;$(_WorkerProject)&quot; -c $(Configuration) -r $(RuntimeIdentifier) --self-contained $(_WorkerSelfContained) -p:PublishSingleFile=$(_WorkerPublishSingleFile) -p:IncludeNativeLibrariesForSelfExtract=$(_WorkerIncludeNative) -p:Version=$(Version) -p:VersoIncludeGpuRuntimes=$(_WorkerGpuRuntimes) -o &quot;$(_WorkerPublishDir)&quot;" />
+  </Target>
+
+  <Target Name="LayoutPayloadDirectory" AfterTargets="PublishVersoWorker" Condition="'$(RuntimeIdentifier)' != ''">
+    <PropertyGroup>
+      <_PubDir>$([System.IO.Path]::GetFullPath('$(PublishDir)').TrimEnd('\').TrimEnd('/'))</_PubDir>
+      <_PayloadDir>$(_PubDir)/engine</_PayloadDir>
+      <_LayoutScript>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\scripts\layout-payload.ps1'))</_LayoutScript>
+    </PropertyGroup>
+    <!-- Windows: Windows PowerShell (nem sempre há pwsh). Unix: pwsh do runner. -->
+    <Exec
+      Condition="'$(OS)' == 'Windows_NT'"
+      Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(_LayoutScript)&quot; -PublishDir &quot;$(_PubDir)&quot;" />
+    <Exec
+      Condition="'$(OS)' != 'Windows_NT'"
+      Command="pwsh -NoProfile -File &quot;$(_LayoutScript)&quot; -PublishDir &quot;$(_PubDir)&quot;" />
   </Target>
 </Project>

@@ -21,11 +21,11 @@
 
 ## 1. O que é o Verso
 
-**Verso** é um aplicativo desktop para transcrição de áudio e vídeo usando o modelo [Whisper](https://github.com/openai/whisper) da OpenAI, via a biblioteca [whisper.net](https://github.com/sandrohanea/whisper.net). É desenvolvido em .NET 10 com interface Photino.Blazor (WebView2) e tem suporte nativo ao português brasileiro.
+**Verso** é um aplicativo desktop para transcrição de áudio e vídeo usando o modelo [Whisper](https://github.com/openai/whisper) da OpenAI, via a biblioteca [whisper.net](https://github.com/sandrohanea/whisper.net). É desenvolvido em .NET 10 com interface Photino.Blazor e tem suporte nativo ao português brasileiro.
 
 O aplicativo permite transcrever arquivos de áudio e vídeo, organizar transcrições em **pesquisas** e **tags**, editar segmentos com atribuição de **locutores**, gravar áudio direto do microfone e exportar nos formatos **TXT**, **SRT** e **VTT**.
 
-**Plataforma:** Windows 10/11 apenas (Photino + WebView2 — Windows-only).
+**Plataformas:** Windows 10/11 (WebView2), Linux x64 (WebKitGTK) e macOS Apple Silicon (WKWebView).
 
 ---
 
@@ -110,7 +110,7 @@ O Verso suporta quatro modos de execução:
 | **CUDA** | Aceleração por GPU NVIDIA (CUDA) | Placa NVIDIA com VRAM ≥ 4 GB recomendada. |
 | **Vulkan** | Aceleração por GPU via Vulkan (AMD, Intel, NVIDIA) | Alternativa ao CUDA para GPUs não-NVIDIA. |
 
-> **Nota:** a variante **GPU** da release inclui os runtimes nativos para CUDA, CUDA 12 e Vulkan. A variante **CPU** inclui apenas o runtime CPU.
+> **Nota:** a variante **GPU** inclui CUDA/Vulkan no Windows e Linux, e Core ML no macOS. A variante **CPU** inclui apenas o runtime CPU.
 
 ---
 
@@ -118,9 +118,9 @@ O Verso suporta quatro modos de execução:
 
 ### 4.1 Requisitos
 
-- **Windows 10 ou 11** (Photino + WebView2 — Windows-only)
-- **Microsoft Edge WebView2 Runtime** — já presente por padrão no Windows 11; no Windows 10 pode precisar instalar
-- **FFmpeg** — o aplicativo tenta localizar no `PATH`; se não encontrar, oferece instalação automática
+- **Windows 10/11**, **Linux x64** ou **macOS Apple Silicon**
+- Runtime de WebView: WebView2 (Windows), WebKitGTK (Linux), WKWebView (macOS)
+- **FFmpeg** no `PATH` (no Windows o app pode oferecer instalação via winget)
 - Para build: **[.NET 10 SDK](https://dotnet.microsoft.com/download)** (apenas para desenvolvimento)
 
 ### 4.2 Build e execução em desenvolvimento
@@ -169,27 +169,28 @@ Verso.sln                    — Solução principal
 
 ## 5. Como baixar as releases
 
-As releases são geradas automaticamente pelo GitHub Actions ao publicar uma tag `v*.*.*` no repositório, ou ao fazer push na branch `main` (que auto-incrementa o patch). Cada release contém **duas variantes** do aplicativo.
+As releases são geradas automaticamente pelo GitHub Actions ao publicar uma tag `v*.*.*` no repositório, ou ao fazer push na branch `main` (que auto-incrementa o patch). Cada release contém **seis zips** (cpu/gpu × três plataformas).
 
-### 5.1 Variantes CPU e GPU
+### 5.1 Variantes por plataforma
 
-| Arquivo | Tamanho aproximado | Contém | Para quem |
-|---------|:-:|--------|-----------|
-| `Verso-X.Y.Z-cpu-win-x64.zip` | **~200 MB** | Runtime CPU apenas | Qualquer computador. Recomendado para quem **não tem** placa NVIDIA. |
-| `Verso-X.Y.Z-gpu-win-x64.zip` | **~960 MB** | Runtimes CPU + CUDA + CUDA 12 + Vulkan | Quem tem **placa NVIDIA** (ou quer aceleração por GPU Vulkan). |
+| Arquivo | Contém | Para quem |
+|---------|--------|-----------|
+| `Verso-X.Y.Z-cpu-win-x64.zip` | CPU | Windows sem GPU NVIDIA |
+| `Verso-X.Y.Z-gpu-win-x64.zip` | CUDA + CUDA 12 + Vulkan | Windows com NVIDIA/Vulkan |
+| `Verso-X.Y.Z-cpu-linux-x64.zip` | CPU | Linux (WebKitGTK) |
+| `Verso-X.Y.Z-gpu-linux-x64.zip` | CUDA + Vulkan | Linux com NVIDIA/Vulkan |
+| `Verso-X.Y.Z-cpu-osx-arm64.zip` | CPU | macOS Apple Silicon |
+| `Verso-X.Y.Z-gpu-osx-arm64.zip` | Core ML | macOS Apple Silicon com aceleração |
 
-Ambas são **self-contained** (não exigem .NET runtime instalado) e **single-file** (DLLs gerenciadas embutidas nos exes). O zip contém `Verso.App.exe`, `Verso.Worker.exe` (iniciado automaticamente na transcrição; sem janela de console), `wwwroot/` e `runtimes/` nativos.
+Builds **self-contained** / **single-file**. O zip contém o app, o Worker (iniciado automaticamente na transcrição), `wwwroot/` e `runtimes/`.
 
 ### 5.2 Instalação e execução
 
-1. Baixe o arquivo `.zip` da [página de Releases do GitHub](https://github.com/gnios/Verso/releases)
-2. Escolha a variante:
-   - **cpu** — se não tiver placa NVIDIA ou quiser simplicidade
-   - **gpu** — se tiver placa NVIDIA com drivers CUDA instalados
-3. Extraia o conteúdo para uma pasta (qualquer local, sem necessidade de instalação)
-4. Execute `Verso.App.exe` — o Worker sobe sozinho quando houver transcrição
+1. Baixe o `.zip` da [página de Releases](https://github.com/gnios/Verso/releases) para a sua plataforma
+2. Escolha **cpu** ou **gpu** conforme o hardware
+3. Extraia e execute `Verso.App.exe` (Windows) ou `./Verso.App` (Linux/macOS)
 
-**Pré-requisito na máquina do usuário:** apenas o Microsoft Edge WebView2 Runtime (presente por padrão no Windows 11). Nenhuma outra instalação é necessária.
+**Pré-requisitos:** WebView2 (Windows), WebKitGTK (Linux), WKWebView (macOS). No Linux: `sudo apt install libwebkit2gtk-4.1-0` (nome pode variar).
 
 **Dados portáteis:** modelos, áudios, banco de dados e logs ficam numa pasta `data/` ao lado do executável. Você pode mover a pasta inteira para outro local que tudo funciona — sem depender de `%AppData%`.
 

@@ -25,7 +25,7 @@ public static class ModelRecommender
 
         return device switch
         {
-            ExecutionDevice.Cuda or ExecutionDevice.Vulkan => RecommendGpu(ramGb),
+            ExecutionDevice.Cuda or ExecutionDevice.Vulkan or ExecutionDevice.CoreMl => RecommendGpu(ramGb),
             ExecutionDevice.Cpu => RecommendCpu(ramGb),
             // Auto: não sabemos se há GPU disponível — recomenda de forma conservadora (como CPU).
             _ => RecommendCpu(ramGb),
