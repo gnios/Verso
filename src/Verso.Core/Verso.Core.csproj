@@ -4,6 +4,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!--
+      Default true: builds locais de dev incluem CUDA/Vulkan.
+      Release CPU do CI passa -p:VersoIncludeGpuRuntimes=false.
+    -->
+    <VersoIncludeGpuRuntimes Condition="'$(VersoIncludeGpuRuntimes)' == ''">true</VersoIncludeGpuRuntimes>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,7 +24,13 @@
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
     <PackageReference Include="NAudio" Version="2.3.0" />
-    <PackageReference Include="Whisper.net.AllRuntimes" Version="1.9.1" />
+    <!-- Pacotes explícitos Windows (sem AllRuntimes: evita OpenVINO/CoreML/Linux). -->
+    <PackageReference Include="Whisper.net" Version="1.9.1" />
+    <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" />
+    <PackageReference Include="Whisper.net.Runtime.NoAvx" Version="1.9.1" />
+    <PackageReference Include="Whisper.net.Runtime.Cuda.Windows" Version="1.9.1" Condition="'$(VersoIncludeGpuRuntimes)' == 'true'" />
+    <PackageReference Include="Whisper.net.Runtime.Cuda12.Windows" Version="1.9.1" Condition="'$(VersoIncludeGpuRuntimes)' == 'true'" />
+    <PackageReference Include="Whisper.net.Runtime.Vulkan" Version="1.9.1" Condition="'$(VersoIncludeGpuRuntimes)' == 'true'" />
   </ItemGroup>
 
 </Project>

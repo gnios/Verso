@@ -2,7 +2,7 @@
 
 App desktop de transcrição de áudio/vídeo com [whisper.net](https://github.com/sandrohanea/whisper.net), em português. Windows-only.
 
-**Stack:** .NET 10 · WPF + Blazor Hybrid (WebView2) · EF Core 10 + SQLite · whisper.net 1.9.1 · NAudio
+**Stack:** .NET 10 · Photino.Blazor (WebView2) · EF Core 10 + SQLite · whisper.net 1.9.1 · NAudio
 
 ## O que faz
 
@@ -77,7 +77,7 @@ Whisper é um modelo de rede neural da OpenAI para transcrição de fala, treina
 
 ## Requisitos
 
-- **Windows 10/11** (WPF + WebView2 não rodam em Linux/macOS)
+- **Windows 10/11** (Photino + WebView2 — Windows-only)
 - Microsoft Edge **WebView2 Runtime** (presente por padrão no Windows 11)
 - **FFmpeg** — o app tenta localizar no `PATH`; se não achar, oferece instalar automaticamente
 - Para build: [.NET 10 SDK](https://dotnet.microsoft.com/download)
@@ -97,9 +97,10 @@ O banco SQLite, as migrations e a pasta `data/` são criados automaticamente no 
 ## Estrutura
 
 ```
-src/Verso.App    UI WPF + Blazor Hybrid (WebView2), ViewModels, serviços de UI
-src/Verso.Core   Engine (whisper.net), serviços, dados (EF Core + SQLite), export
-tests/Verso.Tests  testes xUnit
+src/Verso.App     UI Photino.Blazor (WebView2), ViewModels, serviços de UI
+src/Verso.Worker  Processo isolado de transcrição (spawn automático pelo App)
+src/Verso.Core    Engine (whisper.net), serviços, dados (EF Core + SQLite), export
+tests/Verso.Tests testes xUnit
 ```
 
 ## Releases
@@ -109,7 +110,7 @@ Pipeline em `.github/workflows/release.yml`. Ao publicar uma tag `v*.*.*`, ou fa
 - **`Verso-x.y.z-cpu-win-x64.zip`** (~200 MB) — só runtime CPU. Recomendado para quem não tem GPU NVIDIA.
 - **`Verso-x.y.z-gpu-win-x64.zip`** (~960 MB) — inclui runtimes CUDA + CUDA 12 + Vulkan para aceleração por GPU.
 
-Nenhuma exige .NET Runtime instalado — só o WebView2 Runtime. **Dados portáteis:** modelos, áudios, banco e logs ficam em `data/` ao lado do exe — mova a pasta inteira que tudo funciona.
+Cada zip contém `Verso.App.exe` + `Verso.Worker.exe` (iniciado automaticamente na transcrição; sem console) + `wwwroot/` + `runtimes/`. Nenhuma exige .NET Runtime instalado — só o WebView2 Runtime. **Dados portáteis:** modelos, áudios, banco e logs ficam em `data/` ao lado do exe — mova a pasta inteira que tudo funciona.
 
 ```bash
 git tag v0.1.0
@@ -130,7 +131,7 @@ A etapa de assinatura está no pipeline e ativa **automaticamente** quando as va
    - **Secrets:** `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`
    - **Variables:** `AZURE_SIGNING_ENDPOINT`, `AZURE_SIGNING_ACCOUNT`, `AZURE_CERTIFICATE_PROFILE`
 
-A próxima tag assina o `Verso.App.exe` automaticamente.
+A próxima tag assina os `.exe` da raiz (`Verso.App.exe` e `Verso.Worker.exe`) automaticamente.
 
 ## Roadmap
 
@@ -146,4 +147,4 @@ A próxima tag assina o `Verso.App.exe` automaticamente.
 
 ### Futuro (fora de escopo atual)
 
-- **Suporte Linux/macOS** — app é Windows-only (WPF + WebView2); exigiria reescrever a UI.
+- **Suporte Linux/macOS** — app é Windows-only (Photino + WebView2); exigiria reescrever a UI.
