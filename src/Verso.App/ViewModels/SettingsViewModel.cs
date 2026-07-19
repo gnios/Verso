@@ -76,6 +76,8 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     private string _modelRecommendationReason = "";
 
+    [ObservableProperty]
+    private bool _isAdvancedExpanded;
 
     public long DetectedRamGb { get; private set; }
 

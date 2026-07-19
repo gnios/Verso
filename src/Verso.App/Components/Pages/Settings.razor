@@ -73,24 +73,14 @@
             </div>
             <div class="toggle @(ViewModel.LiveTranscriptionEnabled ? "on" : "")" @onclick="ToggleLiveTranscription"></div>
         </div>
-        <div class="settings-row">
-            <div>
-                <div class="settings-row-label">Dispositivo de execução</div>
-            </div>
-            <select value="@ViewModel.SelectedDeviceOption?.Value" @onchange="OnDeviceChanged">
-                @foreach (var option in ViewModel.DeviceOptions)
-                {
-                    <option value="@option.Value">@option.Label</option>
-                }
-            </select>
-        </div>
     </div>
 
     <div class="settings-section">
-        <div class="settings-section-title">Modelo de transcrição</div>
+        <div class="settings-section-title">Precisão da transcrição</div>
         <div class="settings-row">
             <div>
-                <div class="settings-row-label">Modelo padrão</div>
+                <div class="settings-row-label">Precisão da transcrição</div>
+                <div class="settings-row-sub">@(ViewModel.SelectedModelOption?.Description)</div>
             </div>
             <select value="@ViewModel.SelectedModelOption?.Value" @onchange="OnModelChanged">
                 @foreach (var option in ViewModel.ModelOptions)
@@ -104,7 +94,7 @@
             <div class="settings-recommendation">
                 <div class="settings-recommendation-title">
                     Recomendado para seu computador
-                    <span class="settings-ram-hint">(@(ViewModel.DetectedRamGb) GB · @(ViewModel.SelectedDeviceOption?.Label))</span>
+                    <span class="settings-ram-hint">(@(ViewModel.DetectedRamGb) GB)</span>
                 </div>
                 <div class="settings-recommendation-body">
                     <span class="rec-model">@ViewModel.RecommendedModelOption?.Label · @ViewModel.RecommendedModelOption?.SizeLabel</span>
@@ -125,92 +115,114 @@
             <div class="toggle @(ThemeService.IsDark ? "on" : "")" @onclick="ToggleTheme"></div>
         </div>
     </div>
+
     <div class="settings-section">
-        <div class="settings-section-title">Desenvolvedor</div>
-        <div class="settings-row dev-info-row">
-            <div>
-                <div class="settings-row-label">Dispositivo configurado</div>
-                <div class="settings-row-sub">@ViewModel.ConfiguredDeviceLabel</div>
-            </div>
-        </div>
-        <div class="settings-row dev-info-row">
-            <div>
-                <div class="settings-row-label">Preferência de runtime</div>
-                <div class="settings-row-sub dev-mono">@ViewModel.RuntimePreferenceLabel</div>
-            </div>
-        </div>
-        <div class="settings-row dev-info-row">
-            <div>
-                <div class="settings-row-label">Runtime em uso</div>
-                <div class="settings-row-sub">
-                    @if (ViewModel.IsRuntimeLoaded)
-                    {
-                        <span class="dev-runtime-badge dev-runtime-@ViewModel.LoadedBackendLabel.ToLower()">
-                            @ViewModel.LoadedRuntimeLabel · @ViewModel.LoadedBackendLabel
-                        </span>
-                    }
-                    else
-                    {
-                        <span class="dev-runtime-badge dev-runtime-none">Ainda não carregado</span>
-                    }
-                </div>
-            </div>
-            <button type="button" class="settings-recommendation-btn" @onclick="VerifyRuntime">Verificar agora</button>
-        </div>
-
-        <div class="settings-row dev-info-row dev-stack">
-            <div>
-                <div class="settings-row-label">Placa em uso (backend ativo)</div>
-                <div class="settings-row-sub">
-                    <span class="dev-active-gpu">@ViewModel.ActiveGpuLabel</span>
-                    @if (!string.IsNullOrEmpty(ViewModel.ActiveGpuSourceLabel) && ViewModel.ActiveGpuSourceLabel != "—")
-                    {
-                        <span class="dev-active-gpu-source"> · @ViewModel.ActiveGpuSourceLabel</span>
-                    }
-                </div>
-                @if (!string.IsNullOrEmpty(ViewModel.ActiveGpuNote))
-                {
-                    <div class="dev-message">@ViewModel.ActiveGpuNote</div>
-                }
-            </div>
-        </div>
-
-
-        <div class="settings-row dev-info-row dev-stack">
-            <div>
-                <div class="settings-row-label">Placas de vídeo detectadas</div>
-                @if (ViewModel.Gpus.Count == 0)
-                {
-                    <div class="settings-row-sub">Nenhuma placa detectada (WMI indisponível).</div>
-                }
-                else
-                {
-                    <ul class="dev-gpu-list">
-                        @foreach (var gpu in ViewModel.Gpus)
+        <button type="button" class="settings-advanced-toggle" @onclick="ToggleAdvanced">
+            <span>Avançado</span>
+            <span class="settings-advanced-chevron @(ViewModel.IsAdvancedExpanded ? "open" : "")">▾</span>
+        </button>
+        @if (ViewModel.IsAdvancedExpanded)
+        {
+            <div class="settings-advanced-body">
+                <div class="settings-row">
+                    <div>
+                        <div class="settings-row-label">Dispositivo de execução</div>
+                        <div class="settings-row-sub">Deixe em Automático, salvo se precisar forçar CPU ou GPU</div>
+                    </div>
+                    <select value="@ViewModel.SelectedDeviceOption?.Value" @onchange="OnDeviceChanged">
+                        @foreach (var option in ViewModel.DeviceOptions)
                         {
-                            <li>
-                                <span class="dev-gpu-kind @gpu.KindLabel.ToLower()">@gpu.KindLabel</span>
-                                <span class="dev-gpu-name">@gpu.Name</span>
-                                <span class="dev-gpu-vendor">@gpu.Vendor · @gpu.RamLabel</span>
-                            </li>
+                            <option value="@option.Value">@option.Label</option>
                         }
-                    </ul>
-                }
-            </div>
-            <button type="button" class="settings-recommendation-btn" @onclick="RefreshDeveloperInfo">Atualizar</button>
-        </div>
+                    </select>
+                </div>
 
-        <div class="settings-row dev-info-row dev-stack">
-            <div>
-                <div class="settings-row-label">Arquivo de logs</div>
-                <div class="settings-row-sub dev-mono">@ViewModel.LogDirectoryPath</div>
-                @if (!string.IsNullOrEmpty(ViewModel.DeveloperMessage))
-                {
-                    <div class="dev-message">@ViewModel.DeveloperMessage</div>
-                }
+                <div class="settings-section-title settings-advanced-subtitle">Desenvolvedor</div>
+                <div class="settings-row dev-info-row">
+                    <div>
+                        <div class="settings-row-label">Dispositivo configurado</div>
+                        <div class="settings-row-sub">@ViewModel.ConfiguredDeviceLabel</div>
+                    </div>
+                </div>
+                <div class="settings-row dev-info-row">
+                    <div>
+                        <div class="settings-row-label">Preferência de runtime</div>
+                        <div class="settings-row-sub dev-mono">@ViewModel.RuntimePreferenceLabel</div>
+                    </div>
+                </div>
+                <div class="settings-row dev-info-row">
+                    <div>
+                        <div class="settings-row-label">Runtime em uso</div>
+                        <div class="settings-row-sub">
+                            @if (ViewModel.IsRuntimeLoaded)
+                            {
+                                <span class="dev-runtime-badge dev-runtime-@ViewModel.LoadedBackendLabel.ToLower()">
+                                    @ViewModel.LoadedRuntimeLabel · @ViewModel.LoadedBackendLabel
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="dev-runtime-badge dev-runtime-none">Ainda não carregado</span>
+                            }
+                        </div>
+                    </div>
+                    <button type="button" class="settings-recommendation-btn" @onclick="VerifyRuntime">Verificar agora</button>
+                </div>
+
+                <div class="settings-row dev-info-row dev-stack">
+                    <div>
+                        <div class="settings-row-label">Placa em uso (backend ativo)</div>
+                        <div class="settings-row-sub">
+                            <span class="dev-active-gpu">@ViewModel.ActiveGpuLabel</span>
+                            @if (!string.IsNullOrEmpty(ViewModel.ActiveGpuSourceLabel) && ViewModel.ActiveGpuSourceLabel != "—")
+                            {
+                                <span class="dev-active-gpu-source"> · @ViewModel.ActiveGpuSourceLabel</span>
+                            }
+                        </div>
+                        @if (!string.IsNullOrEmpty(ViewModel.ActiveGpuNote))
+                        {
+                            <div class="dev-message">@ViewModel.ActiveGpuNote</div>
+                        }
+                    </div>
+                </div>
+
+                <div class="settings-row dev-info-row dev-stack">
+                    <div>
+                        <div class="settings-row-label">Placas de vídeo detectadas</div>
+                        @if (ViewModel.Gpus.Count == 0)
+                        {
+                            <div class="settings-row-sub">Nenhuma placa detectada (WMI indisponível).</div>
+                        }
+                        else
+                        {
+                            <ul class="dev-gpu-list">
+                                @foreach (var gpu in ViewModel.Gpus)
+                                {
+                                    <li>
+                                        <span class="dev-gpu-kind @gpu.KindLabel.ToLower()">@gpu.KindLabel</span>
+                                        <span class="dev-gpu-name">@gpu.Name</span>
+                                        <span class="dev-gpu-vendor">@gpu.Vendor · @gpu.RamLabel</span>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                    <button type="button" class="settings-recommendation-btn" @onclick="RefreshDeveloperInfo">Atualizar</button>
+                </div>
+
+                <div class="settings-row dev-info-row dev-stack">
+                    <div>
+                        <div class="settings-row-label">Arquivo de logs</div>
+                        <div class="settings-row-sub dev-mono">@ViewModel.LogDirectoryPath</div>
+                        @if (!string.IsNullOrEmpty(ViewModel.DeveloperMessage))
+                        {
+                            <div class="dev-message">@ViewModel.DeveloperMessage</div>
+                        }
+                    </div>
+                    <button type="button" class="settings-recommendation-btn" @onclick="OpenLogFolder">Abrir pasta</button>
+                </div>
             </div>
-            <button type="button" class="settings-recommendation-btn" @onclick="OpenLogFolder">Abrir pasta</button>
-        </div>
+        }
     </div>
 </section>
 
@@ -280,6 +292,7 @@
 
 
     private void UseRecommended() => ViewModel.UseRecommendedModelCommand.Execute(null);
+    private void ToggleAdvanced() => ViewModel.IsAdvancedExpanded = !ViewModel.IsAdvancedExpanded;
     private void RefreshDeveloperInfo() => ViewModel.RefreshDeveloperInfoCommand.Execute(null);
     private void VerifyRuntime() => ViewModel.VerifyRuntimeCommand.Execute(null);
     private void OpenLogFolder() => ViewModel.OpenLogFolderCommand.Execute(null);

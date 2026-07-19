@@ -30,7 +30,7 @@ public static class TranscriptionTextFormatter
             $"Título: {title}",
             $"Arquivo: {mediaFileName ?? title}",
             $"Idioma: {language}",
-            $"Qualidade: {qualityLabel}",
+            $"Precisão: {qualityLabel}",
             $"Duração: {FormatDuration(TimeSpan.FromSeconds(durationSeconds))}"
         ];
     }

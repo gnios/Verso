@@ -295,23 +295,8 @@ public partial class FeedbackViewModel : ViewModelBase
         return $"Processador ({Environment.ProcessorCount} núcleos)";
     }
 
-    private static string ModelName(ModelQuality q) => q switch
-    {
-        ModelQuality.Tiny => "Tiny",
-        ModelQuality.TinyEn => "Tiny (EN)",
-        ModelQuality.Base => "Base",
-        ModelQuality.BaseEn => "Base (EN)",
-        ModelQuality.Standard => "Padrão (Small)",
-        ModelQuality.SmallEn => "Small (EN)",
-        ModelQuality.Medium => "Medium",
-        ModelQuality.MediumEn => "Medium (EN)",
-        ModelQuality.High => "Alta (LargeV3)",
-        ModelQuality.LargeV1 => "LargeV1",
-        ModelQuality.LargeV2 => "LargeV2",
-        ModelQuality.LargeV3Turbo => "LargeV3 Turbo",
-        ModelQuality.PtBrTurbo => "Pt-BR Turbo",
-        _ => q.ToString(),
-    };
+    private static string ModelName(ModelQuality q) =>
+        ModelCatalog.Find(q).Label;
 
     private static string DeviceLabel(ExecutionDevice d) => d switch
     {

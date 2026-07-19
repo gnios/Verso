@@ -4,20 +4,16 @@ using Verso.Core.Data.Entities;
 namespace Verso.Core.Engine;
 
 /// <summary>
-/// Recomendação dinâmica de modelo Whisper a partir do dispositivo de execução
-/// escolhido e da memória física total do computador. Lógica pura e testável —
-/// a leitura de RAM (ambiente-dependente) fica em <see cref="SystemMemory"/>.
+/// Recomendação dinâmica de perfil de precisão a partir do dispositivo e da RAM.
+/// Sempre retorna um dos três perfis de UI: Base (Rápido), Standard (Equilibrado),
+/// LargeV3Turbo (Preciso).
 /// </summary>
 public static class ModelRecommender
 {
     /// <summary>Modelo recomendado + justificativa curta em pt-BR.</summary>
     public sealed record Recommendation(ModelQuality Quality, string Reason);
 
-    /// <summary>
-    /// Sugere um modelo multilíngue adequado. Nunca recomenda variantes "En"
-    /// (inglês-only), pois o app é multilíngue por padrão.
-    /// </summary>
-    /// <param name="device">Dispositivo de execução escolhido pelo usuário (CPU/Cuda/Vulkan/Auto).</param>
+    /// <param name="device">Dispositivo de execução escolhido pelo usuário.</param>
     /// <param name="ramBytes">Memória física total em bytes (de <see cref="SystemMemory"/>).</param>
     public static Recommendation Recommend(ExecutionDevice device, long ramBytes)
     {
@@ -27,7 +23,7 @@ public static class ModelRecommender
         {
             ExecutionDevice.Cuda or ExecutionDevice.Vulkan or ExecutionDevice.CoreMl => RecommendGpu(ramGb),
             ExecutionDevice.Cpu => RecommendCpu(ramGb),
-            // Auto: não sabemos se há GPU disponível — recomenda de forma conservadora (como CPU).
+            // Auto: conservador como CPU (não sabemos se há GPU).
             _ => RecommendCpu(ramGb),
         };
     }
@@ -35,24 +31,20 @@ public static class ModelRecommender
     private static Recommendation RecommendCpu(long ramGb) =>
         ramGb switch
         {
-            < 6 => new(ModelQuality.Tiny,
-                "Pouca memória para CPU — Tiny é rápido e leve, ideal para testes rápidos."),
-            < 12 => new(ModelQuality.Base,
-                "Memória moderada para CPU — Base equilibra velocidade e precisão."),
+            < 6 => new(ModelQuality.Base,
+                "Pouca memória — Rápido é leve e adequado para testes e rascunhos."),
             < 24 => new(ModelQuality.Standard,
-                "Memória adequada para CPU — Padrão (small) oferece boa precisão sem ser lento demais."),
-            _ => new(ModelQuality.Medium,
-                "Memória ampla para CPU — Medium dá alta precisão, mas a transcrição será mais lenta."),
+                "Memória adequada — Equilibrado oferece boa precisão na maioria das entrevistas."),
+            _ => new(ModelQuality.LargeV3Turbo,
+                "Memória ampla — Preciso entrega melhor qualidade para citação e análise."),
         };
 
     private static Recommendation RecommendGpu(long ramGb) =>
         ramGb switch
         {
             < 8 => new(ModelQuality.LargeV3Turbo,
-                "GPU ativa com memória limitada — Large-v3-turbo equilibra velocidade e qualidade."),
-            < 32 => new(ModelQuality.LargeV3Turbo,
-                "GPU ativa — Large-v3-turbo é a melhor relação velocidade/qualidade."),
-            _ => new(ModelQuality.High,
-                "GPU ativa com memória ampla — Alta (large-v3) entrega a melhor qualidade disponível."),
+                "Aceleração gráfica com memória limitada — Preciso equilibra velocidade e qualidade."),
+            _ => new(ModelQuality.LargeV3Turbo,
+                "Aceleração gráfica disponível — Preciso é a melhor relação velocidade/qualidade."),
         };
 }

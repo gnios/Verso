@@ -3,10 +3,10 @@
 ## Índice
 
 1. [O que é o Verso](#1-o-que-é-o-verso)
-2. [Modelos de Transcrição](#2-modelos-de-transcrição)
-   - [O que são os modelos Whisper](#21-o-que-são-os-modelos-whisper)
-   - [Tabela comparativa de modelos](#22-tabela-comparativa-de-modelos)
-   - [Indicação para cada modelo](#23-indicação-para-cada-modelo)
+2. [Precisão da transcrição](#2-precisão-da-transcrição)
+   - [Perfis na interface](#21-perfis-na-interface)
+   - [Recomendação automática](#22-recomendação-automática)
+   - [Modelos Whisper (referência técnica)](#23-modelos-whisper-referência-técnica)
 3. [Dispositivos de Execução](#3-dispositivos-de-execução)
 4. [Como usar o projeto](#4-como-usar-o-projeto)
    - [Requisitos](#41-requisitos)
@@ -29,73 +29,43 @@ O aplicativo permite transcrever arquivos de áudio e vídeo, organizar transcri
 
 ---
 
-## 2. Modelos de Transcrição
+## 2. Precisão da transcrição
 
-### 2.1 O que são os modelos Whisper
+### 2.1 Perfis na interface
 
-Whisper é um modelo de rede neural desenvolvido pela OpenAI para transcrição de fala e tradução. Ele foi treinado com 680 mil horas de áudio multilíngue e suporta 99 idiomas.
+Para o público acadêmico, o Verso expõe **três perfis** (sem nomes técnicos de modelo Whisper):
 
-O Verso utiliza os modelos no formato **GGML** (quantizados), que são versões comprimidas dos modelos originais para rodar eficientemente em hardware de consumo. A quantização reduz o tamanho do arquivo e o uso de memória, com perda mínima de precisão.
+| Perfil na UI | Quando usar | Modelo interno | Tamanho |
+|--------|-------------|:---:|:---:|
+| **Rápido** | Rascunho, checagem de áudio | Base | ~142 MB |
+| **Equilibrado** | Maioria das entrevistas (padrão) | Small (`Standard`) | ~466 MB |
+| **Preciso** | Citação, áudio difícil | Large v3-turbo | ~1,2 GB |
 
-Os modelos se diferenciam por:
-- **Tamanho e arquitetura**: quanto maior o modelo, mais parâmetros e camadas, maior a precisão — e maior o custo computacional.
-- **Suporte a idiomas**: a maioria dos modelos é multilíngue; existem variantes "EN" que processam apenas inglês (mais rápidas e menores para este idioma).
-- **Versão da arquitetura**: Large v1, v2, v3 são versões progressivamente mais precisas. Large-v3 é o estado da arte entre os modelos grandes padrão.
-- **Versões "turbo"**: arquitetura otimizada com attention pooling e decodificador mais raso — qualidade próxima ao Large completo com **2–3× mais velocidade**.
-- **Fine-tuning**: o modelo **Pt-BR Turbo** é uma versão fine-tuned (distil-whisper-large-v3) especificamente para português brasileiro, oferecendo qualidade superior para este idioma com tamanho reduzido (~538 MB).
+Qualidades legadas no banco (Tiny, Medium, Large v1/v2, variantes EN, High) continuam válidas no engine e são mapeadas para o perfil mais próximo na UI.
 
-### 2.2 Tabela comparativa de modelos
+### 2.2 Recomendação automática
 
-| Modelo | Tamanho no disco | RAM/VRAM estimada | Idiomas | Velocidade relativa | Precisão relativa |
-|--------|:-:|:-:|:-:|:-:|:-:|
-| **Tiny** | ~75 MB | ~1 GB | Multilíngue | Muito rápida | Baixa |
-| **Base** | ~142 MB | ~1,5 GB | Multilíngue | Rápida | Baixa–Média |
-| **Padrão (Small)** | ~466 MB | ~2,5 GB | Multilíngue | Moderada | Média–Alta |
-| **Medium** | ~1,5 GB | ~5 GB | Multilíngue | Lenta | Alta |
-| **Large v3-turbo** | ~1,2 GB | ~4 GB | Multilíngue | Rápida (GPU) | Muito alta |
-| **Large v2** | ~3 GB | ~6–8 GB | Multilíngue | Muito lenta | Alta |
-| **Large v3 (Alta)** | ~3 GB | ~6–8 GB | Multilíngue | Muito lenta | Máxima |
-| **Large v1** | ~3 GB | ~6–8 GB | Multilíngue | Muito lenta | Alta (obsoleto) |
-| **Pt-BR Turbo (distil)** | ~538 MB | ~2 GB | Português (forçado) | Rápida | Muito alta (pt-BR) |
-| **Tiny (inglês)** | ~75 MB | ~1 GB | Inglês apenas | Muito rápida | Baixa |
-| **Base (inglês)** | ~142 MB | ~1,5 GB | Inglês apenas | Rápida | Baixa–Média |
-| **Small (inglês)** | ~466 MB | ~2,5 GB | Inglês apenas | Moderada | Média–Alta |
-| **Medium (inglês)** | ~1,5 GB | ~5 GB | Inglês apenas | Lenta | Alta |
+O recomendador sugere um dos três perfis com base no dispositivo e na RAM. Motivos usam os nomes Rápido / Equilibrado / Preciso.
 
-> **Sobre a RAM/VRAM:** os valores são estimativas para uso em GPU. Em CPU pura, o consumo de RAM é maior e o desempenho significativamente mais lento.
+| Contexto | Perfil sugerido |
+|----------|-----------------|
+| CPU, &lt; 6 GB RAM | Rápido |
+| CPU, 6–24 GB RAM | Equilibrado |
+| CPU, ≥ 24 GB RAM | Preciso |
+| GPU (CUDA / Vulkan / Core ML) | Preciso |
 
-### 2.3 Indicação para cada modelo
+Hardware (CPU/CUDA/Vulkan) e logs ficam em **Configurações → Avançado**.
 
-#### Recomendação dinâmica
+### 2.3 Modelos Whisper (referência técnica)
 
-O Verso possui um **recomendador automático** que sugere o modelo ideal com base no dispositivo (CPU ou GPU) e na memória RAM total do computador. A recomendação aparece na tela de Configurações.
+O Verso usa [Whisper](https://github.com/openai/whisper) via [whisper.net](https://github.com/sandrohanea/whisper.net) em formato **GGML**. A tabela abaixo é referência interna — não aparece na UI do usuário comum.
 
-#### CPU
-
-| RAM | Modelo recomendado | Motivo |
-|:---:|:---:|------|
-| < 6 GB | **Tiny** (~75 MB) | Único que roda confortavelmente em máquinas com pouca memória. Ideal para testes rápidos. |
-| 6–12 GB | **Base** (~142 MB) | Equilíbrio entre velocidade e precisão para hardware modesto. |
-| 12–24 GB | **Padrão/Small** (~466 MB) | Boa precisão sem ser lento demais. Escolha segura para a maioria dos notebooks. |
-| ≥ 24 GB | **Medium** (~1,5 GB) | Máxima precisão em CPU, mas a transcrição será lenta (considere usar GPU). |
-
-#### GPU (CUDA NVIDIA ou Vulkan)
-
-| RAM/VRAM | Modelo recomendado | Motivo |
-|:---:|:---:|------|
-| < 8 GB | **Large v3-turbo** (~1,2 GB) | Equilíbrio entre velocidade e qualidade para GPUs de entrada. |
-| 8–32 GB | **Large v3-turbo** (~1,2 GB) | Melhor relação velocidade/qualidade. Processa áudio longo rapidamente. |
-| ≥ 32 GB | **Large v3** / Alta (~3 GB) | Máxima qualidade disponível. Para GPUs com bastante VRAM (12 GB+). |
-
-#### Orientações gerais
-
-- **Primeiro uso / testes:** comece com **Padrão (Small)**. É o modelo padrão do aplicativo, bom equilíbrio entre velocidade e qualidade.
-- **Português brasileiro:** use **Pt-BR Turbo (distil)**. É um modelo fine-tuned especificamente para o português do Brasil, com qualidade superior ao Large-v3-turbo geral, mas com metade do tamanho (~538 MB vs ~1,2 GB). Ideal para transcrições em português.
-- **Máxima qualidade (GPU recomendada):** use **Alta (Large v3)**. É o modelo mais preciso disponível, mas exige ~6–8 GB de VRAM e bastante tempo de processamento.
-- **Máxima velocidade (GPU):** use **Large v3-turbo**. Perde pouco em qualidade para o Large v3 completo, mas é 2–3× mais rápido.
-- **Inglês apenas:** Se todo o conteúdo for em inglês, prefira uma variante **"EN"** correspondente — são mais rápidas e precisas para este idioma.
-- **Hardware muito limitado (≤ 4 GB RAM):** use **Tiny** ou **Base**.
-- **Modelos obsoletos:** Large v1 e Large v2 existem apenas para compatibilidade. Prefira Large v3, Large v3-turbo ou Pt-BR Turbo.
+| Modelo GGML | Tamanho | Uso no Verso |
+|--------|:---:|------|
+| Base | ~142 MB | Perfil Rápido |
+| Small | ~466 MB | Perfil Equilibrado (padrão) |
+| Large v3-turbo | ~1,2 GB | Perfil Preciso |
+| Tiny / Medium / Large v1–v3 / EN | vários | Legado / engine apenas |
 
 ---
 

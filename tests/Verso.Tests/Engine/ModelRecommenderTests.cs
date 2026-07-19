@@ -8,21 +8,24 @@ public class ModelRecommenderTests
     private const long GB = 1024L * 1024L * 1024L;
 
     [Theory]
-    [InlineData(ExecutionDevice.Cpu, 4L * GB, ModelQuality.Tiny)]
-    [InlineData(ExecutionDevice.Cpu, 8L * GB, ModelQuality.Base)]
+    [InlineData(ExecutionDevice.Cpu, 4L * GB, ModelQuality.Base)]
+    [InlineData(ExecutionDevice.Cpu, 8L * GB, ModelQuality.Standard)]
     [InlineData(ExecutionDevice.Cpu, 16L * GB, ModelQuality.Standard)]
-    [InlineData(ExecutionDevice.Cpu, 32L * GB, ModelQuality.Medium)]
+    [InlineData(ExecutionDevice.Cpu, 32L * GB, ModelQuality.LargeV3Turbo)]
     [InlineData(ExecutionDevice.Cuda, 8L * GB, ModelQuality.LargeV3Turbo)]
     [InlineData(ExecutionDevice.Cuda, 16L * GB, ModelQuality.LargeV3Turbo)]
-    [InlineData(ExecutionDevice.Cuda, 40L * GB, ModelQuality.High)]
+    [InlineData(ExecutionDevice.Cuda, 40L * GB, ModelQuality.LargeV3Turbo)]
     [InlineData(ExecutionDevice.Vulkan, 16L * GB, ModelQuality.LargeV3Turbo)]
     [InlineData(ExecutionDevice.Auto, 16L * GB, ModelQuality.Standard)]
-    public void Recommend_ReturnsExpectedQualityWithNonEmptyReason(ExecutionDevice device, long ramBytes, ModelQuality expected)
+    public void Recommend_ReturnsExpectedProfileWithNonEmptyReason(ExecutionDevice device, long ramBytes, ModelQuality expected)
     {
         var recommendation = ModelRecommender.Recommend(device, ramBytes);
 
         Assert.Equal(expected, recommendation.Quality);
         Assert.False(string.IsNullOrEmpty(recommendation.Reason));
+        Assert.DoesNotContain("Tiny", recommendation.Reason);
+        Assert.DoesNotContain("small", recommendation.Reason, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("large-v3", recommendation.Reason, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -31,12 +34,18 @@ public class ModelRecommenderTests
         var recommendation = ModelRecommender.Recommend(ExecutionDevice.Cpu, 0L);
 
         Assert.Equal(ModelQuality.Standard, recommendation.Quality);
-        Assert.False(string.IsNullOrEmpty(recommendation.Reason));
+        Assert.Contains("Equilibrado", recommendation.Reason);
     }
 
     [Fact]
-    public void Recommend_ReasonIsNeverEmptyAcrossTestedCombinations()
+    public void Recommend_OnlyReturnsUiProfiles()
     {
+        var allowed = new HashSet<ModelQuality>
+        {
+            ModelQuality.Base,
+            ModelQuality.Standard,
+            ModelQuality.LargeV3Turbo,
+        };
         var devices = new[]
         {
             ExecutionDevice.Auto,
@@ -52,6 +61,7 @@ public class ModelRecommenderTests
             foreach (var ram in ramSizes)
             {
                 var recommendation = ModelRecommender.Recommend(device, ram);
+                Assert.Contains(recommendation.Quality, allowed);
                 Assert.False(string.IsNullOrEmpty(recommendation.Reason),
                     $"Reason empty for device={device}, ram={ram}");
             }

@@ -28,13 +28,6 @@ public class ModelManagerTests
     }
 
     [Fact]
-    public void GetModelFileName_PtBrTurbo_ReturnsCustomGgmlFileName()
-    {
-        // PtBrTurbo não tem GgmlType canônico — nome de arquivo é fixo (modelo fine-tuned pt-BR).
-        Assert.Equal("ggml-distil-large-v3-ptbr-q5_0.bin", ModelManager.GetModelFileName(ModelQuality.PtBrTurbo));
-    }
-
-    [Fact]
     public void IsModelFileValid_RejectsPartialDownload()
     {
         var path = Path.Combine(Path.GetTempPath(), $"transcriba-partial-{Guid.NewGuid():N}.bin");
@@ -217,7 +210,7 @@ public class WhisperRuntimeConfiguratorTests
         ];
         try
         {
-            WhisperRuntimeConfigurator.Configure(ExecutionDevice.Vulkan, ModelQuality.PtBrTurbo);
+            WhisperRuntimeConfigurator.Configure(ExecutionDevice.Vulkan, ModelQuality.Standard);
 
             Assert.NotNull(WhisperRuntimeConfigurator.VramFallbackReason);
             Assert.Contains("Nenhuma GPU dedicada", WhisperRuntimeConfigurator.VramFallbackReason);

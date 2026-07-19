@@ -16,7 +16,6 @@ public enum ModelQuality
     BaseEn,        // inglês apenas
     SmallEn,       // inglês apenas
     MediumEn,      // inglês apenas
-    PtBrTurbo,     // distil-whisper-large-v3 fine-tuned pt-BR (GGML Q5_0, ~538 MB) — força idioma pt
 }
 
 public enum SpeakerMode { Automatic, Off }

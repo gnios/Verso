@@ -80,25 +80,25 @@
         <div class="upload-form">
             <div>
                 <label class="upload-label">Idioma</label>
-                <select class="upload-select" value="@ViewModel.SelectedLanguageOption?.Code" disabled="@ViewModel.IsLanguageLocked" @onchange="OnLanguageChanged">
+                <select class="upload-select" value="@ViewModel.SelectedLanguageOption?.Code" @onchange="OnLanguageChanged">
                     @foreach (var option in ViewModel.LanguageOptions)
                     {
                         <option value="@option.Code">@option.Label</option>
                     }
                 </select>
-                @if (ViewModel.IsLanguageLocked)
-                {
-                    <div class="upload-hint">Idioma fixado em pt-BR pelo modelo selecionado.</div>
-                }
             </div>
             <div>
-                <label class="upload-label">Qualidade</label>
+                <label class="upload-label">Precisão da transcrição</label>
                 <select class="upload-select" value="@ViewModel.SelectedModelOption?.Value" @onchange="OnModelChanged">
                     @foreach (var option in ViewModel.ModelOptions)
                     {
                         <option value="@option.Value">@option.Label · @option.SizeLabel</option>
                     }
                 </select>
+                @if (ViewModel.SelectedModelOption is not null)
+                {
+                    <div class="upload-hint upload-hint-muted">@ViewModel.SelectedModelOption.Description</div>
+                }
             </div>
             <div>
                 <label class="upload-label">Locutores</label>
