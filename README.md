@@ -1,8 +1,8 @@
 # Verso
 
-App desktop de transcrição de áudio/vídeo com [whisper.net](https://github.com/sandrohanea/whisper.net), em português. Windows-only.
+App desktop de transcrição de áudio/vídeo com [whisper.net](https://github.com/sandrohanea/whisper.net), em português. Windows, Linux e macOS (Apple Silicon).
 
-**Stack:** .NET 10 · Photino.Blazor (WebView2) · EF Core 10 + SQLite · whisper.net 1.9.1 · NAudio
+**Stack:** .NET 10 · Photino.Blazor (WebView2 / WebKitGTK / WKWebView) · EF Core 10 + SQLite · whisper.net 1.9.1 · NAudio
 
 ## O que faz
 
@@ -77,9 +77,12 @@ Whisper é um modelo de rede neural da OpenAI para transcrição de fala, treina
 
 ## Requisitos
 
-- **Windows 10/11** (Photino + WebView2 — Windows-only)
-- Microsoft Edge **WebView2 Runtime** (presente por padrão no Windows 11)
-- **FFmpeg** — o app tenta localizar no `PATH`; se não achar, oferece instalar automaticamente
+- **Windows 10/11**, **Linux x64** ou **macOS Apple Silicon**
+- Runtime de WebView da plataforma:
+  - Windows: Edge **WebView2** (padrão no Windows 11)
+  - Linux: **WebKitGTK** (ex.: `libwebkit2gtk-4.1-0` no Ubuntu/Debian)
+  - macOS: **WKWebView** (nativo)
+- **FFmpeg** no `PATH` (no Windows o app pode oferecer instalação via winget)
 - Para build: [.NET 10 SDK](https://dotnet.microsoft.com/download)
 
 ## Rodar em desenvolvimento
@@ -89,6 +92,7 @@ dotnet restore
 dotnet run --project src/Verso.App
 # ou:
 dotnet publish src/Verso.App -c Release -r win-x64 --self-contained true -o ./publish
+# Linux: -r linux-x64 · macOS Apple Silicon: -r osx-arm64
 dotnet test
 ```
 
@@ -97,7 +101,7 @@ O banco SQLite, as migrations e a pasta `data/` são criados automaticamente no 
 ## Estrutura
 
 ```
-src/Verso.App     UI Photino.Blazor (WebView2), ViewModels, serviços de UI
+src/Verso.App     UI Photino.Blazor, ViewModels, serviços de UI
 src/Verso.Worker  Processo isolado de transcrição (spawn automático pelo App)
 src/Verso.Core    Engine (whisper.net), serviços, dados (EF Core + SQLite), export
 tests/Verso.Tests testes xUnit
@@ -105,12 +109,15 @@ tests/Verso.Tests testes xUnit
 
 ## Releases
 
-Pipeline em `.github/workflows/release.yml`. Ao publicar uma tag `v*.*.*`, ou fazer push na `main`, o CI builda **duas variantes self-contained** win-x64 e cria um GitHub Release:
+Pipeline em `.github/workflows/release.yml`. Tag `v*.*.*` ou push na `main` gera um GitHub Release com **6 zips** (cpu/gpu × win-x64 / linux-x64 / osx-arm64):
 
-- **`Verso-x.y.z-cpu-win-x64.zip`** (~200 MB) — só runtime CPU. Recomendado para quem não tem GPU NVIDIA.
-- **`Verso-x.y.z-gpu-win-x64.zip`** (~960 MB) — inclui runtimes CUDA + CUDA 12 + Vulkan para aceleração por GPU.
+| Zip | Aceleração |
+|-----|------------|
+| `*-cpu-win-x64.zip` / `*-gpu-win-x64.zip` | CPU · CUDA/Vulkan |
+| `*-cpu-linux-x64.zip` / `*-gpu-linux-x64.zip` | CPU · CUDA/Vulkan |
+| `*-cpu-osx-arm64.zip` / `*-gpu-osx-arm64.zip` | CPU · Core ML |
 
-Cada zip contém `Verso.App.exe` + `Verso.Worker.exe` (iniciado automaticamente na transcrição; sem console) + `wwwroot/` + `runtimes/`. Nenhuma exige .NET Runtime instalado — só o WebView2 Runtime. **Dados portáteis:** modelos, áudios, banco e logs ficam em `data/` ao lado do exe — mova a pasta inteira que tudo funciona.
+Cada zip tem o app + Worker (iniciado na transcrição) + `wwwroot/` + `runtimes/`. Self-contained (sem .NET instalado). **Dados portáteis** em `data/` ao lado do executável.
 
 ```bash
 git tag v0.1.0
@@ -147,4 +154,4 @@ A próxima tag assina os `.exe` da raiz (`Verso.App.exe` e `Verso.Worker.exe`) a
 
 ### Futuro (fora de escopo atual)
 
-- **Suporte Linux/macOS** — app é Windows-only (Photino + WebView2); exigiria reescrever a UI.
+- **macOS Intel (osx-x64)** — release atual foca em Apple Silicon (`osx-arm64`).

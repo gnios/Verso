@@ -276,18 +276,22 @@ public partial class FeedbackViewModel : ViewModelBase
 
     private static string GetCpuName()
     {
-        try
+        if (OperatingSystem.IsWindows())
         {
-            using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
-                @"HARDWARE\DESCRIPTION\System\CentralProcessor\0");
-            var name = key?.GetValue("ProcessorNameString")?.ToString();
-            if (!string.IsNullOrWhiteSpace(name))
-                return name.Trim();
+            try
+            {
+                using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                    @"HARDWARE\DESCRIPTION\System\CentralProcessor\0");
+                var name = key?.GetValue("ProcessorNameString")?.ToString();
+                if (!string.IsNullOrWhiteSpace(name))
+                    return name.Trim();
+            }
+            catch
+            {
+                // fallback
+            }
         }
-        catch
-        {
-            // fallback
-        }
+
         return $"Processador ({Environment.ProcessorCount} núcleos)";
     }
 
@@ -315,6 +319,7 @@ public partial class FeedbackViewModel : ViewModelBase
         ExecutionDevice.Cpu => "CPU",
         ExecutionDevice.Cuda => "CUDA",
         ExecutionDevice.Vulkan => "Vulkan",
+        ExecutionDevice.CoreMl => "Core ML",
         _ => d.ToString(),
     };
 

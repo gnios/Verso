@@ -1,22 +1,20 @@
 name: release
 
-## Pipeline de distribuição Windows do Verso (Photino.Blazor + WebView2, net10.0).
-## O app é Windows-only (Photino/WebView2), então o runner é windows-latest.
+## Pipeline de distribuição multiplataforma do Verso (Photino.Blazor, net10.0).
 ##
-## Publica DUAS variantes por release (matrix cpu|gpu), ambas single-file (DLLs gerenciadas
-## embutidas no Verso.App.exe / Verso.Worker.exe) e portáteis (dados em <appdir>/data).
-## Layout do zip: Verso.App.exe + Verso.Worker.exe + wwwroot/ + runtimes/.
-## O Worker é processo separado (transcrição); o App o spawna sob demanda como sibling —
-## o usuário só abre Verso.App.exe (WinExe, sem console).
-##   - cpu: VersoIncludeGpuRuntimes=false — só CPU/NoAvx (~200 MB)
-##   - gpu: VersoIncludeGpuRuntimes=true — CUDA/CUDA12/Vulkan win-x64 (~960 MB)
-## Cleanup remove RIDs não-win e peso morto (pdb/xml) antes do zip.
+## Matrix por OS/RID × cpu|gpu:
+##   - windows-latest / win-x64     — WebView2; gpu = CUDA.Windows + Vulkan
+##   - ubuntu-latest  / linux-x64   — WebKitGTK (deps no usuário); gpu = CUDA.Linux + Vulkan
+##   - macos-latest   / osx-arm64   — WKWebView; gpu = CoreML
+##
+## Single-file (DLLs gerenciadas embutidas). Layout: App.exe na raiz + engine/ (Worker, wwwroot, runtimes, nativos).
+## Worker é sibling spawnado sob demanda (sem console no Windows via WinExe).
+## Assinatura Azure Trusted Signing só no Windows.
 ##
 ## Gatilhos:
-##   - push para main           -> calcula próxima versão (incrementa patch da última tag),
-##                                 builda as 2 variantes, cria a tag, gera GitHub Release
-##   - push de tag v*.*.*       -> builda as 2 variantes e cria GitHub Release com os 2 zips
-##   - workflow_dispatch        -> builda e publica artifacts (sem Release), útil para validação
+##   - push para main           -> auto-incrementa patch, builda, tag, GitHub Release
+##   - push de tag v*.*.*       -> builda e cria GitHub Release
+##   - workflow_dispatch        -> artifacts sem Release
 on:
   push:
     branches:
@@ -26,19 +24,39 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # necessário para criar o GitHub Release e fazer upload dos assets
+  contents: write
 
 jobs:
   build:
-    runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-          - variant: cpu
+          - os: windows-latest
+            rid: win-x64
+            variant: cpu
             gpu_runtimes: 'false'
-          - variant: gpu
+          - os: windows-latest
+            rid: win-x64
+            variant: gpu
             gpu_runtimes: 'true'
+          - os: ubuntu-latest
+            rid: linux-x64
+            variant: cpu
+            gpu_runtimes: 'false'
+          - os: ubuntu-latest
+            rid: linux-x64
+            variant: gpu
+            gpu_runtimes: 'true'
+          - os: macos-latest
+            rid: osx-arm64
+            variant: cpu
+            gpu_runtimes: 'false'
+          - os: macos-latest
+            rid: osx-arm64
+            variant: gpu
+            gpu_runtimes: 'true'
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -52,103 +70,198 @@ jobs:
 
       - name: Determinar versão
         id: version
-        shell: pwsh
+        shell: bash
         run: |
-          # Tag v*.*.* -> version SEM o 'v' (NuGet rejeita 'v0.1.0');
-          # Push para main -> auto-incrementa patch da última tag;
-          # Dispatch -> dev version com short SHA.
-          if ($env:GITHUB_REF -match 'refs/tags/(v.*)') {
-            $tag = $Matches[1]          # v0.1.0
-            $ver = $tag.Substring(1)    # 0.1.0
-          } elseif ($env:GITHUB_REF -eq 'refs/heads/main') {
-            $latest = git tag --list 'v*.*.*' --sort=-v:refname | Select-Object -First 1
-            if (-not $latest) {
-              $ver = '0.1.0'
-            } else {
-              $lastVer = $latest.Substring(1)
-              $parts = $lastVer.Split('.')
-              $patch = [int]$parts[2] + 1
-              $ver = "$($parts[0]).$($parts[1]).$patch"
-            }
-            $tag = "v$ver"
-          } else {
-            $tag = ''
-            $ver = "0.0.0-dev+$($env:GITHUB_SHA.Substring(0,7))"
-          }
-          Write-Host "tag=$tag version=$ver"
-          "tag=$tag" >> $env:GITHUB_OUTPUT
-          "version=$ver" >> $env:GITHUB_OUTPUT
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            tag="${GITHUB_REF#refs/tags/}"
+            ver="${tag#v}"
+          elif [[ "$GITHUB_REF" == refs/heads/main ]]; then
+            latest=$(git tag --list 'v*.*.*' --sort=-v:refname | head -1)
+            if [ -z "$latest" ]; then
+              ver="0.1.0"
+            else
+              lastVer="${latest#v}"
+              IFS='.' read -r -a parts <<< "$lastVer"
+              ver="${parts[0]}.${parts[1]}.$((parts[2] + 1))"
+            fi
+            tag="v${ver}"
+          else
+            tag=""
+            ver="0.0.0-dev+${GITHUB_SHA::7}"
+          fi
+          echo "tag=$tag version=$ver"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
 
-      - name: Publicar self-contained (win-x64, single-file)
-        shell: pwsh
+      - name: Liberar disco do runner
+        shell: bash
         run: |
-          # Single-file empacota DLLs gerenciadas no Verso.App.exe. Nativos
-          # (Photino/WebView2/whisper.cpp/CUDA) ficam em runtimes/. O target
-          # PublishVersoWorker do App.csproj republica o Worker no mesmo -o.
-          # VersoIncludeGpuRuntimes controla se CUDA/Vulkan entram via NuGet.
-          dotnet publish src/Verso.App/Verso.App.csproj `
-            -c Release `
-            -r win-x64 `
-            --self-contained true `
-            -p:PublishSingleFile=true `
-            -p:IncludeNativeLibrariesForSelfExtract=false `
-            -p:VersoIncludeGpuRuntimes=${{ matrix.gpu_runtimes }} `
-            -p:Version=${{ steps.version.outputs.version }} `
-            -o publish/${{ matrix.variant }}
+          # GPU CUDA enche o disco do windows-latest se bins intermediários acumularem.
+          rm -rf src/*/bin src/*/obj tests/*/bin tests/*/obj || true
+          df -h . || true
 
-      - name: Publicar Verso.Worker self-contained (win-x64, single-file)
-        shell: pwsh
+      - name: Publicar App + Worker (self-contained, single-file)
+        shell: bash
         run: |
-          # Redundante com PublishVersoWorker do App, mas garante o sibling
-          # mesmo se o target do App for pulado. Mesmo PublishDir e flags.
-          dotnet publish src/Verso.Worker/Verso.Worker.csproj `
-            -c Release `
-            -r win-x64 `
-            --self-contained true `
-            -p:PublishSingleFile=true `
-            -p:IncludeNativeLibrariesForSelfExtract=false `
-            -p:VersoIncludeGpuRuntimes=${{ matrix.gpu_runtimes }} `
-            -p:Version=${{ steps.version.outputs.version }} `
-            -o publish/${{ matrix.variant }}
+          set -euo pipefail
+          OUT="publish/${{ matrix.variant }}-${{ matrix.rid }}"
+          rm -rf "$OUT"
+          # Um único publish do App: target PublishVersoWorker já coloca o Worker sibling.
+          # Segundo publish do Worker no mesmo -o já apagou nativos em releases quebradas.
+          dotnet publish src/Verso.App/Verso.App.csproj \
+            -c Release \
+            -r "${{ matrix.rid }}" \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=false \
+            -p:DeleteExistingFiles=false \
+            -p:VersoIncludeGpuRuntimes=${{ matrix.gpu_runtimes }} \
+            -p:Version=${{ steps.version.outputs.version }} \
+            -o "$OUT"
+
+          if [[ "${{ matrix.rid }}" == win-* ]]; then
+            test -f "$OUT/Verso.App.exe"
+            test -f "$OUT/engine/Verso.Worker.exe"
+          else
+            chmod +x "$OUT/Verso.App" "$OUT/engine/Verso.Worker"
+            test -f "$OUT/Verso.App"
+            test -f "$OUT/engine/Verso.Worker"
+          fi
+          # Raiz limpa: só o App; payload em engine/ (pdbs removidos no LayoutPayloadDirectory).
+          root_extras=$(find "$OUT" -maxdepth 1 -mindepth 1 ! -name 'Verso.App' ! -name 'Verso.App.exe' ! -name 'engine' ! -name 'data' | wc -l | tr -d ' ')
+          if [[ "$root_extras" -gt 0 ]]; then
+            echo "::warning::itens inesperados na raiz do publish:"
+            find "$OUT" -maxdepth 1 -mindepth 1 ! -name 'Verso.App' ! -name 'Verso.App.exe' ! -name 'engine' ! -name 'data' || true
+          fi
 
       - name: Remover runtimes e arquivos desnecessários
-        shell: pwsh
+        shell: bash
         run: |
-          $pub = "publish/${{ matrix.variant }}"
-          # 1. Pacotes CPU (Runtime/NoAvx) ainda trazem RIDs multiplataforma —
-          #    remove tudo que não é win-x64 (e flavors cuda*/vulkan com sub-RIDs).
-          Get-ChildItem "$pub/runtimes" -Directory -ErrorAction SilentlyContinue |
-            ForEach-Object {
-              $top = $_.Name
-              if ($top -match '^(cuda|cuda12|vulkan)$') {
-                Get-ChildItem $_ -Directory -ErrorAction SilentlyContinue |
-                  Where-Object { $_.Name -ne 'win-x64' } |
-                  Remove-Item -Recurse -Force
-              } elseif ($top -match '^(linux|macos|osx|win-arm64|win-x86|browser|ios|android|maccatalyst|tvos|coreml)') {
-                Remove-Item $_.FullName -Recurse -Force
-              } elseif ($top -eq 'noavx') {
-                Get-ChildItem $_ -Directory -ErrorAction SilentlyContinue |
-                  Where-Object { $_.Name -ne 'win-x64' } |
-                  Remove-Item -Recurse -Force
-              }
-            }
-          # 2. Safety net: variante CPU não deve ter CUDA/Vulkan (NuGet já omitiu).
-          if ('${{ matrix.variant }}' -eq 'cpu') {
-            Get-ChildItem "$pub/runtimes" -Directory -ErrorAction SilentlyContinue |
-              Where-Object { $_.Name -match '^(cuda|cuda12|vulkan)$' } |
-              Remove-Item -Recurse -Force
+          set -euo pipefail
+          PUB="publish/${{ matrix.variant }}-${{ matrix.rid }}"
+          PAYLOAD="$PUB/engine"
+          RID="${{ matrix.rid }}"
+          VARIANT="${{ matrix.variant }}"
+
+          case "$RID" in
+            win-x64) KEEP="win-x64"; KEEP_ALT="" ;;
+            linux-x64) KEEP="linux-x64"; KEEP_ALT="" ;;
+            osx-arm64) KEEP="osx-arm64"; KEEP_ALT="macos-arm64" ;;
+            osx-x64) KEEP="osx-x64"; KEEP_ALT="macos-x64" ;;
+            *) KEEP="$RID"; KEEP_ALT="" ;;
+          esac
+
+          keep_rid() {
+            local name="$1"
+            [[ "$name" == "$KEEP" || ( -n "$KEEP_ALT" && "$name" == "$KEEP_ALT" ) ]]
           }
-          # 3. Peso morto: símbolos, docs XML, Metal.
-          Get-ChildItem $pub -Recurse -Include *.pdb,*.xml,ggml-metal.metal -File -ErrorAction SilentlyContinue |
-            Remove-Item -Force
-          $files = @(Get-ChildItem $pub -Recurse -File)
-          $sum = ($files | Measure-Object Length -Sum).Sum
-          Write-Host "Arquivos: $($files.Count); tamanho: $([math]::Round($sum/1MB, 1)) MB"
+
+          if [[ -d "$PAYLOAD/runtimes" ]]; then
+            for top in "$PAYLOAD/runtimes"/*; do
+              [[ -d "$top" ]] || continue
+              name=$(basename "$top")
+              case "$name" in
+                cuda|cuda12|vulkan|noavx|coreml)
+                  for sub in "$top"/*; do
+                    [[ -d "$sub" ]] || continue
+                    subname=$(basename "$sub")
+                    if ! keep_rid "$subname"; then
+                      rm -rf "$sub"
+                    fi
+                  done
+                  if [[ -z "$(find "$top" -type f | head -1)" ]]; then
+                    rm -rf "$top"
+                  fi
+                  ;;
+                *)
+                  if ! keep_rid "$name"; then
+                    rm -rf "$top"
+                  fi
+                  ;;
+              esac
+            done
+          fi
+
+          if [[ "$VARIANT" == "cpu" ]]; then
+            rm -rf "$PAYLOAD/runtimes/cuda" "$PAYLOAD/runtimes/cuda12" "$PAYLOAD/runtimes/vulkan" "$PAYLOAD/runtimes/coreml" 2>/dev/null || true
+          fi
+
+          if [[ "$RID" == osx-* ]]; then
+            rm -rf "$PAYLOAD/runtimes/cuda" "$PAYLOAD/runtimes/cuda12" "$PAYLOAD/runtimes/vulkan" 2>/dev/null || true
+            if [[ "$VARIANT" == "cpu" ]]; then
+              rm -rf "$PAYLOAD/runtimes/coreml" 2>/dev/null || true
+            fi
+          else
+            rm -rf "$PAYLOAD/runtimes/coreml" 2>/dev/null || true
+          fi
+
+          find "$PUB" -type f \( -name '*.pdb' -o -name '*.xml' -o -name 'ggml-metal.metal' \) -delete 2>/dev/null || true
+
+          count=$(find "$PUB" -type f | wc -l | tr -d ' ')
+          size=$(du -sm "$PUB" | cut -f1)
+          echo "Arquivos: $count; tamanho: ${size} MB"
+
+      - name: Validar payload nativo
+        shell: bash
+        run: |
+          set -euo pipefail
+          PUB="publish/${{ matrix.variant }}-${{ matrix.rid }}"
+          PAYLOAD="$PUB/engine"
+          RID="${{ matrix.rid }}"
+          VARIANT="${{ matrix.variant }}"
+
+          if [[ ! -d "$PAYLOAD" ]]; then
+            echo "::error::pasta engine/ ausente — LayoutPayloadDirectory falhou?"
+            exit 1
+          fi
+
+          # SQLite nativo em engine/ — sem isto o app abre e fecha no MigrateAsync.
+          if ! find "$PAYLOAD" -type f \( -name 'e_sqlite3.dll' -o -name 'libe_sqlite3.so' -o -name 'libe_sqlite3.dylib' \) | grep -q .; then
+            echo "::error::e_sqlite3 nativo ausente em $PAYLOAD"
+            find "$PAYLOAD" -maxdepth 3 -type f | head -50
+            exit 1
+          fi
+
+          rt_files=$(find "$PAYLOAD/runtimes" -type f 2>/dev/null | wc -l | tr -d ' ')
+          echo "runtimes files: $rt_files"
+          if [[ "${rt_files:-0}" -lt 1 ]]; then
+            echo "::error::engine/runtimes/ sem arquivos — publish incompleto (disco cheio ou NuGet?)"
+            exit 1
+          fi
+
+          if [[ "$VARIANT" == "gpu" && "$RID" == win-* ]]; then
+            if [[ ! -d "$PAYLOAD/runtimes/cuda" && ! -d "$PAYLOAD/runtimes/cuda12" && ! -d "$PAYLOAD/runtimes/vulkan" ]]; then
+              echo "::error::variante GPU win sem cuda/cuda12/vulkan"
+              exit 1
+            fi
+            gpu_bytes=$(find "$PAYLOAD/runtimes"/cuda* "$PAYLOAD/runtimes/vulkan" -type f -printf '%s\n' 2>/dev/null | awk '{s+=$1} END {print s+0}')
+            echo "gpu native bytes: $gpu_bytes"
+            if [[ "$gpu_bytes" -lt 50000000 ]]; then
+              echo "::error::nativos GPU pequenos demais ($gpu_bytes bytes) — zip quebrado como 0.2.12"
+              find "$PAYLOAD/runtimes" -type f | head -40
+              exit 1
+            fi
+          fi
+
+          if [[ "$VARIANT" == "gpu" && "$RID" == linux-* ]]; then
+            gpu_bytes=$(find "$PAYLOAD/runtimes"/cuda* "$PAYLOAD/runtimes/vulkan" -type f -printf '%s\n' 2>/dev/null | awk '{s+=$1} END {print s+0}')
+            if [[ "$gpu_bytes" -lt 50000000 ]]; then
+              echo "::error::nativos GPU linux pequenos demais ($gpu_bytes bytes)"
+              exit 1
+            fi
+          fi
+
+          if [[ "$VARIANT" == "gpu" && "$RID" == osx-* ]]; then
+            if [[ ! -d "$PAYLOAD/runtimes/coreml" ]] || [[ -z "$(find "$PAYLOAD/runtimes/coreml" -type f | head -1)" ]]; then
+              echo "::error::variante GPU mac sem CoreML"
+              exit 1
+            fi
+          fi
+
+          echo "Validação OK"
 
       - name: Assinar executáveis (Azure Trusted Signing)
-        # Ativa automaticamente quando AZURE_SIGNING_ACCOUNT estiver definido (repo Variables).
-        # Enquanto não configurado, o build sai sem assinar (alerta do SmartScreen permanece).
-        if: ${{ vars.AZURE_SIGNING_ACCOUNT != '' }}
+        if: ${{ matrix.os == 'windows-latest' && vars.AZURE_SIGNING_ACCOUNT != '' }}
         uses: azure/artifact-signing-action@v2
         with:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -157,26 +270,41 @@ jobs:
           endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
           signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT }}
           certificate-profile-name: ${{ vars.AZURE_CERTIFICATE_PROFILE }}
-          files-folder: publish/${{ matrix.variant }}
+          files-folder: publish/${{ matrix.variant }}-${{ matrix.rid }}
           files-folder-filter: exe
-          files-folder-recurse: false
+          files-folder-recurse: true
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
+
       - name: Empacotar zip
         shell: pwsh
         run: |
           $ver = '${{ steps.version.outputs.version }}'
           $variant = '${{ matrix.variant }}'
+          $rid = '${{ matrix.rid }}'
+          $out = "publish/${variant}-${rid}"
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          $zip = "Verso-${ver}-${variant}-win-x64.zip"
-          Compress-Archive -Path "publish/$variant/*" -DestinationPath "dist/$zip" -Force
-          Write-Host "Criado dist/$zip"
+          $zipName = "Verso-${ver}-${variant}-${rid}.zip"
+          $zipPath = Join-Path dist $zipName
+          if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
+          # ZipFile.CreateFromDirectory inclui subpastas/nativos de forma confiável
+          # (Compress-Archive com wildcard e o zip.exe do Git Bash já geraram
+          # releases com runtimes/ vazios — ver 0.2.12-gpu).
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          [System.IO.Compression.ZipFile]::CreateFromDirectory(
+            (Resolve-Path $out).Path,
+            (Join-Path (Resolve-Path dist).Path $zipName))
+          $item = Get-Item $zipPath
+          Write-Host "Criado $($item.Name) ($([math]::Round($item.Length/1MB,1)) MB)"
+          if ($variant -eq 'gpu' -and $rid -like 'win-*' -and $item.Length -lt 80MB) {
+            throw "Zip GPU win suspeito ($([math]::Round($item.Length/1MB,1)) MB) — esperado > 200 MB"
+          }
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Verso-${{ matrix.variant }}-win-x64
+          name: Verso-${{ matrix.variant }}-${{ matrix.rid }}
           path: dist/*.zip
           if-no-files-found: error
           retention-days: 30
@@ -195,12 +323,10 @@ jobs:
         shell: bash
         run: |
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            # Push de tag: extrair direto
             tag="${GITHUB_REF#refs/tags/}"
             ver="${tag#v}"
             echo "new_tag=false" >> "$GITHUB_OUTPUT"
           else
-            # Push para main: auto-incrementar patch da última tag
             latest=$(git tag --list 'v*.*.*' --sort=-v:refname | head -1)
             if [ -z "$latest" ]; then
               ver="0.1.0"
@@ -236,18 +362,33 @@ jobs:
         run: |
           tag="${{ steps.rel.outputs.tag }}"
           ver="${{ steps.rel.outputs.version }}"
+          mapfile -t zips < <(find assets -type f -name '*.zip' | sort)
+          if [ "${#zips[@]}" -eq 0 ]; then
+            echo "Nenhum zip encontrado em assets/" >&2
+            exit 1
+          fi
           gh release create "$tag" -R "${{ github.repository }}" \
-            assets/Verso-cpu-win-x64/*.zip assets/Verso-gpu-win-x64/*.zip \
+            "${zips[@]}" \
             --title "Verso $ver" \
-            --notes "Verso $ver (Windows x64)
+            --notes "Verso $ver
 
-          - **Verso-${ver}-cpu-win-x64.zip** (~200 MB) — sem GPU, roda em qualquer máquina. Recomendado para quem não tem NVIDIA.
-          - **Verso-${ver}-gpu-win-x64.zip** (~960 MB) — inclui runtimes CUDA/Vulkan para aceleração por GPU.
+          ### Windows (x64)
+          - **Verso-${ver}-cpu-win-x64.zip** — CPU. WebView2.
+          - **Verso-${ver}-gpu-win-x64.zip** — CUDA/Vulkan. WebView2.
 
-          Build self-contained single-file (Photino.Blazor + WebView2) — não requer instalação do .NET runtime. A pasta contém Verso.App.exe, Verso.Worker.exe (iniciado automaticamente na transcrição), wwwroot/ e runtimes/ nativos. Ambos os exes são WinExe (sem janela de console).
+          ### Linux (x64)
+          - **Verso-${ver}-cpu-linux-x64.zip** — CPU. Requer WebKitGTK no sistema.
+          - **Verso-${ver}-gpu-linux-x64.zip** — CUDA/Vulkan. Requer WebKitGTK + drivers NVIDIA/Vulkan.
 
-          App portátil: modelos, áudios, banco de dados e logs ficam numa pasta data/ ao lado do exe — mover a pasta leva tudo junto, sem depender de %AppData%.
+          ### macOS (Apple Silicon)
+          - **Verso-${ver}-cpu-osx-arm64.zip** — CPU. WKWebView nativo.
+          - **Verso-${ver}-gpu-osx-arm64.zip** — Core ML.
 
-          Pré-requisito: Windows 10/11 com o Microsoft Edge WebView2 Runtime (presente por padrão no Windows 11).
+          Build self-contained (Photino.Blazor) — não requer .NET instalado.
+          Pasta: Verso.App(+.exe) na raiz; Worker, wwwroot/, runtimes/ e nativos em engine/.
+          Dados portáteis em data/ ao lado do app.
 
-          Descompacte e execute Verso.App.exe."
+          **Linux:** instale WebKitGTK (ex.: \`libwebkit2gtk-4.1-0\` no Ubuntu/Debian).
+          **Windows:** Edge WebView2 Runtime (padrão no Windows 11).
+
+          Descompacte e execute o Verso.App da sua plataforma."

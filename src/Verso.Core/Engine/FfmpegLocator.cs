@@ -81,11 +81,27 @@ public sealed class FfmpegLocator
 
     internal static IEnumerable<string> GetPathDirectoriesFromEnvironment()
     {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seen = new HashSet<string>(OperatingSystem.IsWindows()
+            ? StringComparer.OrdinalIgnoreCase
+            : StringComparer.Ordinal);
 
-        foreach (var target in new[] { EnvironmentVariableTarget.Process, EnvironmentVariableTarget.User, EnvironmentVariableTarget.Machine })
+        // User/Machine PATH: no Windows; em Unix só Process (User/Machine lançam PlatformNotSupportedException).
+        var targets = OperatingSystem.IsWindows()
+            ? new[] { EnvironmentVariableTarget.Process, EnvironmentVariableTarget.User, EnvironmentVariableTarget.Machine }
+            : new[] { EnvironmentVariableTarget.Process };
+
+        foreach (var target in targets)
         {
-            var pathEnv = Environment.GetEnvironmentVariable("PATH", target);
+            string? pathEnv;
+            try
+            {
+                pathEnv = Environment.GetEnvironmentVariable("PATH", target);
+            }
+            catch (PlatformNotSupportedException)
+            {
+                continue;
+            }
+
             if (string.IsNullOrWhiteSpace(pathEnv))
                 continue;
 

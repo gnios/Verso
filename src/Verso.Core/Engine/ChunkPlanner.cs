@@ -45,6 +45,7 @@ public static class ChunkPlanner
         {
             ExecutionDevice.Cpu => 1,
             ExecutionDevice.Vulkan => 1,
+            ExecutionDevice.CoreMl => 1,
             _ => Math.Min(2, maxPartes), // CUDA: 2 instâncias paralelas do modelo
         };
         var threadsPorJob = threadsOverride >= 1

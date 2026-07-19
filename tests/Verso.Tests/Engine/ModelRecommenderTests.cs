@@ -37,7 +37,14 @@ public class ModelRecommenderTests
     [Fact]
     public void Recommend_ReasonIsNeverEmptyAcrossTestedCombinations()
     {
-        var devices = new[] { ExecutionDevice.Auto, ExecutionDevice.Cpu, ExecutionDevice.Cuda, ExecutionDevice.Vulkan };
+        var devices = new[]
+        {
+            ExecutionDevice.Auto,
+            ExecutionDevice.Cpu,
+            ExecutionDevice.Cuda,
+            ExecutionDevice.Vulkan,
+            ExecutionDevice.CoreMl,
+        };
         var ramSizes = new[] { 0L, 4L * GB, 8L * GB, 16L * GB, 32L * GB, 40L * GB };
 
         foreach (var device in devices)
