@@ -20,6 +20,8 @@ public sealed class TranscriptionQueueService : BackgroundService
     private readonly ILogger<TranscriptionQueueService> _logger;
     private readonly Channel<TranscriptionJobRequest> _channel;
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _jobCancellationSources = new();
+    private readonly ConcurrentDictionary<Guid, byte> _cancelledJobs = new();
+    private readonly ConcurrentDictionary<Guid, TranscriptionProgressEventArgs> _latestProgress = new();
     private readonly TaskCompletionSource _startupCompleted = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public Task StartupCompleted => _startupCompleted.Task;
@@ -42,8 +44,17 @@ public sealed class TranscriptionQueueService : BackgroundService
     public event EventHandler<TranscriptionStatusChangedEventArgs>? StatusChanged;
     public event EventHandler<TranscriptionProgressEventArgs>? ProgressChanged;
 
+    /// <summary>
+    /// Último progresso conhecido de um job ainda em andamento — sobrevive à recriação
+    /// dos ViewModels ao navegar, para a UI não voltar à barra indeterminada.
+    /// </summary>
+    public bool TryGetLatestProgress(Guid transcriptionId, out TranscriptionProgressEventArgs progress) =>
+        _latestProgress.TryGetValue(transcriptionId, out progress!);
+
     public Guid Enqueue(TranscriptionJobRequest request)
     {
+        _cancelledJobs.TryRemove(request.TranscriptionId, out _);
+
         if (!_channel.Writer.TryWrite(request))
             throw new InvalidOperationException("Não foi possível enfileirar a transcrição.");
 
@@ -53,6 +64,7 @@ public sealed class TranscriptionQueueService : BackgroundService
 
     public void Cancel(Guid transcriptionId)
     {
+        _cancelledJobs[transcriptionId] = 0;
         if (_jobCancellationSources.TryGetValue(transcriptionId, out var cts))
             cts.Cancel();
     }
@@ -108,6 +120,12 @@ public sealed class TranscriptionQueueService : BackgroundService
 
         try
         {
+            if (_cancelledJobs.TryRemove(request.TranscriptionId, out _) || linkedCts.IsCancellationRequested)
+            {
+                await MarkCancelledAsync(request.TranscriptionId, stoppingToken).ConfigureAwait(false);
+                return;
+            }
+
             await UpdateStatusAsync(request.TranscriptionId, TranscriptionStatus.InProgress, null, stoppingToken)
                 .ConfigureAwait(false);
             RaiseStatusChanged(request.TranscriptionId, TranscriptionStatusChanged.InProgress);
@@ -137,11 +155,7 @@ public sealed class TranscriptionQueueService : BackgroundService
         }
         catch (OperationCanceledException) when (linkedCts.IsCancellationRequested && !stoppingToken.IsCancellationRequested)
         {
-            _logger.LogInformation(
-                "Transcrição {TranscriptionId} cancelada pelo usuário",
-                request.TranscriptionId);
-            await UpdateStatusAsync(request.TranscriptionId, TranscriptionStatus.Error, "Cancelada", stoppingToken);
-            RaiseStatusChanged(request.TranscriptionId, TranscriptionStatusChanged.Error, "Cancelada");
+            await MarkCancelledAsync(request.TranscriptionId, stoppingToken).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -156,7 +170,16 @@ public sealed class TranscriptionQueueService : BackgroundService
         finally
         {
             _jobCancellationSources.TryRemove(request.TranscriptionId, out _);
+            _cancelledJobs.TryRemove(request.TranscriptionId, out _);
         }
+    }
+
+    private async Task MarkCancelledAsync(Guid transcriptionId, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Transcrição {TranscriptionId} cancelada pelo usuário", transcriptionId);
+        await UpdateStatusAsync(transcriptionId, TranscriptionStatus.Error, "Cancelada", cancellationToken)
+            .ConfigureAwait(false);
+        RaiseStatusChanged(transcriptionId, TranscriptionStatusChanged.Error, "Cancelada");
     }
 
     private async Task PersistSuccessAsync(
@@ -261,18 +284,31 @@ public sealed class TranscriptionQueueService : BackgroundService
     private void RaiseStatusChanged(
         Guid transcriptionId,
         TranscriptionStatusChanged status,
-        string? errorMessage = null) =>
+        string? errorMessage = null)
+    {
+        if (status is TranscriptionStatusChanged.Queued
+            or TranscriptionStatusChanged.Done
+            or TranscriptionStatusChanged.Error)
+        {
+            _latestProgress.TryRemove(transcriptionId, out _);
+        }
+
         StatusChanged?.Invoke(this, new TranscriptionStatusChangedEventArgs(transcriptionId, status)
         {
             ErrorMessage = errorMessage,
         });
+    }
 
     private void RaiseProgressChanged(
         Guid transcriptionId,
         string stage,
         int? partIndex,
-        int? totalParts) =>
-        ProgressChanged?.Invoke(this, new TranscriptionProgressEventArgs(transcriptionId, stage, partIndex, totalParts));
+        int? totalParts)
+    {
+        var args = new TranscriptionProgressEventArgs(transcriptionId, stage, partIndex, totalParts);
+        _latestProgress[transcriptionId] = args;
+        ProgressChanged?.Invoke(this, args);
+    }
 
     /// <summary>
     /// <see cref="IProgress{T}"/> síncrono — não captura <see cref="SynchronizationContext"/>,
