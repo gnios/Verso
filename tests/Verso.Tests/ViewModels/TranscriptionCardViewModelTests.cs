@@ -207,6 +207,95 @@ public class TranscriptionCardViewModelTests
         Assert.Equal("", card.Preview);
     }
 
+    // --- CARD-06 / CARD-08: hierarquia InProgress / Error ---
+
+    [Fact]
+    public void InProgress_ExposesStatusProgressAndLabeledAudio()
+    {
+        var card = CreateCard(TranscriptionStatus.InProgress, durationSeconds: 180);
+
+        Assert.Equal("Em andamento", card.StatusLabel);
+        Assert.True(card.ShowProgress);
+        Assert.Equal("Áudio · 3 min", card.Duration);
+        Assert.False(card.ShowDate);
+    }
+
+    [Fact]
+    public void Error_ExposesMessageLabeledAudioAndActions()
+    {
+        var card = CreateCard(
+            TranscriptionStatus.Error,
+            errorMessage: "ffmpeg indisponível",
+            retryHandler: _ => { },
+            durationSeconds: 180);
+
+        Assert.Equal("Erro", card.StatusLabel);
+        Assert.Equal("ffmpeg indisponível", card.ErrorMessage);
+        Assert.Equal("Áudio · 3 min", card.Duration);
+        Assert.True(card.CanRetry);
+        Assert.True(card.CanDelete);
+        Assert.False(card.ShowDate);
+    }
+
+    // --- Edge: transição InProgress → Done ---
+
+    [Fact]
+    public void StatusTransition_InProgressToDone_ClearsEstimateAndShowsDatePreview()
+    {
+        TranscriptionEstimator.RecordRtf(ModelQuality.Tiny, ExecutionDevice.Cpu, actualRtf: 0.5);
+        var card = CreateCard(
+            TranscriptionStatus.InProgress,
+            durationSeconds: 60,
+            quality: ModelQuality.Tiny,
+            device: ExecutionDevice.Cpu,
+            preview: "texto final");
+        card.ApplyProgress(new TranscriptionProgressEventArgs(card.Id, "transcribing", 1, 2));
+
+        Assert.NotNull(card.EstimatedTimeLabel);
+        Assert.Equal("Transcrevendo… 50%", card.Preview);
+
+        card.Status = TranscriptionStatus.Done;
+
+        Assert.Null(card.EstimatedTimeLabel);
+        Assert.False(card.ShowProgress);
+        Assert.True(card.ShowDate);
+        Assert.Equal("texto final", card.Preview);
+    }
+
+    // --- Edge: loading/preparing com RTF aprendido ---
+
+    [Fact]
+    public void EstimatedTimeLabel_WhenLoadingAndLearned_ShowsWhileIndeterminate()
+    {
+        TranscriptionEstimator.RecordRtf(ModelQuality.TinyEn, ExecutionDevice.Cuda, actualRtf: 0.5);
+        var card = CreateCard(
+            TranscriptionStatus.InProgress,
+            durationSeconds: 60,
+            quality: ModelQuality.TinyEn,
+            device: ExecutionDevice.Cuda);
+        card.ApplyProgress(new TranscriptionProgressEventArgs(card.Id, "loading", null, null));
+
+        Assert.Equal("Estimativa · ~30s", card.EstimatedTimeLabel);
+        Assert.True(card.IsProgressIndeterminate);
+        Assert.Equal("Carregando modelo…", card.Preview);
+    }
+
+    [Fact]
+    public void EstimatedTimeLabel_WhenPreparingAndLearned_ShowsWhileIndeterminate()
+    {
+        TranscriptionEstimator.RecordRtf(ModelQuality.BaseEn, ExecutionDevice.Cpu, actualRtf: 0.5);
+        var card = CreateCard(
+            TranscriptionStatus.InProgress,
+            durationSeconds: 60,
+            quality: ModelQuality.BaseEn,
+            device: ExecutionDevice.Cpu);
+        card.ApplyProgress(new TranscriptionProgressEventArgs(card.Id, "preparing", null, null));
+
+        Assert.Equal("Estimativa · ~30s", card.EstimatedTimeLabel);
+        Assert.True(card.IsProgressIndeterminate);
+        Assert.Equal("Preparando áudio…", card.Preview);
+    }
+
     private static TranscriptionCardViewModel CreateCard(
         TranscriptionStatus status,
         string? errorMessage = null,

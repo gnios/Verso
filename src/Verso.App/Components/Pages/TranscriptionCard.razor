@@ -12,7 +12,7 @@
 
 <div class="dash-card" data-testid="transcription-card" data-transcription-id="@ViewModel.Id" @onclick="() => ViewModel.OpenCommand.Execute(null)">
     <div class="dash-card-title" data-testid="transcription-card-title">@ViewModel.StatusIcon@(string.IsNullOrEmpty(ViewModel.StatusIcon) ? "" : " ")@ViewModel.Icon @ViewModel.Title</div>
-    <div class="dash-card-preview" data-testid="transcription-card-preview">@ViewModel.Preview</div>
+    <div class="dash-card-preview @(ViewModel.IsDone ? "dash-card-preview-done" : "")" data-testid="transcription-card-preview">@ViewModel.Preview</div>
     <div class="tags-row">
         @foreach (var tag in ViewModel.Tags)
         {
