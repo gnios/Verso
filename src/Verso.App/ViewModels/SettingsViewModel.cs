@@ -35,12 +35,12 @@ public partial class SettingsViewModel : ViewModelBase
         var options = new List<DeviceOptionViewModel>
         {
             new(ExecutionDevice.Auto, "Automático"),
-            new(ExecutionDevice.Cpu, "CPU"),
-            new(ExecutionDevice.Cuda, "CUDA"),
-            new(ExecutionDevice.Vulkan, "Vulkan"),
+            new(ExecutionDevice.Cpu, "Somente processador"),
+            new(ExecutionDevice.Cuda, "GPU NVIDIA"),
+            new(ExecutionDevice.Vulkan, "GPU (outras placas)"),
         };
         if (OperatingSystem.IsMacOS())
-            options.Add(new(ExecutionDevice.CoreMl, "Core ML"));
+            options.Add(new(ExecutionDevice.CoreMl, "Apple Silicon"));
         return options;
     }
 

@@ -38,6 +38,9 @@ public partial class UploadViewModel : ViewModelBase
 
     public IReadOnlyList<ModelOptionViewModel> ModelOptions { get; } = ModelCatalog.All;
 
+    /// <summary>Perfil padrão sugerido nos cartões (Equilibrado).</summary>
+    public ModelOptionViewModel DefaultRecommendedModel { get; } = ModelCatalog.Find(ModelQuality.Standard);
+
     public IReadOnlyList<SpeakerModeOptionViewModel> SpeakerModeOptions { get; } =
     [
         new(SpeakerMode.Automatic, "Automático"),

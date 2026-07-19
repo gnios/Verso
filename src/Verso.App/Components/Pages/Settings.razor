@@ -1,6 +1,6 @@
 @*
     Tela de Configurações (T67) reaproveitando o SettingsViewModel real (perfil, idioma padrão,
-    identificar locutores, transcrição ao vivo inerte, dispositivo de execução) — fiel às classes
+    identificar locutores, precisão por cartões, dispositivo de execução em Avançado) — fiel às classes
     CSS `.settings-*`/`.toggle`/`.screen-*` do protótipo (transcriba-v2-icons-transcriptions.html).
 
     ViewModel recebido via [Parameter] (e não @inject) porque SettingsViewModel é Transient
@@ -16,7 +16,9 @@
 @inject ThemeService ThemeService
 @using System.ComponentModel
 @using System.Linq
+@using Verso.App.Components.Shared
 @using Verso.Core.Data.Entities
+@using Verso.App.ViewModels
 
 <section class="screen active">
     <div class="screen-header">
@@ -69,26 +71,20 @@
         <div class="settings-row">
             <div>
                 <div class="settings-row-label">Transcrição ao vivo</div>
-                <div class="settings-row-sub">Texto em tempo real durante gravação (inerte no MVP)</div>
+                <div class="settings-row-sub">Em breve — ainda não disponível nesta versão</div>
             </div>
-            <div class="toggle @(ViewModel.LiveTranscriptionEnabled ? "on" : "")" @onclick="ToggleLiveTranscription"></div>
+            <div class="toggle disabled @(ViewModel.LiveTranscriptionEnabled ? "on" : "")"
+                 title="Em breve"
+                 aria-disabled="true"></div>
         </div>
     </div>
 
     <div class="settings-section">
         <div class="settings-section-title">Precisão da transcrição</div>
-        <div class="settings-row">
-            <div>
-                <div class="settings-row-label">Precisão da transcrição</div>
-                <div class="settings-row-sub">@(ViewModel.SelectedModelOption?.Description)</div>
-            </div>
-            <select value="@ViewModel.SelectedModelOption?.Value" @onchange="OnModelChanged">
-                @foreach (var option in ViewModel.ModelOptions)
-                {
-                    <option value="@option.Value">@option.Label · @option.SizeLabel</option>
-                }
-            </select>
-        </div>
+        <PrecisionProfileCards Options="ViewModel.ModelOptions"
+                              Selected="ViewModel.SelectedModelOption"
+                              Recommended="ViewModel.RecommendedModelOption"
+                              SelectedChanged="OnPrecisionSelected" />
         @if (ViewModel.RecommendedModelOption is not null)
         {
             <div class="settings-recommendation">
@@ -97,7 +93,7 @@
                     <span class="settings-ram-hint">(@(ViewModel.DetectedRamGb) GB)</span>
                 </div>
                 <div class="settings-recommendation-body">
-                    <span class="rec-model">@ViewModel.RecommendedModelOption?.Label · @ViewModel.RecommendedModelOption?.SizeLabel</span>
+                    <span class="rec-model">@ViewModel.RecommendedModelOption?.Label · @ViewModel.RecommendedModelOption?.SpeedHint</span>
                     <span class="settings-recommendation-reason">@ViewModel.ModelRecommendationReason</span>
                 </div>
                 <button type="button" class="settings-recommendation-btn" @onclick="UseRecommended">Usar recomendado</button>
@@ -278,18 +274,8 @@
         }
     }
 
-    private void OnModelChanged(ChangeEventArgs e)
-    {
-        if (Enum.TryParse<ModelQuality>(e.Value?.ToString(), out var quality))
-        {
-            var option = ViewModel.ModelOptions.FirstOrDefault(o => o.Value == quality);
-            if (option is not null)
-            {
-                ViewModel.SelectedModelOption = option;
-            }
-        }
-    }
-
+    private void OnPrecisionSelected(ModelOptionViewModel option) =>
+        ViewModel.SelectedModelOption = option;
 
     private void UseRecommended() => ViewModel.UseRecommendedModelCommand.Execute(null);
     private void ToggleAdvanced() => ViewModel.IsAdvancedExpanded = !ViewModel.IsAdvancedExpanded;
@@ -297,8 +283,6 @@
     private void VerifyRuntime() => ViewModel.VerifyRuntimeCommand.Execute(null);
     private void OpenLogFolder() => ViewModel.OpenLogFolderCommand.Execute(null);
     private void ToggleIdentifySpeakers() => ViewModel.IdentifySpeakersDefault = !ViewModel.IdentifySpeakersDefault;
-
-    private void ToggleLiveTranscription() => ViewModel.LiveTranscriptionEnabled = !ViewModel.LiveTranscriptionEnabled;
 
     private async Task ToggleTheme() => await ThemeService.ToggleAsync();
 

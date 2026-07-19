@@ -131,6 +131,7 @@ input,select,textarea{font-family:inherit;color:inherit}
 .upload-zone-sub{font-size:13px;color:var(--fg-secondary)}
 .upload-error{font-size:13px;color:var(--red);margin-bottom:16px}
 .upload-form{display:grid;grid-template-columns:1fr 1fr;gap:16px 32px;max-width:560px}
+.upload-precision{max-width:720px;margin-top:20px}
 .upload-details{display:grid;grid-template-columns:1fr 1fr;gap:16px 32px;max-width:560px;margin-top:20px}
 .upload-details .modal-field{margin-bottom:0}
 .upload-details .modal-field.full-row{grid-column:1/-1}
@@ -348,6 +349,22 @@ html.dark .rec-btn-record.recording{background:#e4e4e3}
 .toggle.on{background:var(--accent)}
 .toggle::after{content:'';position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;top:2px;left:2px;transition:transform .2s}
 .toggle.on::after{transform:translateX(18px)}
+.toggle.disabled{opacity:.45;cursor:not-allowed;pointer-events:none}
+
+.precision-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:8px}
+.precision-card{display:flex;flex-direction:column;gap:6px;align-items:flex-start;text-align:left;padding:14px 14px 12px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg);color:var(--fg);cursor:pointer;transition:border-color .15s,background .15s}
+.precision-card:hover{border-color:var(--accent)}
+.precision-card.selected{border-color:var(--accent);background:var(--accent-light)}
+.precision-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%}
+.precision-card-label{font-size:14px;font-weight:700;color:var(--fg)}
+.precision-card-badge{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--accent);background:var(--bg);border:1px solid var(--accent);border-radius:var(--radius);padding:2px 6px;white-space:nowrap}
+.precision-card-speed{font-size:12px;font-weight:600;color:var(--accent)}
+.precision-card-desc{font-size:13px;color:var(--fg);line-height:1.35}
+.precision-card-when{font-size:12px;color:var(--muted);line-height:1.4}
+.precision-card-size{font-size:11px;color:var(--fg-secondary);margin-top:auto;padding-top:4px}
+@media (max-width:720px){
+  .precision-cards{grid-template-columns:1fr}
+}
 .storage-bar{width:100%;max-width:300px;height:7px;background:var(--surface);border-radius:4px;overflow:hidden;margin-top:6px}
 .storage-bar-fill{height:100%;background:var(--accent);border-radius:4px;width:24%}
 

@@ -35,13 +35,13 @@ O aplicativo permite transcrever arquivos de áudio e vídeo, organizar transcri
 
 Para o público acadêmico, o Verso expõe **três perfis** (sem nomes técnicos de modelo Whisper):
 
-| Perfil na UI | Quando usar | Modelo interno | Tamanho |
-|--------|-------------|:---:|:---:|
-| **Rápido** | Rascunho, checagem de áudio | Base | ~142 MB |
-| **Equilibrado** | Maioria das entrevistas (padrão) | Small (`Standard`) | ~466 MB |
-| **Preciso** | Citação, áudio difícil | Large v3-turbo | ~1,2 GB |
+| Perfil na UI | Quando usar | Tempo | Modelo interno | Tamanho |
+|--------|-------------|------|:---:|:---:|
+| **Rápido** | Rascunho, checagem de áudio | Mais rápido | Base | ~142 MB |
+| **Equilibrado** | Maioria das entrevistas (padrão) | Tempo médio | Small (`Standard`) | ~466 MB |
+| **Preciso** | Citação, áudio difícil | Mais lento · maior qualidade | Large v3-turbo | ~1,2 GB |
 
-Qualidades legadas no banco (Tiny, Medium, Large v1/v2, variantes EN, High) continuam válidas no engine e são mapeadas para o perfil mais próximo na UI.
+A escolha na UI é por **cartões** (não dropdown), com badge “Recomendado” quando o perfil coincide com a sugestão do sistema.
 
 ### 2.2 Recomendação automática
 

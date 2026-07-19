@@ -1,0 +1,51 @@
+@*
+    Seletor visual dos 3 perfis de precisão (Rápido / Equilibrado / Preciso).
+    Usado em Upload e Settings — sem nomes técnicos de modelo.
+*@
+@using Verso.App.ViewModels
+
+<div class="precision-cards" role="radiogroup" aria-label="Precisão da transcrição">
+    @foreach (var option in Options)
+    {
+        var selected = Selected?.Value == option.Value;
+        var recommended = Recommended?.Value == option.Value;
+        <button type="button"
+                role="radio"
+                aria-checked="@selected"
+                class="precision-card @(selected ? "selected" : "") @(recommended ? "recommended" : "")"
+                @onclick="() => SelectAsync(option)">
+            <div class="precision-card-top">
+                <span class="precision-card-label">@option.Label</span>
+                @if (recommended)
+                {
+                    <span class="precision-card-badge">Recomendado</span>
+                }
+            </div>
+            <div class="precision-card-speed">@option.SpeedHint</div>
+            <div class="precision-card-desc">@option.Description</div>
+            <div class="precision-card-when">@option.WhenToUse</div>
+            <div class="precision-card-size">Download @option.SizeLabel</div>
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<ModelOptionViewModel> Options { get; set; } = [];
+
+    [Parameter]
+    public ModelOptionViewModel? Selected { get; set; }
+
+    /// <summary>Perfil sugerido pelo recomendador (Settings) ou default Equilibrado (Upload).</summary>
+    [Parameter]
+    public ModelOptionViewModel? Recommended { get; set; }
+
+    [Parameter]
+    public EventCallback<ModelOptionViewModel> SelectedChanged { get; set; }
+
+    private async Task SelectAsync(ModelOptionViewModel option)
+    {
+        Selected = option;
+        await SelectedChanged.InvokeAsync(option);
+    }
+}
