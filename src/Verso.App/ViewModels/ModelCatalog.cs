@@ -16,17 +16,23 @@ public static class ModelCatalog
             ModelQuality.Base,
             "Rápido",
             "~142 MB",
-            "Rascunho e revisão rápida"),
+            "Rascunho e revisão rápida",
+            "Mais rápido",
+            "Ideal para checar se o áudio está ok ou fazer uma primeira passagem."),
         new(
             ModelQuality.Standard,
             "Equilibrado",
             "~466 MB",
-            "Recomendado para a maioria das entrevistas"),
+            "Recomendado para a maioria das entrevistas",
+            "Tempo médio",
+            "Funciona bem na maioria das entrevistas, aulas e notas de campo."),
         new(
             ModelQuality.LargeV3Turbo,
             "Preciso",
             "~1,2 GB",
-            "Citação e análise fina"),
+            "Citação e análise fina",
+            "Mais lento · maior qualidade",
+            "Use quando for citar trechos na tese ou o áudio for difícil de entender."),
     ];
 
     /// <summary>

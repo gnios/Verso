@@ -21,13 +21,13 @@ App desktop de transcrição de áudio/vídeo com [whisper.net](https://github.c
 
 O Verso oferece **três perfis** pensados para pesquisa acadêmica (sem nomes técnicos de modelo):
 
-| Perfil | Tamanho | Quando usar |
-|--------|:-------:|-------------|
-| **Rápido** | ~142 MB | Rascunho, checagem de áudio, primeira passagem |
-| **Equilibrado** | ~466 MB | Maioria das entrevistas e aulas (padrão) |
-| **Preciso** | ~1,2 GB | Citação na tese, áudio difícil, análise fina |
+| Perfil | Tamanho | Tempo | Quando usar |
+|--------|:-------:|:-----:|-------------|
+| **Rápido** | ~142 MB | Mais rápido | Rascunho, checagem de áudio, primeira passagem |
+| **Equilibrado** | ~466 MB | Tempo médio | Maioria das entrevistas e aulas (padrão) |
+| **Preciso** | ~1,2 GB | Mais lento · maior qualidade | Citação na tese, áudio difícil, análise fina |
 
-> O app recomenda um perfil na tela de Configurações com base na memória do computador. Opções de hardware (CPU/GPU) ficam em **Avançado**.
+> A escolha na interface é por **cartões**. O app recomenda um perfil em Configurações com base na memória. Hardware (CPU/GPU) fica em **Avançado**.
 
 ### Dispositivos de execução (Avançado)
 

@@ -15,6 +15,21 @@ public class ModelCatalogTests
             ModelCatalog.All.Select(o => o.Value).ToArray());
     }
 
+    [Fact]
+    public void All_SpeedHintsAndWhenToUseAreFriendly()
+    {
+        Assert.Equal(
+            ["Mais rápido", "Tempo médio", "Mais lento · maior qualidade"],
+            ModelCatalog.All.Select(o => o.SpeedHint).ToArray());
+        Assert.All(ModelCatalog.All, o =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(o.WhenToUse));
+            Assert.DoesNotContain("Whisper", o.WhenToUse, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("large", o.WhenToUse, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("ggml", o.WhenToUse, StringComparison.OrdinalIgnoreCase);
+        });
+    }
+
     [Theory]
     [InlineData(ModelQuality.Tiny, ModelQuality.Base)]
     [InlineData(ModelQuality.Base, ModelQuality.Base)]
