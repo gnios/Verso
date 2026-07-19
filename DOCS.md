@@ -21,11 +21,11 @@
 
 ## 1. O que é o Verso
 
-**Verso** é um aplicativo desktop para transcrição de áudio e vídeo usando o modelo [Whisper](https://github.com/openai/whisper) da OpenAI, via a biblioteca [whisper.net](https://github.com/sandrohanea/whisper.net). É desenvolvido em .NET 10 com interface WPF + Blazor Hybrid (WebView2) e tem suporte nativo ao português brasileiro.
+**Verso** é um aplicativo desktop para transcrição de áudio e vídeo usando o modelo [Whisper](https://github.com/openai/whisper) da OpenAI, via a biblioteca [whisper.net](https://github.com/sandrohanea/whisper.net). É desenvolvido em .NET 10 com interface Photino.Blazor (WebView2) e tem suporte nativo ao português brasileiro.
 
 O aplicativo permite transcrever arquivos de áudio e vídeo, organizar transcrições em **pesquisas** e **tags**, editar segmentos com atribuição de **locutores**, gravar áudio direto do microfone e exportar nos formatos **TXT**, **SRT** e **VTT**.
 
-**Plataforma:** Windows 10/11 apenas (usa WPF + WebView2, que não rodam em Linux/macOS).
+**Plataforma:** Windows 10/11 apenas (Photino + WebView2 — Windows-only).
 
 ---
 
@@ -118,7 +118,7 @@ O Verso suporta quatro modos de execução:
 
 ### 4.1 Requisitos
 
-- **Windows 10 ou 11** (WPF + WebView2 não funcionam em Linux/macOS)
+- **Windows 10 ou 11** (Photino + WebView2 — Windows-only)
 - **Microsoft Edge WebView2 Runtime** — já presente por padrão no Windows 11; no Windows 10 pode precisar instalar
 - **FFmpeg** — o aplicativo tenta localizar no `PATH`; se não encontrar, oferece instalação automática
 - Para build: **[.NET 10 SDK](https://dotnet.microsoft.com/download)** (apenas para desenvolvimento)
@@ -132,8 +132,10 @@ dotnet restore
 # Executar em desenvolvimento
 dotnet run --project src/Verso.App
 
-# Publicar (self-contained)
-dotnet publish src/Verso.App -c Release -r win-x64 --self-contained true -o ./publish
+# Publicar (self-contained, single-file; Worker sai no mesmo -o)
+dotnet publish src/Verso.App -c Release -r win-x64 --self-contained true `
+  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=false `
+  -o ./publish
 
 # Executar testes
 dotnet test
@@ -146,12 +148,13 @@ O banco SQLite, as migrations e a pasta de dados (`data/`) são criados automati
 ```
 Verso.sln                    — Solução principal
 ├── src/
-│   ├── Verso.App/           — UI (WPF + Blazor Hybrid + WebView2)
+│   ├── Verso.App/           — UI (Photino.Blazor + WebView2)
 │   │   ├── Pages/           — Páginas Razor (Dashboard, Editor, Upload, etc.)
 │   │   ├── ViewModels/      — ViewModels (Settings, Upload, Editor, etc.)
 │   │   ├── Services/        — Serviços de UI
 │   │   ├── wwwroot/         — Assets estáticos (CSS, JS, fontes)
 │   │   └── Program.cs       — Entry point
+│   ├── Verso.Worker/        — Processo isolado de transcrição (spawn automático)
 │   └── Verso.Core/          — Motor e dados
 │       ├── Engine/           — Transcrição (whisper.net), fila, download de modelos
 │       ├── Services/         — Serviços de domínio (Library, Speaker, Export, etc.)
@@ -175,7 +178,7 @@ As releases são geradas automaticamente pelo GitHub Actions ao publicar uma tag
 | `Verso-X.Y.Z-cpu-win-x64.zip` | **~200 MB** | Runtime CPU apenas | Qualquer computador. Recomendado para quem **não tem** placa NVIDIA. |
 | `Verso-X.Y.Z-gpu-win-x64.zip` | **~960 MB** | Runtimes CPU + CUDA + CUDA 12 + Vulkan | Quem tem **placa NVIDIA** (ou quer aceleração por GPU Vulkan). |
 
-Ambas são **self-contained** (não exigem .NET runtime instalado) e **single-file** (todas as DLLs gerenciadas estão empacotadas dentro do `Verso.App.exe` — a raiz fica limpa).
+Ambas são **self-contained** (não exigem .NET runtime instalado) e **single-file** (DLLs gerenciadas embutidas nos exes). O zip contém `Verso.App.exe`, `Verso.Worker.exe` (iniciado automaticamente na transcrição; sem janela de console), `wwwroot/` e `runtimes/` nativos.
 
 ### 5.2 Instalação e execução
 
@@ -184,7 +187,7 @@ Ambas são **self-contained** (não exigem .NET runtime instalado) e **single-fi
    - **cpu** — se não tiver placa NVIDIA ou quiser simplicidade
    - **gpu** — se tiver placa NVIDIA com drivers CUDA instalados
 3. Extraia o conteúdo para uma pasta (qualquer local, sem necessidade de instalação)
-4. Execute `Verso.App.exe`
+4. Execute `Verso.App.exe` — o Worker sobe sozinho quando houver transcrição
 
 **Pré-requisito na máquina do usuário:** apenas o Microsoft Edge WebView2 Runtime (presente por padrão no Windows 11). Nenhuma outra instalação é necessária.
 

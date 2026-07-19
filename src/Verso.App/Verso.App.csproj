@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <Version>1.0.0.0</Version>
@@ -67,5 +67,26 @@
       DestinationFolder="$(OutDir)%(RecursiveDir)"
       SkipUnchangedFiles="true"
       Condition="'@(_VersoWorkerOutputFiles)' != ''" />
+  </Target>
+
+  <!--
+    Publish single-file: o copy de Build acima traz o bin framework-dependent, não o
+    Verso.Worker.exe self-contained. Republica o Worker no mesmo PublishDir com os
+    mesmos flags, para `dotnet publish` do App já deixar o sibling pronto (CI e local).
+  -->
+  <Target Name="PublishVersoWorker" AfterTargets="Publish" Condition="'$(RuntimeIdentifier)' != ''">
+    <PropertyGroup>
+      <_WorkerProject>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\Verso.Worker\Verso.Worker.csproj'))</_WorkerProject>
+      <_WorkerPublishDir>$([System.IO.Path]::GetFullPath('$(PublishDir)'))</_WorkerPublishDir>
+      <_WorkerSelfContained Condition="'$(SelfContained)' == ''">true</_WorkerSelfContained>
+      <_WorkerSelfContained Condition="'$(SelfContained)' != ''">$(SelfContained)</_WorkerSelfContained>
+      <_WorkerPublishSingleFile Condition="'$(PublishSingleFile)' == ''">true</_WorkerPublishSingleFile>
+      <_WorkerPublishSingleFile Condition="'$(PublishSingleFile)' != ''">$(PublishSingleFile)</_WorkerPublishSingleFile>
+      <_WorkerIncludeNative Condition="'$(IncludeNativeLibrariesForSelfExtract)' == ''">false</_WorkerIncludeNative>
+      <_WorkerIncludeNative Condition="'$(IncludeNativeLibrariesForSelfExtract)' != ''">$(IncludeNativeLibrariesForSelfExtract)</_WorkerIncludeNative>
+      <_WorkerGpuRuntimes Condition="'$(VersoIncludeGpuRuntimes)' == ''">true</_WorkerGpuRuntimes>
+      <_WorkerGpuRuntimes Condition="'$(VersoIncludeGpuRuntimes)' != ''">$(VersoIncludeGpuRuntimes)</_WorkerGpuRuntimes>
+    </PropertyGroup>
+    <Exec Command="dotnet publish &quot;$(_WorkerProject)&quot; -c $(Configuration) -r $(RuntimeIdentifier) --self-contained $(_WorkerSelfContained) -p:PublishSingleFile=$(_WorkerPublishSingleFile) -p:IncludeNativeLibrariesForSelfExtract=$(_WorkerIncludeNative) -p:Version=$(Version) -p:VersoIncludeGpuRuntimes=$(_WorkerGpuRuntimes) -o &quot;$(_WorkerPublishDir)&quot;" />
   </Target>
 </Project>
