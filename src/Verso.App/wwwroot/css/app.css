@@ -131,7 +131,18 @@ input,select,textarea{font-family:inherit;color:inherit}
 .upload-zone-sub{font-size:13px;color:var(--fg-secondary)}
 .upload-error{font-size:13px;color:var(--red);margin-bottom:16px}
 .upload-form{display:grid;grid-template-columns:1fr 1fr;gap:16px 32px;max-width:560px}
+.upload-form-single{grid-template-columns:1fr;max-width:280px;margin-top:20px}
 .upload-precision{max-width:720px;margin-top:20px}
+.upload-identity{max-width:720px;margin-bottom:4px}
+.upload-audio-section{max-width:560px;margin-top:8px}
+.upload-audio-section .upload-zone{margin-top:6px}
+.upload-audio-section .upload-file-info{margin-top:6px;margin-bottom:0}
+.upload-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
+.upload-tags-input{flex:1;min-width:160px;padding:6px 10px;border:1px solid transparent;border-radius:var(--radius);font-size:13px;color:var(--fg);background:transparent;outline:none}
+.upload-tags-input:hover{background:var(--surface)}
+.upload-tags-input:focus{background:var(--surface);border-color:var(--border);box-shadow:0 0 0 2px var(--accent-light)}
+.upload-tags-input::placeholder{color:var(--muted)}
+.upload-icon-done{padding:5px 12px;font-size:12px;border-radius:var(--radius);background:var(--surface);border:1px solid var(--border);color:var(--fg-secondary);cursor:pointer}
 .upload-details{display:grid;grid-template-columns:1fr 1fr;gap:16px 32px;max-width:560px;margin-top:20px}
 .upload-details .modal-field{margin-bottom:0}
 .upload-details .modal-field.full-row{grid-column:1/-1}

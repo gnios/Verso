@@ -1,35 +1,14 @@
 @*
-    Upload (T62) reaproveitando UploadViewModel (fila real via TranscriptionQueueService/MediaStorageService)
-    — fiel às classes `.upload-*`/`.screen-*` do protótipo (transcriba-v2-icons-transcriptions.html,
-    seção `#screen-upload`).
-
-    ViewModel recebido via [Parameter] (e não @inject) pelo mesmo motivo do Dashboard/ResearchPage/
-    Settings: UploadViewModel é Transient (AppServiceCollectionExtensions) e a instância viva é a
-    resolvida pelo NavigationService em NavigationService.CurrentViewModel a cada
-    NavigateTo(ScreenKey.Upload) — quem monta este componente (MainLayout.razor, integração central
-    pendente de fase futura) deve passar essa instância.
-
-    Drag&drop: os eventos @ondragover/@ondragleave/@ondrop dão apenas feedback visual (classe
-    "dragover"), pois o WebView2/Blazor Hybrid, como qualquer motor Chromium, só expõe o objeto
-    `File` do navegador em um drop — não o caminho absoluto no disco. Ler o caminho real exigiria
-    hook nativo no WebView2 hospedeiro (ICoreWebView2CompositionController::Drop com IDataObject/
-    CF_HDROP, modo "windowless"/composição), que é infraestrutura do host (MainWindow/BlazorWebView),
-    fora do escopo deste componente e do arquivo que esta task pode tocar (MainLayout.razor é do
-    integrador). Por isso a seleção real de arquivo usa IFileOpenService (OpenFileDialog nativo via
-    WpfFileOpenService), que funciona de ponta a ponta.
+    Upload — nova transcrição.
+    Sem arquivo: só a zona de áudio/vídeo.
+    Com arquivo: identidade → precisão → idioma → arquivo → iniciar.
 *@
 @implements IDisposable
 @using System.Linq
-@using Verso.Core.Data.Entities
 @using Verso.App.Components.Shared
 @inject IFileOpenService FileOpenService
 
 <section class="screen active">
-    <div class="screen-header">
-        <h1 class="screen-title">Nova transcrição</h1>
-        <p class="screen-subtitle">Faça upload de um arquivo de áudio ou vídeo</p>
-    </div>
-
     @if (!string.IsNullOrWhiteSpace(ViewModel.ValidationError))
     {
         <div class="upload-error">@ViewModel.ValidationError</div>
@@ -37,47 +16,60 @@
 
     @if (!ViewModel.HasSelectedFile)
     {
-        <div class="upload-zone @(ViewModel.IsDragOver ? "dragover" : "")"
-             @onclick="OnZoneClickedAsync"
-             @ondragover="OnDragOver" @ondragover:preventDefault="true"
-             @ondragleave="OnDragLeave"
-             @ondrop="OnDrop" @ondrop:preventDefault="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
-            <div class="upload-zone-title">Arraste um arquivo aqui</div>
-            <div class="upload-zone-sub">@ViewModel.SupportedFormatsLabel</div>
+        <div class="upload-audio-section">
+            <label class="upload-label">Arquivo de áudio ou vídeo</label>
+            <div class="upload-zone @(ViewModel.IsDragOver ? "dragover" : "")"
+                 @onclick="OnZoneClickedAsync"
+                 @ondragover="OnDragOver" @ondragover:preventDefault="true"
+                 @ondragleave="OnDragLeave"
+                 @ondrop="OnDrop" @ondrop:preventDefault="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+                <div class="upload-zone-title">Arraste um arquivo aqui</div>
+                <div class="upload-zone-sub">@ViewModel.SupportedFormatsLabel</div>
+            </div>
         </div>
     }
     else
     {
-        <div class="upload-file-info show">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
-            <div>
-                <div class="upload-file-name">@ViewModel.SelectedFileName</div>
-                <div class="upload-file-size">@ViewModel.SelectedFileSize</div>
+        <div class="upload-identity">
+            <div class="editor-title-row" style="position:relative">
+                <div class="editor-page-icon @(ViewModel.HasIcon ? "has-icon" : "")"
+                     title="Clique para trocar ícone"
+                     @onclick="() => ViewModel.ToggleIconPickerCommand.Execute(null)">
+                    @(ViewModel.HasIcon ? ViewModel.Icon : "+")
+                </div>
+                <input type="text" class="editor-title-input" value="@ViewModel.Title"
+                       placeholder="Título da transcrição"
+                       @oninput="OnTitleInput" />
+                <div class="icon-popup @(ViewModel.IsIconPickerOpen ? "open" : "")">
+                    <div class="icon-popup-title">Ícone da transcrição</div>
+                    <IconPicker ViewModel="ViewModel.IconPicker" />
+                    <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:8px">
+                        <button type="button" class="upload-icon-done"
+                                @onclick="() => ViewModel.CloseIconPickerCommand.Execute(null)">Feito</button>
+                    </div>
+                </div>
             </div>
-            <button type="button" class="upload-file-clear" title="Remover arquivo" @onclick="() => ViewModel.ClearFileCommand.Execute(null)">✕</button>
+
+            <div class="upload-meta">
+                <FolderCombobox Options="ViewModel.FolderOptions"
+                                SelectedId="ViewModel.SelectedFolderId"
+                                OnSelected="OnFolderSelected" />
+                <span class="editor-meta-dot"></span>
+                <input type="text" class="upload-tags-input" value="@ViewModel.TagsText"
+                       @oninput="OnTagsInput"
+                       placeholder="Tags (vírgula)" />
+            </div>
         </div>
 
-        <div class="upload-details">
-            <div class="modal-field full-row">
-                <label>Ícone</label>
-                <IconPicker ViewModel="ViewModel.IconPicker" />
-            </div>
-
-            <div class="modal-field">
-                <label>Título</label>
-                <input type="text" value="@ViewModel.Title" @oninput="OnTitleInput"
-                       placeholder="Ex.: Entrevista 01 — Mobilidade" />
-            </div>
-
-            <div class="modal-field">
-                <label>Tags (vírgula)</label>
-                <input type="text" value="@ViewModel.TagsText" @oninput="OnTagsInput"
-                       placeholder="entrevista, campo, piloto" />
-            </div>
+        <div class="upload-precision">
+            <label class="upload-label">Precisão da transcrição</label>
+            <PrecisionProfileCards Options="ViewModel.ModelOptions"
+                                  Selected="ViewModel.SelectedModelOption"
+                                  SelectedChanged="OnPrecisionSelected" />
         </div>
 
-        <div class="upload-form">
+        <div class="upload-form upload-form-single">
             <div>
                 <label class="upload-label">Idioma</label>
                 <select class="upload-select" value="@ViewModel.SelectedLanguageOption?.Code" @onchange="OnLanguageChanged">
@@ -87,32 +79,18 @@
                     }
                 </select>
             </div>
-            <div>
-                <label class="upload-label">Locutores</label>
-                <select class="upload-select" value="@ViewModel.SelectedSpeakerModeOption?.Value" @onchange="OnSpeakerModeChanged">
-                    @foreach (var option in ViewModel.SpeakerModeOptions)
-                    {
-                        <option value="@option.Value">@option.Label</option>
-                    }
-                </select>
-            </div>
-            <div>
-                <label class="upload-label">Pasta</label>
-                <select class="upload-select" value="@(ViewModel.SelectedFolder?.Id?.ToString() ?? "")" @onchange="OnFolderChanged">
-                    @foreach (var option in ViewModel.FolderOptions)
-                    {
-                        <option value="@(option.Id?.ToString() ?? "")">@option.Name</option>
-                    }
-                </select>
-            </div>
         </div>
 
-        <div class="upload-precision">
-            <label class="upload-label">Precisão da transcrição</label>
-            <PrecisionProfileCards Options="ViewModel.ModelOptions"
-                                  Selected="ViewModel.SelectedModelOption"
-                                  Recommended="ViewModel.DefaultRecommendedModel"
-                                  SelectedChanged="OnPrecisionSelected" />
+        <div class="upload-audio-section">
+            <label class="upload-label">Arquivo de áudio ou vídeo</label>
+            <div class="upload-file-info show">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
+                <div>
+                    <div class="upload-file-name">@ViewModel.SelectedFileName</div>
+                    <div class="upload-file-size">@ViewModel.SelectedFileSize</div>
+                </div>
+                <button type="button" class="upload-file-clear" title="Remover arquivo" @onclick="() => ViewModel.ClearFileCommand.Execute(null)">✕</button>
+            </div>
         </div>
 
         <button type="button" class="upload-btn" disabled="@(!ViewModel.CanStart)" @onclick="() => ViewModel.StartTranscriptionCommand.ExecuteAsync(null)">
@@ -148,21 +126,11 @@
         }
     }
 
-    private void OnDragOver()
-    {
-        // Feedback visual apenas: sem acesso ao File do navegador aqui (evitamos JS interop
-        // desnecessário já que não há caminho absoluto a extrair — ver comentário no topo do arquivo).
-        ViewModel.IsDragOver = true;
-    }
+    private void OnDragOver() => ViewModel.IsDragOver = true;
 
     private void OnDragLeave() => ViewModel.ClearDragOver();
 
-    private void OnDrop()
-    {
-        // TODO: drag&drop funcional requer path absoluto do arquivo, ver nota no tasks.md (T62).
-        // Por ora o drop só encerra o feedback visual; a seleção real é feita via clique (OpenFileDialog).
-        ViewModel.ClearDragOver();
-    }
+    private void OnDrop() => ViewModel.ClearDragOver();
 
     private void OnLanguageChanged(ChangeEventArgs e)
     {
@@ -177,36 +145,17 @@
     private void OnPrecisionSelected(ModelOptionViewModel option) =>
         ViewModel.SelectedModelOption = option;
 
-    private void OnSpeakerModeChanged(ChangeEventArgs e)
+    private void OnFolderSelected(int? folderId)
     {
-        if (!Enum.TryParse<SpeakerMode>(e.Value?.ToString(), out var mode))
-        {
-            return;
-        }
-
-        var option = ViewModel.SpeakerModeOptions.FirstOrDefault(o => o.Value == mode);
-        if (option is not null)
-        {
-            ViewModel.SelectedSpeakerModeOption = option;
-        }
+        ViewModel.SelectedFolder = ViewModel.FolderOptions.FirstOrDefault(o => o.Id == folderId)
+            ?? ViewModel.FolderOptions.FirstOrDefault(o => o.Id is null);
     }
 
-    private void OnFolderChanged(ChangeEventArgs e)
-    {
-        var idText = e.Value?.ToString();
-        var id = string.IsNullOrEmpty(idText) ? (int?)null : int.Parse(idText);
-        var option = ViewModel.FolderOptions.FirstOrDefault(o => o.Id == id);
-        if (option is not null)
-        {
-            ViewModel.SelectedFolder = option;
-        }
-    }
     private void OnTitleInput(ChangeEventArgs e) =>
         ViewModel.Title = e.Value?.ToString() ?? "";
 
     private void OnTagsInput(ChangeEventArgs e) =>
         ViewModel.TagsText = e.Value?.ToString() ?? "";
-
 
     private void OnViewModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) =>
         InvokeAsync(StateHasChanged);

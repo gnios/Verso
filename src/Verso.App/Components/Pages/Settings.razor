@@ -1,16 +1,6 @@
 @*
-    Tela de Configurações (T67) reaproveitando o SettingsViewModel real (perfil, idioma padrão,
-    identificar locutores, precisão por cartões, dispositivo de execução em Avançado) — fiel às classes
-    CSS `.settings-*`/`.toggle`/`.screen-*` do protótipo (transcriba-v2-icons-transcriptions.html).
-
-    ViewModel recebido via [Parameter] (e não @inject) porque SettingsViewModel é Transient
-    (AppServiceCollectionExtensions) e a instância viva é a resolvida pelo NavigationService em
-    NavigationService.CurrentViewModel — mesmo padrão que os demais componentes de página
-    (Dashboard/Upload/Editor) devem seguir quando o MainLayout passar a despachar por tela.
-
-    O toggle de tema reaproveita o ThemeService singleton (mesmo serviço já usado pelo
-    Sidebar.razor para o botão de tema do cabeçalho) em vez de duplicar lógica de persistência
-    no SettingsViewModel — ThemeService.ToggleAsync já persiste via SettingsService.
+    Tela de Configurações — idioma, precisão, aparência e Avançado (dispositivo/dev).
+    ViewModel via [Parameter] (Transient resolvido pelo NavigationService).
 *@
 @implements IDisposable
 @inject ThemeService ThemeService
@@ -23,29 +13,7 @@
 <section class="screen active">
     <div class="screen-header">
         <h1 class="screen-title">Configurações</h1>
-        <p class="screen-subtitle">Gerencie seu perfil e preferências</p>
-    </div>
-
-    <div class="settings-section">
-        <div class="settings-section-title">Perfil</div>
-        <div class="settings-row">
-            <div>
-                <div class="settings-row-label">Nome</div>
-            </div>
-            <input type="text" value="@ViewModel.Name" @onchange="OnNameChanged" />
-        </div>
-        <div class="settings-row">
-            <div>
-                <div class="settings-row-label">E-mail</div>
-            </div>
-            <input type="email" value="@ViewModel.Email" @onchange="OnEmailChanged" />
-        </div>
-        <div class="settings-row">
-            <div>
-                <div class="settings-row-label">Instituição</div>
-            </div>
-            <input type="text" value="@ViewModel.Institution" @onchange="OnInstitutionChanged" />
-        </div>
+        <p class="screen-subtitle">Preferências de transcrição e aparência</p>
     </div>
 
     <div class="settings-section">
@@ -230,24 +198,6 @@
     {
         ViewModel.PropertyChanged += OnObservedChanged;
         ThemeService.PropertyChanged += OnObservedChanged;
-    }
-
-    private void OnNameChanged(ChangeEventArgs e)
-    {
-        ViewModel.Name = e.Value?.ToString() ?? "";
-        ViewModel.SaveProfileCommand.Execute(null);
-    }
-
-    private void OnEmailChanged(ChangeEventArgs e)
-    {
-        ViewModel.Email = e.Value?.ToString() ?? "";
-        ViewModel.SaveProfileCommand.Execute(null);
-    }
-
-    private void OnInstitutionChanged(ChangeEventArgs e)
-    {
-        ViewModel.Institution = e.Value?.ToString() ?? "";
-        ViewModel.SaveProfileCommand.Execute(null);
     }
 
     private void OnLanguageChanged(ChangeEventArgs e)

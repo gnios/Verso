@@ -36,12 +36,6 @@ public partial class SidebarViewModel : ViewModelBase
     [ObservableProperty]
     private int _unassignedCount;
 
-    [ObservableProperty]
-    private bool _isNewMenuOpen;
-
-    [ObservableProperty]
-    private string _searchText = "";
-
     public string ThemeIcon => _themeService.IsDark ? "☀️" : "🌙";
 
     public SidebarViewModel(
@@ -138,40 +132,11 @@ public partial class SidebarViewModel : ViewModelBase
             new NavigationParameter(UnassignedOnly: true));
 
     [RelayCommand]
-    private void NavigateRecording() =>
-        _navigation.NavigateTo(ScreenKey.Recording);
+    private void NewFolder() => _newPageModal.Open();
 
     [RelayCommand]
-    private void ToggleNewMenu() =>
-        IsNewMenuOpen = !IsNewMenuOpen;
-
-    [RelayCommand]
-    private void NewFolder()
-    {
-        IsNewMenuOpen = false;
-        _newPageModal.Open();
-    }
-
-    [RelayCommand]
-    private void NewTranscription()
-    {
-        IsNewMenuOpen = false;
+    private void NewTranscription() =>
         _navigation.NavigateTo(ScreenKey.Upload);
-    }
-
-    [RelayCommand]
-    private void ImportFile()
-    {
-        IsNewMenuOpen = false;
-        _navigation.NavigateTo(ScreenKey.Upload);
-    }
-
-    [RelayCommand]
-    private void NewRecording()
-    {
-        IsNewMenuOpen = false;
-        _navigation.NavigateTo(ScreenKey.Recording);
-    }
 
     [RelayCommand]
     private async Task ToggleThemeAsync() => await _themeService.ToggleAsync();
