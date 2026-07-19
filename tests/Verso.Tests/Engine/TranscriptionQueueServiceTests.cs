@@ -128,6 +128,81 @@ public class TranscriptionQueueServiceTests
         Assert.All(received, e => Assert.Equal(transcriptionId, e.TranscriptionId));
     }
 
+    [Fact]
+    public async Task Cancel_WhenJobIsRunning_UpdatesStatusToErrorCancelada()
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var engine = new GatedProgressEngine(release.Task, started);
+        await using var fixture = await QueueFixture.CreateAsync(engine);
+        var transcriptionId = await fixture.SeedTranscriptionAsync();
+
+        fixture.Queue.Enqueue(fixture.CreateRequest(transcriptionId));
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        fixture.Queue.Cancel(transcriptionId);
+        release.SetResult();
+
+        await fixture.WaitForStatusAsync(transcriptionId, TranscriptionStatus.Error);
+
+        await using var context = await fixture.Factory.CreateDbContextAsync();
+        var transcription = await context.Transcriptions.SingleAsync(t => t.Id == transcriptionId);
+        Assert.Equal(TranscriptionStatus.Error, transcription.Status);
+        Assert.Equal("Cancelada", transcription.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task Cancel_WhenJobIsStillQueued_MarksCanceladaWithoutRunningEngine()
+    {
+        var releaseFirst = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var engine = new CountingGatedEngine(releaseFirst.Task, firstStarted);
+        await using var fixture = await QueueFixture.CreateAsync(engine);
+
+        var firstId = await fixture.SeedTranscriptionAsync();
+        var secondId = await fixture.SeedTranscriptionAsync();
+
+        fixture.Queue.Enqueue(fixture.CreateRequest(firstId));
+        fixture.Queue.Enqueue(fixture.CreateRequest(secondId));
+        await firstStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        fixture.Queue.Cancel(secondId);
+        releaseFirst.SetResult();
+
+        await fixture.WaitForStatusAsync(firstId, TranscriptionStatus.Done);
+        await fixture.WaitForStatusAsync(secondId, TranscriptionStatus.Error);
+
+        await using var context = await fixture.Factory.CreateDbContextAsync();
+        var second = await context.Transcriptions.SingleAsync(t => t.Id == secondId);
+        Assert.Equal(TranscriptionStatus.Error, second.Status);
+        Assert.Equal("Cancelada", second.ErrorMessage);
+        Assert.Equal(1, engine.TranscribeCallCount);
+    }
+
+    [Fact]
+    public async Task TryGetLatestProgress_KeepsSnapshotWhileRunning_AndClearsWhenDone()
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var reachedTranscribing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var engine = new GatedProgressEngine(release.Task, reachedTranscribing);
+        await using var fixture = await QueueFixture.CreateAsync(engine);
+        var transcriptionId = await fixture.SeedTranscriptionAsync();
+
+        fixture.Queue.Enqueue(fixture.CreateRequest(transcriptionId));
+        await reachedTranscribing.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.True(fixture.Queue.TryGetLatestProgress(transcriptionId, out var snapshot));
+        Assert.Equal("transcribing", snapshot.Stage);
+        Assert.Equal(1, snapshot.PartIndex);
+        Assert.Equal(3, snapshot.TotalParts);
+        Assert.Equal(33, snapshot.Percent);
+
+        release.SetResult();
+        await fixture.WaitForStatusAsync(transcriptionId, TranscriptionStatus.Done);
+
+        Assert.False(fixture.Queue.TryGetLatestProgress(transcriptionId, out _));
+    }
+
     private static string CreateTempDbPath() =>
         Path.Combine(Path.GetTempPath(), $"transcriba-queue-{Guid.NewGuid():N}", "verso.db");
 
@@ -291,6 +366,47 @@ public class TranscriptionQueueServiceTests
             progress?.Report(new EngineProgress("transcribing", 2, 3));
             await Task.Yield();
             progress?.Report(new EngineProgress("done", 3, 3));
+            return new TranscriptionResult([new TranscriptionSegmentResult(0, 1, "ok")]);
+        }
+    }
+
+    private sealed class GatedProgressEngine(
+        Task release,
+        TaskCompletionSource reachedTranscribing) : ITranscriptionEngine
+    {
+        public async Task<TranscriptionResult> TranscribeAsync(
+            TranscriptionJobRequest request,
+            IProgress<EngineProgress>? progress,
+            CancellationToken cancellationToken)
+        {
+            progress?.Report(new EngineProgress("loading"));
+            progress?.Report(new EngineProgress("transcribing", 1, 3));
+            reachedTranscribing.TrySetResult();
+            await release.WaitAsync(cancellationToken);
+            progress?.Report(new EngineProgress("done", 3, 3));
+            return new TranscriptionResult([new TranscriptionSegmentResult(0, 1, "ok")]);
+        }
+    }
+
+    private sealed class CountingGatedEngine(
+        Task release,
+        TaskCompletionSource firstStarted) : ITranscriptionEngine
+    {
+        private int _callCount;
+        public int TranscribeCallCount => Volatile.Read(ref _callCount);
+
+        public async Task<TranscriptionResult> TranscribeAsync(
+            TranscriptionJobRequest request,
+            IProgress<EngineProgress>? progress,
+            CancellationToken cancellationToken)
+        {
+            var call = Interlocked.Increment(ref _callCount);
+            if (call == 1)
+            {
+                firstStarted.TrySetResult();
+                await release.WaitAsync(cancellationToken);
+            }
+
             return new TranscriptionResult([new TranscriptionSegmentResult(0, 1, "ok")]);
         }
     }
