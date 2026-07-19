@@ -225,53 +225,6 @@ public class UploadViewModelTests
             TestDbHelper.Cleanup(directory);
         }
     }
-
-    [Fact]
-    public async Task SelectPtBrTurboModel_ForcesPortugueseLanguage()
-    {
-        var (provider, directory, _, _) = await CreateUploadProviderAsync();
-        try
-        {
-            var upload = await CreateUploadAsync(provider);
-            // SettingsDefault é "es"; ao carregar o DefaultQuality (Standard) o idioma vem "es".
-            Assert.Equal("es", upload.Language);
-
-            var ptBr = upload.ModelOptions.First(o => o.Value == ModelQuality.PtBrTurbo);
-            upload.SelectedModelOption = ptBr;
-
-            Assert.Equal(ModelQuality.PtBrTurbo, upload.Quality);
-            Assert.True(upload.IsLanguageLocked);
-            Assert.Equal("pt", upload.Language);
-            Assert.Equal("pt", upload.SelectedLanguageOption!.Code);
-        }
-        finally
-        {
-            TestDbHelper.Cleanup(directory);
-        }
-    }
-
-    [Fact]
-    public async Task PtBrTurboModel_RevertsNonPtLanguageChange()
-    {
-        var (provider, directory, _, _) = await CreateUploadProviderAsync();
-        try
-        {
-            var upload = await CreateUploadAsync(provider);
-            upload.SelectedModelOption = upload.ModelOptions.First(o => o.Value == ModelQuality.PtBrTurbo);
-            Assert.Equal("pt", upload.Language);
-
-            // Tentar trocar para es/es/other é revertido para pt pelo travamento do modelo pt-BR.
-            upload.SelectedLanguageOption = upload.LanguageOptions.First(o => o.Code == "es");
-
-            Assert.Equal("pt", upload.Language);
-            Assert.Equal("pt", upload.SelectedLanguageOption!.Code);
-            Assert.True(upload.IsLanguageLocked);
-        }
-        finally
-        {
-            TestDbHelper.Cleanup(directory);
-        }
-    }
 }
 
 internal sealed class SuccessTranscriptionEngine : ITranscriptionEngine

@@ -65,7 +65,10 @@ public class SettingsViewModelTests
             Assert.False(settings.IdentifySpeakersDefault);
             Assert.False(settings.LiveTranscriptionEnabled);
             Assert.Equal(ExecutionDevice.Vulkan, settings.SelectedDeviceOption!.Value);
-            Assert.Equal(ModelQuality.Medium, settings.SelectedModelOption!.Value);
+            // Medium legado mapeia para o perfil Equilibrado (Standard) na UI.
+            Assert.Equal(ModelQuality.Standard, settings.SelectedModelOption!.Value);
+            Assert.Equal("Equilibrado", settings.SelectedModelOption.Label);
+            Assert.False(settings.IsAdvancedExpanded);
             Assert.NotNull(settings.RecommendedModelOption);
             Assert.False(string.IsNullOrEmpty(settings.ModelRecommendationReason));
         }
@@ -208,14 +211,14 @@ public class SettingsViewModelTests
             var settings = CreateSettings(provider);
             await settings.LoadAsync();
 
-            settings.SelectedModelOption = settings.ModelOptions.First(o => o.Value == ModelQuality.Tiny);
+            settings.SelectedModelOption = settings.ModelOptions.First(o => o.Value == ModelQuality.Base);
             await Task.Delay(50);
 
             using var scope = provider.CreateScope();
             var service = scope.ServiceProvider.GetRequiredService<SettingsService>();
             var saved = await service.GetAsync();
 
-            Assert.Equal(ModelQuality.Tiny, saved.DefaultQuality);
+            Assert.Equal(ModelQuality.Base, saved.DefaultQuality);
         }
         finally
         {
@@ -237,9 +240,7 @@ public class SettingsViewModelTests
             settings.SelectedDeviceOption = settings.DeviceOptions.First(o => o.Value == ExecutionDevice.Cuda);
             await Task.Delay(50);
 
-            Assert.True(
-                settings.RecommendedModelOption!.Value == ModelQuality.LargeV3Turbo ||
-                settings.RecommendedModelOption!.Value == ModelQuality.High);
+            Assert.Equal(ModelQuality.LargeV3Turbo, settings.RecommendedModelOption!.Value);
 
             settings.SelectedDeviceOption = settings.DeviceOptions.First(o => o.Value == ExecutionDevice.Cpu);
             await Task.Delay(50);

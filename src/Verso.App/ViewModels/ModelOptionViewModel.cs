@@ -3,11 +3,14 @@ using Verso.Core.Data.Entities;
 namespace Verso.App.ViewModels;
 
 /// <summary>
-/// Opção de modelo Whisper para os seletores de Settings e Upload.
-/// Carrega Value (enum persistido), Label (exibido), SizeLabel (tamanho aprox.
-/// do download) e IsEnglish (variantes inglês-only, sinalizadas na UI).
+/// Perfil de precisão exibido em Settings e Upload.
+/// Value é o <see cref="ModelQuality"/> persistido; Label/Description são amigáveis ao usuário acadêmico.
 /// </summary>
-public sealed record ModelOptionViewModel(ModelQuality Value, string Label, string SizeLabel, bool IsEnglish)
+public sealed record ModelOptionViewModel(
+    ModelQuality Value,
+    string Label,
+    string SizeLabel,
+    string Description)
 {
     public override string ToString() => $"{Label} · {SizeLabel}";
 }

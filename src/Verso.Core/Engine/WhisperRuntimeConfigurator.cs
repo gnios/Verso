@@ -104,7 +104,6 @@ public static class WhisperRuntimeConfigurator
         ModelQuality.Base or ModelQuality.BaseEn => 1_000_000_000,       // ~1 GB
         ModelQuality.Standard => 1_500_000_000,                          // ~1.5 GB (Small)
         ModelQuality.SmallEn => 1_500_000_000,                           // ~1.5 GB
-        ModelQuality.PtBrTurbo => 1_500_000_000,                         // ~1.5 GB (Q5_0, compacto)
         ModelQuality.Medium or ModelQuality.MediumEn => 3_000_000_000,   // ~3 GB
         ModelQuality.High or ModelQuality.LargeV1 or ModelQuality.LargeV2
             or ModelQuality.LargeV3Turbo => 4_500_000_000,                // ~4.5 GB

@@ -66,7 +66,6 @@ public partial class UploadViewModel : ViewModelBase
     private LanguageOptionViewModel? _selectedLanguageOption;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsLanguageLocked))]
     private ModelQuality _quality = ModelQuality.Standard;
 
     [ObservableProperty]
@@ -94,8 +93,6 @@ public partial class UploadViewModel : ViewModelBase
     public bool HasSelectedFile => !string.IsNullOrWhiteSpace(SelectedFilePath);
     public bool CanStart => HasSelectedFile && !IsStarting && !string.IsNullOrWhiteSpace(Title);
     public string SupportedFormatsLabel => UploadMediaFormats.DisplayList;
-    /// <summary>O modelo pt-BR Turbo (distil) trava o idioma em pt-BR.</summary>
-    public bool IsLanguageLocked => Quality == ModelQuality.PtBrTurbo;
 
     public UploadViewModel(
         IServiceScopeFactory scopeFactory,
@@ -174,13 +171,6 @@ public partial class UploadViewModel : ViewModelBase
         }
 
         Language = value.Code;
-
-        // O modelo pt-BR Turbo (distil) é fine-tuned apenas para português — trava o idioma em pt.
-        if (Quality == ModelQuality.PtBrTurbo && value.Code != "pt")
-        {
-            SelectedLanguageOption = LanguageOptions.First(option => option.Code == "pt");
-            Language = "pt";
-        }
     }
 
     partial void OnSelectedModelOptionChanged(ModelOptionViewModel? value)
@@ -191,13 +181,6 @@ public partial class UploadViewModel : ViewModelBase
         }
 
         Quality = value.Value;
-
-        // Selecionar o modelo pt-BR Turbo força o idioma em pt-BR (o modelo é fine-tuned só para pt).
-        if (value.Value == ModelQuality.PtBrTurbo)
-        {
-            Language = "pt";
-            SelectedLanguageOption = LanguageOptions.First(option => option.Code == "pt");
-        }
     }
 
     partial void OnSelectedSpeakerModeOptionChanged(SpeakerModeOptionViewModel? value)
@@ -226,8 +209,7 @@ public partial class UploadViewModel : ViewModelBase
             var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
             var settingsService = scope.ServiceProvider.GetRequiredService<SettingsService>();
             var settings = await settingsService.GetAsync();
-            // Segurança extra: o modelo pt-BR Turbo é fine-tuned só para pt — nunca envia outro idioma ao engine.
-            var language = Quality == ModelQuality.PtBrTurbo ? "pt" : Language;
+            var language = Language;
             var audioLoader = _services.GetRequiredService<Verso.Core.Engine.AudioLoader>();
             var durationSeconds = audioLoader.GetDuration(mediaPath);
 
@@ -278,6 +260,7 @@ public partial class UploadViewModel : ViewModelBase
         SelectedLanguageOption = LanguageOptions.First(option => option.Code == Language);
         Quality = settings.DefaultQuality;
         SelectedModelOption = ModelCatalog.Find(Quality);
+        // Find dispara OnSelectedModelOptionChanged e normaliza Quality para o perfil de UI.
         SelectedSpeakerModeOption = SpeakerModeOptions.First(option => option.Value == SpeakerMode);
 
         FolderOptions.Clear();

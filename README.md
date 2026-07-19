@@ -14,63 +14,26 @@ App desktop de transcrição de áudio/vídeo com [whisper.net](https://github.c
 - Gravação direto do microfone
 - Exporta em **TXT, SRT e VTT**
 - Tema claro/escuro
-- Baixa modelos do Whisper sob demanda (incl. fine-tune pt-BR)
-- Download e recomendação inteligente de modelo baseada no hardware
+- Baixa modelos de reconhecimento de fala sob demanda
+- Recomendação de precisão com base no hardware
 
-## Modelos de Transcrição
+## Precisão da transcrição
 
-Whisper é um modelo de rede neural da OpenAI para transcrição de fala, treinado com 680 mil horas de áudio multilíngue (99 idiomas). O Verso utiliza os modelos no formato **GGML** (quantizados), que são versões comprimidas para rodar eficientemente em hardware de consumo.
+O Verso oferece **três perfis** pensados para pesquisa acadêmica (sem nomes técnicos de modelo):
 
-### Tabela comparativa
+| Perfil | Tamanho | Quando usar |
+|--------|:-------:|-------------|
+| **Rápido** | ~142 MB | Rascunho, checagem de áudio, primeira passagem |
+| **Equilibrado** | ~466 MB | Maioria das entrevistas e aulas (padrão) |
+| **Preciso** | ~1,2 GB | Citação na tese, áudio difícil, análise fina |
 
-| Modelo | Tamanho | RAM/VRAM | Velocidade | Precisão |
-|--------|:-------:|:--------:|:----------:|:--------:|
-| **Tiny** | ~75 MB | ~1 GB | Muito rápida | Baixa |
-| **Base** | ~142 MB | ~1,5 GB | Rápida | Baixa–Média |
-| **Padrão (Small)** | ~466 MB | ~2,5 GB | Moderada | Média–Alta |
-| **Medium** | ~1,5 GB | ~5 GB | Lenta | Alta |
-| **Large v3-turbo** | ~1,2 GB | ~4 GB | Rápida (GPU) | Muito alta |
-| **Large v3 (Alta)** | ~3 GB | ~6–8 GB | Muito lenta | Máxima |
-| **Pt-BR Turbo (distil)** | ~538 MB | ~2 GB | Rápida | Muito alta (pt-BR) |
-| **Large v2** | ~3 GB | ~6–8 GB | Muito lenta | Alta |
-| **Large v1** | ~3 GB | ~6–8 GB | Muito lenta | Alta (obsoleto) |
-| **Tiny/Base/Small/Medium (EN)** | — | — | Mais rápidos | Inglês apenas |
+> O app recomenda um perfil na tela de Configurações com base na memória do computador. Opções de hardware (CPU/GPU) ficam em **Avançado**.
 
-### Qual modelo usar
-
-**CPU:**
-
-| RAM | Recomendado | Motivo |
-|:---:|:-----------:|--------|
-| < 6 GB | **Tiny** | Roda em máquinas com pouca memória |
-| 6–12 GB | **Base** | Equilíbrio para hardware modesto |
-| 12–24 GB | **Padrão (Small)** | Boa precisão sem ser lento |
-| ≥ 24 GB | **Medium** | Máxima precisão em CPU |
-
-**GPU (CUDA NVIDIA ou Vulkan):**
-
-| RAM | Recomendado | Motivo |
-|:---:|:-----------:|--------|
-| < 8 GB | **Large v3-turbo** | Equilíbrio para GPUs de entrada |
-| 8–32 GB | **Large v3-turbo** | Melhor relação velocidade/qualidade |
-| ≥ 32 GB | **Alta (Large v3)** | Máxima qualidade (VRAM 12 GB+) |
-
-**Orientações rápidas:**
-
-- **Primeiro uso:** comece com **Padrão (Small)**
-- **Português brasileiro:** use **Pt-BR Turbo (distil)** — fine-tuned para pt-BR, qualidade superior com metade do tamanho
-- **Máxima qualidade (GPU):** **Alta (Large v3)**
-- **Máxima velocidade (GPU):** **Large v3-turbo**
-- **Inglês apenas:** prefira variante **EN** (Tiny, Base, Small ou Medium)
-- **Hardware limitado (≤ 4 GB):** **Tiny** ou **Base**
-
-> O app tem um **recomendador automático** que sugere o modelo ideal na tela de Configurações com base no dispositivo e na RAM do computador.
-
-### Dispositivos de execução
+### Dispositivos de execução (Avançado)
 
 | Modo | Descrição |
 |------|-----------|
-| **Automático** | Tenta CUDA → Vulkan → CPU. Padrão recomendado. |
+| **Automático** | Tenta GPU e cai para CPU. Padrão recomendado. |
 | **CPU** | Processa apenas com CPU. Qualquer computador. |
 | **CUDA** | Aceleração por GPU NVIDIA. |
 | **Vulkan** | Aceleração por GPU via Vulkan (AMD, Intel, NVIDIA). |
