@@ -83,14 +83,14 @@ public partial class UploadViewModel : ViewModelBase
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsLanguageLocked))]
     [NotifyPropertyChangedFor(nameof(IsParakeetEngine))]
-    private TranscriptionEngineKind _engine = TranscriptionEngineKind.Whisper;
+    private TranscriptionEngineKind _engine = TranscriptionEngineKind.Parakeet;
 
     [ObservableProperty]
     private EngineOptionViewModel? _selectedEngineOption;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsLanguageLocked))]
-    private ParakeetModel _parakeetModel = ParakeetModel.MultilingualV3;
+    private ParakeetModel _parakeetModel = ParakeetModel.PtBrTagarela;
 
     [ObservableProperty]
     private ParakeetModelOptionViewModel? _selectedParakeetModelOption;

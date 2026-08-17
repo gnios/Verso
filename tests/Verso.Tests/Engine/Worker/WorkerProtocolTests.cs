@@ -25,7 +25,8 @@ public class WorkerProtocolTests
         var deserialized = JsonSerializer.Deserialize<WorkerMessage>(json, WorkerProtocol.JsonOptions);
         var typed = Assert.IsType<WorkerJobMessage>(deserialized);
         Assert.Equal(request, typed.Request);
-        Assert.Equal(TranscriptionEngineKind.Whisper, typed.Request.Engine);
+        Assert.Equal(TranscriptionEngineKind.Parakeet, typed.Request.Engine);
+        Assert.Equal(ParakeetModel.PtBrTagarela, typed.Request.ParakeetModel);
     }
 
     [Fact]

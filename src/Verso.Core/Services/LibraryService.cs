@@ -68,8 +68,8 @@ public class LibraryService(IDbContextFactory<VersoDbContext> dbContextFactory)
         double durationSeconds,
         string? icon = null,
         IEnumerable<string>? tagNames = null,
-        TranscriptionEngineKind engine = TranscriptionEngineKind.Whisper,
-        ParakeetModel parakeetModel = ParakeetModel.MultilingualV3)
+        TranscriptionEngineKind engine = TranscriptionEngineKind.Parakeet,
+        ParakeetModel parakeetModel = ParakeetModel.PtBrTagarela)
     {
         await using var context = await dbContextFactory.CreateDbContextAsync();
         var transcription = new Transcription
