@@ -126,7 +126,9 @@ public class UploadViewModelTests
         {
             var upload = await CreateUploadAsync(provider);
 
-            Assert.Equal("es", upload.Language);
+            Assert.Equal("pt", upload.Language);
+            Assert.Equal(TranscriptionEngineKind.Parakeet, upload.Engine);
+            Assert.Equal(ParakeetModel.PtBrTagarela, upload.ParakeetModel);
             Assert.Equal(SpeakerMode.Off, upload.SpeakerMode);
         }
         finally
@@ -173,8 +175,9 @@ public class UploadViewModelTests
             var transcription = Assert.Single(ctx.Transcriptions);
             Assert.Equal(TranscriptionStatus.InProgress, transcription.Status);
             Assert.Equal(folderId, transcription.FolderId);
-            Assert.Equal("es", transcription.Language);
-            Assert.Equal(TranscriptionEngineKind.Whisper, transcription.Engine);
+            Assert.Equal("pt", transcription.Language);
+            Assert.Equal(TranscriptionEngineKind.Parakeet, transcription.Engine);
+            Assert.Equal(ParakeetModel.PtBrTagarela, transcription.ParakeetModel);
             Assert.Equal(SpeakerMode.Off, transcription.SpeakerMode);
             Assert.False(string.IsNullOrWhiteSpace(transcription.MediaFilePath));
             Assert.True(File.Exists(transcription.MediaFilePath));

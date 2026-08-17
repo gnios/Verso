@@ -39,8 +39,8 @@ public static class ModelCatalog
 
     public static IReadOnlyList<EngineOptionViewModel> Engines { get; } =
     [
-        new(TranscriptionEngineKind.Whisper, "Whisper", "Melhor cobertura de idiomas; mais lento em CPU"),
-        new(TranscriptionEngineKind.Parakeet, "Parakeet (leve, CPU)", "Rápido sem GPU; pt/en/es"),
+        new(TranscriptionEngineKind.Parakeet, "Parakeet", "Padrão · rápido em CPU · pt-BR TAGARELA"),
+        new(TranscriptionEngineKind.Whisper, "Whisper", "Mais idiomas · mais lento em CPU"),
     ];
 
     public static IReadOnlyList<ParakeetModelOptionViewModel> ParakeetModels { get; } =

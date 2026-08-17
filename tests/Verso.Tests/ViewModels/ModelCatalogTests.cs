@@ -52,4 +52,13 @@ public class ModelCatalogTests
     {
         Assert.All(ModelCatalog.All, o => Assert.False(string.IsNullOrWhiteSpace(o.Description)));
     }
+
+    [Fact]
+    public void Engines_ListsParakeetFirstThenWhisper()
+    {
+        Assert.Equal(
+            [TranscriptionEngineKind.Parakeet, TranscriptionEngineKind.Whisper],
+            ModelCatalog.Engines.Select(o => o.Value).ToArray());
+        Assert.Equal(ParakeetModel.PtBrTagarela, ModelCatalog.ParakeetModels[0].Value);
+    }
 }

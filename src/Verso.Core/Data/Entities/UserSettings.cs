@@ -11,8 +11,8 @@ public class UserSettings
     public bool LiveTranscriptionEnabled { get; set; } = true; // inerte no MVP
     public ExecutionDevice Device { get; set; } = ExecutionDevice.Auto;
     public ModelQuality DefaultQuality { get; set; } = ModelQuality.Standard;
-    public TranscriptionEngineKind DefaultEngine { get; set; } = TranscriptionEngineKind.Whisper;
-    public ParakeetModel DefaultParakeetModel { get; set; } = ParakeetModel.MultilingualV3;
+    public TranscriptionEngineKind DefaultEngine { get; set; } = TranscriptionEngineKind.Parakeet;
+    public ParakeetModel DefaultParakeetModel { get; set; } = ParakeetModel.PtBrTagarela;
     public bool DarkTheme { get; set; }
     public int MaxTranscriptionThreads { get; set; } // 0 = automático
 }
