@@ -8,7 +8,9 @@ public sealed record TranscriptionJobRequest(
     string Language,
     ModelQuality Quality,
     ExecutionDevice Device,
-    int MaxTranscriptionThreads = 0);
+    int MaxTranscriptionThreads = 0,
+    TranscriptionEngineKind Engine = TranscriptionEngineKind.Whisper,
+    ParakeetModel ParakeetModel = ParakeetModel.MultilingualV3);
 
 public sealed record TranscriptionSegmentResult(
     double StartSeconds,

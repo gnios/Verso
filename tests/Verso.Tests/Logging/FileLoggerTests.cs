@@ -89,6 +89,20 @@ public class FileLoggerTests : IDisposable
         Assert.Contains("via DI", content);
     }
 
+    [Fact]
+    public void FileNamePrefix_WritesToPrefixedDailyFile()
+    {
+        var options = Microsoft.Extensions.Options.Options.Create(
+            new FileLoggerOptions { Directory = _logDir, FileNamePrefix = "verso-worker" });
+        using var provider = new FileLoggerProvider(options);
+        provider.CreateLogger("Verso.Worker").LogInformation("job started");
+        provider.Dispose();
+
+        var file = Assert.Single(Directory.GetFiles(_logDir));
+        Assert.Contains("verso-worker-", Path.GetFileName(file), StringComparison.Ordinal);
+        Assert.Contains("job started", File.ReadAllText(file));
+    }
+
     private FileLoggerProvider CreateProvider(LogLevel minLevel)
     {
         var options = Microsoft.Extensions.Options.Options.Create(

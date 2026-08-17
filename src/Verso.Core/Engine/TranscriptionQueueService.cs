@@ -135,10 +135,12 @@ public sealed class TranscriptionQueueService : BackgroundService
                 RaiseProgressChanged(request.TranscriptionId, e.Stage, e.PartIndex, e.TotalParts));
             var stopwatch = Stopwatch.StartNew();
             _logger.LogInformation(
-                "Transcrevendo {TranscriptionId}: dispositivo={Device}, modelo={Quality}",
+                "Transcrevendo {TranscriptionId}: engine={Engine}, dispositivo={Device}, modelo={Quality}, parakeet={ParakeetModel}",
                 request.TranscriptionId,
+                request.Engine,
                 request.Device,
-                request.Quality);
+                request.Quality,
+                request.ParakeetModel);
             var result = await _engine.TranscribeAsync(request, progress, linkedCts.Token)
                 .ConfigureAwait(false);
             stopwatch.Stop();
@@ -339,9 +341,18 @@ public static class EngineServiceCollectionExtensions
         return services;
     }
 
+    public static IServiceCollection AddParakeetEngine(this IServiceCollection services)
+    {
+        services.AddSingleton<ParakeetModelManager>();
+        services.AddSingleton<IParakeetRecognizerFactory, OnnxParakeetRecognizerFactory>();
+        services.AddSingleton<ParakeetTranscriptionEngine>();
+        return services;
+    }
+
     public static IServiceCollection AddVersoEngine(this IServiceCollection services)
     {
         services.AddWhisperEngine();
+        services.AddParakeetEngine();
         services.AddSingleton<IWorkerExecutableLocator, WorkerExecutableLocator>();
         services.AddSingleton<IWorkerProcessFactory, WorkerProcessFactory>();
         services.AddSingleton<ITranscriptionEngine, WorkerProcessTranscriptionEngine>();

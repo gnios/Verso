@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.Linq;
 using Verso.Core.Data.Entities;
+using Verso.Core.Engine;
 
 namespace Verso.App.ViewModels;
 
@@ -35,6 +37,18 @@ public static class ModelCatalog
             "Use quando for citar trechos na tese ou o áudio for difícil de entender."),
     ];
 
+    public static IReadOnlyList<EngineOptionViewModel> Engines { get; } =
+    [
+        new(TranscriptionEngineKind.Whisper, "Whisper", "Melhor cobertura de idiomas; mais lento em CPU"),
+        new(TranscriptionEngineKind.Parakeet, "Parakeet (leve, CPU)", "Rápido sem GPU; pt/en/es"),
+    ];
+
+    public static IReadOnlyList<ParakeetModelOptionViewModel> ParakeetModels { get; } =
+    [
+        new(ParakeetModel.PtBrTagarela, "pt-BR TAGARELA", ParakeetModelManager.GetSizeLabel(ParakeetModel.PtBrTagarela)),
+        new(ParakeetModel.MultilingualV3, "TDT v3 (pt/en/es)", ParakeetModelManager.GetSizeLabel(ParakeetModel.MultilingualV3)),
+    ];
+
     /// <summary>
     /// Localiza o perfil de UI para uma qualidade persistida (incluindo legados).
     /// Fallback: Equilibrado.
@@ -53,6 +67,12 @@ public static class ModelCatalog
         return All[1];
     }
 
+    public static EngineOptionViewModel FindEngine(TranscriptionEngineKind value) =>
+        Engines.FirstOrDefault(o => o.Value == value) ?? Engines[0];
+
+    public static ParakeetModelOptionViewModel FindParakeet(ParakeetModel value) =>
+        ParakeetModels.FirstOrDefault(o => o.Value == value) ?? ParakeetModels[0];
+
     /// <summary>
     /// Mapeia qualquer <see cref="ModelQuality"/> (incl. legados) para um dos 3 perfis.
     /// </summary>
@@ -67,4 +87,11 @@ public static class ModelCatalog
         // Large* / High / desconhecido → Preciso
         _ => ModelQuality.LargeV3Turbo,
     };
+}
+
+public sealed record EngineOptionViewModel(TranscriptionEngineKind Value, string Label, string Hint);
+
+public sealed record ParakeetModelOptionViewModel(ParakeetModel Value, string Label, string SizeLabel)
+{
+    public override string ToString() => $"{Label} · {SizeLabel}";
 }

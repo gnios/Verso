@@ -153,6 +153,9 @@ namespace Verso.Core.Data.Migrations
                     b.Property<int>("Device")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("Engine")
+                        .HasColumnType("INTEGER");
+
                     b.Property<double>("DurationSeconds")
                         .HasColumnType("REAL");
 
@@ -175,6 +178,9 @@ namespace Verso.Core.Data.Migrations
 
                     b.Property<double?>("ProcessingDurationSeconds")
                         .HasColumnType("REAL");
+
+                    b.Property<int>("ParakeetModel")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Quality")
                         .HasColumnType("INTEGER");
@@ -210,6 +216,12 @@ namespace Verso.Core.Data.Migrations
                     b.Property<string>("DefaultLanguage")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("DefaultEngine")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("DefaultParakeetModel")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("DefaultQuality")
                         .HasColumnType("INTEGER");

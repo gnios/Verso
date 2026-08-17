@@ -15,6 +15,12 @@ public partial class ModelDownloadModalViewModel : ViewModelBase
     [ObservableProperty]
     private string _message = "";
 
+    public void Show(string message)
+    {
+        Message = message;
+        IsOpen = true;
+    }
+
     public void Show(ModelQuality quality)
     {
         var profile = ModelCatalog.Find(quality);

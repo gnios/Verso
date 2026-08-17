@@ -6,6 +6,7 @@
 @implements IDisposable
 @using System.Linq
 @using Verso.App.Components.Shared
+@using Verso.Core.Data.Entities
 @inject IFileOpenService FileOpenService
 
 <section class="screen active">
@@ -64,21 +65,45 @@
 
         <div class="upload-precision">
             <label class="upload-label">Precisão da transcrição</label>
-            <PrecisionProfileCards Options="ViewModel.ModelOptions"
-                                  Selected="ViewModel.SelectedModelOption"
-                                  SelectedChanged="OnPrecisionSelected" />
+            @if (!ViewModel.IsParakeetEngine)
+            {
+                <PrecisionProfileCards Options="ViewModel.ModelOptions"
+                                      Selected="ViewModel.SelectedModelOption"
+                                      SelectedChanged="OnPrecisionSelected" />
+            }
         </div>
 
         <div class="upload-form upload-form-single">
             <div>
                 <label class="upload-label">Idioma</label>
-                <select class="upload-select" value="@ViewModel.SelectedLanguageOption?.Code" @onchange="OnLanguageChanged">
+                <select class="upload-select" value="@ViewModel.SelectedLanguageOption?.Code" @onchange="OnLanguageChanged" disabled="@ViewModel.IsLanguageLocked">
                     @foreach (var option in ViewModel.LanguageOptions)
                     {
                         <option value="@option.Code">@option.Label</option>
                     }
                 </select>
             </div>
+            <div>
+                <label class="upload-label">Motor</label>
+                <select class="upload-select" value="@ViewModel.SelectedEngineOption?.Value" @onchange="OnEngineChanged">
+                    @foreach (var option in ViewModel.EngineOptions)
+                    {
+                        <option value="@option.Value">@option.Label</option>
+                    }
+                </select>
+            </div>
+            @if (ViewModel.IsParakeetEngine)
+            {
+                <div>
+                    <label class="upload-label">Modelo Parakeet</label>
+                    <select class="upload-select" value="@ViewModel.SelectedParakeetModelOption?.Value" @onchange="OnParakeetModelChanged">
+                        @foreach (var option in ViewModel.ParakeetModelOptions)
+                        {
+                            <option value="@option.Value">@option.Label · @option.SizeLabel</option>
+                        }
+                    </select>
+                </div>
+            }
         </div>
 
         <div class="upload-audio-section">
@@ -144,6 +169,30 @@
 
     private void OnPrecisionSelected(ModelOptionViewModel option) =>
         ViewModel.SelectedModelOption = option;
+
+    private void OnEngineChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<TranscriptionEngineKind>(e.Value?.ToString(), out var engine))
+        {
+            var option = ViewModel.EngineOptions.FirstOrDefault(o => o.Value == engine);
+            if (option is not null)
+            {
+                ViewModel.SelectedEngineOption = option;
+            }
+        }
+    }
+
+    private void OnParakeetModelChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<ParakeetModel>(e.Value?.ToString(), out var model))
+        {
+            var option = ViewModel.ParakeetModelOptions.FirstOrDefault(o => o.Value == model);
+            if (option is not null)
+            {
+                ViewModel.SelectedParakeetModelOption = option;
+            }
+        }
+    }
 
     private void OnFolderSelected(int? folderId)
     {

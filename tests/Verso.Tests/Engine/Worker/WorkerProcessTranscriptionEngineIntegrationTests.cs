@@ -139,21 +139,32 @@ public class WorkerProcessTranscriptionEngineIntegrationTests : IDisposable
     }
 
     /// <summary>
-    /// Garante permissão de execução no apphost Unix (<c>Verso.Worker</c>). No Windows é no-op.
+    /// Adaptação apenas para ambientes de desenvolvimento sem sufixo ".exe" nativo (ex.:
+    /// macOS/arm64, onde o apphost gerado se chama simplesmente "Verso.Worker"): cria, no MESMO
+    /// diretório de output, uma cópia do apphost com o nome exato que
+    /// <see cref="WorkerExecutableLocator"/> (produção, inalterado) espera. Preserva os arquivos
+    /// irmãos (Verso.Worker.dll, runtimeconfig.json, runtimes/) exigidos pelo apphost para
+    /// resolver o runtime gerenciado. Em CI/Windows, "Verso.Worker.exe" já existe e este método é
+    /// um no-op.
     /// </summary>
     private static void EnsureWorkerExeAlias(string binDirectory)
     {
-        var workerPath = Path.Combine(binDirectory, WorkerExecutableLocator.WorkerFileName);
-        if (!File.Exists(workerPath))
+        var exePath = Path.Combine(binDirectory, "Verso.Worker.exe");
+        if (File.Exists(exePath))
+            return;
+
+        var appHostPath = Path.Combine(binDirectory, "Verso.Worker");
+        if (!File.Exists(appHostPath))
         {
             throw new InvalidOperationException(
-                $"{WorkerExecutableLocator.WorkerFileName} não encontrado em '{binDirectory}'.");
+                $"Nem 'Verso.Worker.exe' nem 'Verso.Worker' encontrados em '{binDirectory}'.");
         }
 
+        File.Copy(appHostPath, exePath, overwrite: true);
         if (!OperatingSystem.IsWindows())
         {
             File.SetUnixFileMode(
-                workerPath,
+                exePath,
                 UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
                 UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
                 UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
