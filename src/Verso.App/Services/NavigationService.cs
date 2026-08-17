@@ -40,12 +40,22 @@ public partial class NavigationService : ObservableObject
         {
             try
             {
-                _services.GetService<IMediaPlaybackService>()?.UnloadAsync().GetAwaiter().GetResult();
+                // Fire-and-forget: bloquear com GetResult() trava a UI no interop JS do <audio>.
+                var playback = _services.GetService<IMediaPlaybackService>();
+                if (playback is not null)
+                {
+                    _ = playback.UnloadAsync();
+                }
             }
             catch (Exception)
             {
                 // O serviço de playback pode estar indisponível fora do app desktop (ex.: testes).
             }
+        }
+
+        if (CurrentViewModel is IDisposable previous)
+        {
+            previous.Dispose();
         }
 
         CurrentScreen = key;

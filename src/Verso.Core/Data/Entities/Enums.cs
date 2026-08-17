@@ -16,12 +16,11 @@ public enum ModelQuality
     BaseEn,        // inglês apenas
     SmallEn,       // inglês apenas
     MediumEn,      // inglês apenas
-    PtBrTurbo,     // distil-whisper-large-v3 fine-tuned pt-BR (GGML Q5_0, ~538 MB) — força idioma pt
 }
 
 public enum SpeakerMode { Automatic, Off }
 
-public enum ExecutionDevice { Auto, Cpu, Cuda, Vulkan }
+public enum ExecutionDevice { Auto, Cpu, Cuda, Vulkan, CoreMl }
 
 public enum TranscriptionEngineKind { Whisper = 0, Parakeet = 1 }
 

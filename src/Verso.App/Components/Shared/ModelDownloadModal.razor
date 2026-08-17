@@ -22,7 +22,7 @@
 
 <div class="modal-overlay @(ViewModel.IsOpen ? "open" : "")">
     <div class="modal">
-        <div class="modal-title">Baixando modelo de transcrição…</div>
+        <div class="modal-title">@ViewModel.Title</div>
         <p class="model-download-message">@ViewModel.Message</p>
         <div class="storage-bar model-download-progress">
             <div class="storage-bar-fill model-download-progress-fill"></div>

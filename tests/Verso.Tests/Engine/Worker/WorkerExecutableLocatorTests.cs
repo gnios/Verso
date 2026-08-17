@@ -7,12 +7,14 @@ public class WorkerExecutableLocatorTests
     [Fact]
     public void Resolve_WhenExecutableExists_ReturnsPath()
     {
-        var appDir = @"C:\apps\Verso";
-        var expectedPath = Path.Combine(appDir, "Verso.Worker.exe");
+        var appDir = Path.Combine(Path.GetTempPath(), "verso-locator-test");
+        var fileName = "Verso.Worker.exe";
+        var expectedPath = Path.Combine(appDir, fileName);
 
         var locator = new WorkerExecutableLocator(
             () => appDir,
-            path => path == expectedPath);
+            path => path == expectedPath,
+            fileName);
 
         var result = locator.Resolve();
 
@@ -20,14 +22,31 @@ public class WorkerExecutableLocatorTests
     }
 
     [Fact]
+    public void Resolve_WhenUnixWorkerExists_ReturnsPathWithoutExe()
+    {
+        var appDir = Path.Combine(Path.GetTempPath(), "verso-locator-unix");
+        var fileName = "Verso.Worker";
+        var expectedPath = Path.Combine(appDir, fileName);
+
+        var locator = new WorkerExecutableLocator(
+            () => appDir,
+            path => path == expectedPath,
+            fileName);
+
+        Assert.Equal(expectedPath, locator.Resolve());
+    }
+
+    [Fact]
     public void Resolve_WhenExecutableMissing_ThrowsFileNotFoundException()
     {
+        var fileName = WorkerExecutableLocator.WorkerFileName;
         var locator = new WorkerExecutableLocator(
-            () => @"C:\apps\Verso",
-            _ => false);
+            () => Path.Combine(Path.GetTempPath(), "verso-missing"),
+            _ => false,
+            fileName);
 
         var ex = Assert.Throws<FileNotFoundException>(() => locator.Resolve());
 
-        Assert.Contains("Verso.Worker.exe", ex.Message);
+        Assert.Contains(fileName, ex.Message);
     }
 }

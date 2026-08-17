@@ -28,6 +28,11 @@ public partial class UploadViewModel : ViewModelBase
 
     public IconPickerViewModel IconPicker { get; } = new();
 
+    public bool HasIcon => !string.IsNullOrWhiteSpace(Icon);
+    public string? Icon => IconPicker.SelectedIcon;
+
+    [ObservableProperty]
+    private bool _isIconPickerOpen;
 
     public IReadOnlyList<LanguageOptionViewModel> LanguageOptions { get; } =
     [
@@ -70,7 +75,6 @@ public partial class UploadViewModel : ViewModelBase
     private LanguageOptionViewModel? _selectedLanguageOption;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsLanguageLocked))]
     private ModelQuality _quality = ModelQuality.Standard;
 
     [ObservableProperty]
@@ -98,7 +102,11 @@ public partial class UploadViewModel : ViewModelBase
     private SpeakerModeOptionViewModel? _selectedSpeakerModeOption;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SelectedFolderId))]
     private FolderOptionViewModel? _selectedFolder;
+
+    /// <summary>Id da pasta selecionada — usado pelo FolderCombobox (mesmo padrão do Editor).</summary>
+    public int? SelectedFolderId => SelectedFolder?.Id;
 
     [ObservableProperty]
     private bool _isStarting;
@@ -113,11 +121,8 @@ public partial class UploadViewModel : ViewModelBase
     public bool HasSelectedFile => !string.IsNullOrWhiteSpace(SelectedFilePath);
     public bool CanStart => HasSelectedFile && !IsStarting && !string.IsNullOrWhiteSpace(Title);
     public string SupportedFormatsLabel => UploadMediaFormats.DisplayList;
-    /// <summary>O modelo pt-BR Turbo (distil) ou TAGARELA trava o idioma em pt-BR.</summary>
     public bool IsLanguageLocked =>
-        Quality == ModelQuality.PtBrTurbo
-        || (Engine == TranscriptionEngineKind.Parakeet && ParakeetModel == ParakeetModel.PtBrTagarela);
-
+        Engine == TranscriptionEngineKind.Parakeet && ParakeetModel == ParakeetModel.PtBrTagarela;
     public bool IsParakeetEngine => Engine == TranscriptionEngineKind.Parakeet;
 
     public UploadViewModel(
@@ -132,6 +137,14 @@ public partial class UploadViewModel : ViewModelBase
         _navigation = navigation;
         _mediaStorage = mediaStorage;
         _queueService = queueService;
+        IconPicker.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(IconPickerViewModel.SelectedIcon))
+            {
+                OnPropertyChanged(nameof(Icon));
+                OnPropertyChanged(nameof(HasIcon));
+            }
+        };
     }
 
     public void Initialize(NavigationParameter? parameter)
@@ -142,10 +155,24 @@ public partial class UploadViewModel : ViewModelBase
         IsStarting = false;
         Title = "";
         TagsText = "";
+        IsIconPickerOpen = false;
         IconPicker.UseTranscriptionIcons = true;
-        IconPicker.AllowNoIcon = false;
+        IconPicker.AllowNoIcon = true;
         IconPicker.SelectedIcon = IconCatalog.TransIcons[0];
+        OnPropertyChanged(nameof(Icon));
+        OnPropertyChanged(nameof(HasIcon));
         _ = LoadFormAsync(parameter?.FolderId);
+    }
+
+    [RelayCommand]
+    private void ToggleIconPicker() => IsIconPickerOpen = !IsIconPickerOpen;
+
+    [RelayCommand]
+    private void CloseIconPicker()
+    {
+        IsIconPickerOpen = false;
+        OnPropertyChanged(nameof(Icon));
+        OnPropertyChanged(nameof(HasIcon));
     }
 
     public bool TrySelectFile(string path)
@@ -197,13 +224,7 @@ public partial class UploadViewModel : ViewModelBase
         }
 
         Language = value.Code;
-
-        // O modelo pt-BR Turbo (distil) é fine-tuned apenas para português — trava o idioma em pt.
-        if (IsLanguageLocked && value.Code != "pt")
-        {
-            SelectedLanguageOption = LanguageOptions.First(option => option.Code == "pt");
-            Language = "pt";
-        }
+        LockPortugueseIfNeeded();
     }
 
     partial void OnSelectedModelOptionChanged(ModelOptionViewModel? value)
@@ -214,13 +235,6 @@ public partial class UploadViewModel : ViewModelBase
         }
 
         Quality = value.Value;
-
-        // Selecionar o modelo pt-BR Turbo força o idioma em pt-BR (o modelo é fine-tuned só para pt).
-        if (value.Value == ModelQuality.PtBrTurbo)
-        {
-            Language = "pt";
-            SelectedLanguageOption = LanguageOptions.First(option => option.Code == "pt");
-        }
     }
 
     partial void OnSelectedEngineOptionChanged(EngineOptionViewModel? value)
@@ -282,7 +296,6 @@ public partial class UploadViewModel : ViewModelBase
             var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
             var settingsService = scope.ServiceProvider.GetRequiredService<SettingsService>();
             var settings = await settingsService.GetAsync();
-            // Segurança extra: o modelo pt-BR Turbo é fine-tuned só para pt — nunca envia outro idioma ao engine.
             var language = IsLanguageLocked ? "pt" : Language;
             var audioLoader = _services.GetRequiredService<Verso.Core.Engine.AudioLoader>();
             var durationSeconds = audioLoader.GetDuration(mediaPath);
@@ -342,11 +355,12 @@ public partial class UploadViewModel : ViewModelBase
         SelectedEngineOption = ModelCatalog.FindEngine(Engine);
         ParakeetModel = settings.DefaultParakeetModel;
         SelectedParakeetModelOption = ModelCatalog.FindParakeet(ParakeetModel);
+        // Find dispara OnSelectedModelOptionChanged e normaliza Quality para o perfil de UI.
         SelectedSpeakerModeOption = SpeakerModeOptions.First(option => option.Value == SpeakerMode);
         LockPortugueseIfNeeded();
 
         FolderOptions.Clear();
-        FolderOptions.Add(new FolderOptionViewModel { Id = null, Name = "Nenhuma (avulsa)" });
+        FolderOptions.Add(new FolderOptionViewModel { Id = null, Name = "Nenhuma pasta", Icon = "" });
 
         foreach (var folder in await folderService.GetAllAsync())
         {
@@ -354,6 +368,7 @@ public partial class UploadViewModel : ViewModelBase
             {
                 Id = folder.Id,
                 Name = folder.Title,
+                Icon = folder.Icon,
             });
         }
 

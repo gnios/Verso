@@ -8,12 +8,14 @@ using Verso.Core.Media;
 
 namespace Verso.App.ViewModels;
 
-public partial class PlayerBarViewModel : ViewModelBase
+public partial class PlayerBarViewModel : ViewModelBase, IDisposable
 {
     private static readonly float[] Speeds = [1f, 1.25f, 1.5f, 2f];
 
     private readonly IMediaPlaybackService _playback;
     private int _speedIndex;
+    private bool _disposed;
+    private TimeSpan _knownDuration;
 
     public event EventHandler<TimeSpan>? PositionChanged;
 
@@ -39,6 +41,7 @@ public partial class PlayerBarViewModel : ViewModelBase
     {
         _playback = playback;
         _playback.PositionChanged += OnPlaybackPositionChanged;
+        _playback.DurationChanged += OnPlaybackDurationChanged;
         Volume = _playback.Volume;
         _playback.PlaybackRate = Speeds[0];
     }
@@ -46,14 +49,15 @@ public partial class PlayerBarViewModel : ViewModelBase
     public void SeekToTime(TimeSpan position)
     {
         _playback.SeekTo(position);
-        var duration = _playback.Duration;
+        var duration = EffectiveDuration;
         var percent = duration > TimeSpan.Zero ? position.TotalSeconds / duration.TotalSeconds : 0;
         UpdateProgress(percent);
         UpdateCurrentTimeDisplay(position);
         PositionChanged?.Invoke(this, position);
     }
 
-    public async Task LoadAsync(string? mediaPath)
+    /// <param name="knownDuration">Duração do banco — exibida sem baixar o arquivo.</param>
+    public async Task LoadAsync(string? mediaPath, TimeSpan? knownDuration = null)
     {
         if (string.IsNullOrWhiteSpace(mediaPath))
         {
@@ -61,8 +65,19 @@ public partial class PlayerBarViewModel : ViewModelBase
             return;
         }
 
+        _knownDuration = knownDuration is { } d && d > TimeSpan.Zero ? d : TimeSpan.Zero;
+        if (_knownDuration > TimeSpan.Zero)
+        {
+            _playback.SetKnownDuration(_knownDuration);
+            TotalTimeDisplay = FormatTime(_knownDuration);
+        }
+        else
+        {
+            TotalTimeDisplay = "00:00";
+        }
+
+        // Só registra o path — o fetch HTTP acontece no primeiro Play/Seek.
         await _playback.LoadAsync(mediaPath);
-        UpdateDurationDisplay();
         UpdateProgress(0);
         CurrentTimeDisplay = "00:00";
         IsPlaying = false;
@@ -70,6 +85,7 @@ public partial class PlayerBarViewModel : ViewModelBase
 
     public async Task UnloadAsync()
     {
+        _knownDuration = TimeSpan.Zero;
         await _playback.UnloadAsync();
         TotalTimeDisplay = "00:00";
         CurrentTimeDisplay = "00:00";
@@ -94,7 +110,7 @@ public partial class PlayerBarViewModel : ViewModelBase
     [RelayCommand]
     private void Seek(double percent)
     {
-        var duration = _playback.Duration;
+        var duration = EffectiveDuration;
         if (duration <= TimeSpan.Zero)
         {
             return;
@@ -131,13 +147,24 @@ public partial class PlayerBarViewModel : ViewModelBase
         IsPlaying = false;
     }
 
-    private void OnPlaybackPositionChanged(object? sender, TimeSpan position) =>
-        // O serviço de playback dispara este evento a partir do timer de posição (thread pool),
-        // não da UI. Repassar direto derruba o app com "The calling thread cannot access this
-        // object because a different thread owns it" ao atualizar Bindings/Commands do Avalonia.
+    private TimeSpan EffectiveDuration =>
+        _playback.Duration > TimeSpan.Zero ? _playback.Duration : _knownDuration;
+
+    private void OnPlaybackDurationChanged(object? sender, TimeSpan duration) =>
         UiThread.Invoke(() =>
         {
-            var duration = _playback.Duration;
+            if (duration > TimeSpan.Zero)
+            {
+                _knownDuration = duration;
+            }
+
+            UpdateDurationDisplay();
+        });
+
+    private void OnPlaybackPositionChanged(object? sender, TimeSpan position) =>
+        UiThread.Invoke(() =>
+        {
+            var duration = EffectiveDuration;
             var percent = duration > TimeSpan.Zero ? position.TotalSeconds / duration.TotalSeconds : 0;
             UpdateProgress(percent);
             UpdateCurrentTimeDisplay(position);
@@ -156,7 +183,7 @@ public partial class PlayerBarViewModel : ViewModelBase
 
     private void UpdateDurationDisplay()
     {
-        TotalTimeDisplay = FormatTime(_playback.Duration);
+        TotalTimeDisplay = FormatTime(EffectiveDuration);
     }
 
     private void UpdateProgress(double percent) => ProgressPercent = Math.Clamp(percent * 100, 0, 100);
@@ -172,5 +199,17 @@ public partial class PlayerBarViewModel : ViewModelBase
         }
 
         return $"{time.Minutes:D2}:{time.Seconds:D2}";
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _playback.PositionChanged -= OnPlaybackPositionChanged;
+        _playback.DurationChanged -= OnPlaybackDurationChanged;
     }
 }

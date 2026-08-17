@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Runtime.InteropServices;
 
 namespace Verso.Core.Engine;
@@ -16,7 +17,7 @@ internal enum VulkanDeviceType
 internal sealed record VulkanDeviceInfo(int Index, VulkanDeviceType DeviceType, string Name);
 
 /// <summary>
-/// Enumerador de dispositivos físicos Vulkan via P/Invoke direto na vulkan-1.dll.
+/// Enumerador de dispositivos físicos Vulkan via P/Invoke (vulkan-1.dll / libvulkan).
 /// Constrói as estruturas VkInstanceCreateInfo em memória não-gerenciada (byte a byte)
 /// para evitar problemas de alinhamento/layout de struct que causaram crashes em
 /// tentativas anteriores com StructLayout marshaling automático.
@@ -29,6 +30,8 @@ internal sealed record VulkanDeviceInfo(int Index, VulkanDeviceType DeviceType, 
 /// </summary>
 internal static class VulkanDeviceEnumerator
 {
+    private const string VulkanLibraryAlias = "verso_vulkan";
+
     // VK_MAKE_API_VERSION(0, 1, 0, 0)
     private const uint VkApiVersion1_0 = 4_194_304;
 
@@ -55,19 +58,44 @@ internal static class VulkanDeviceEnumerator
     //   VkMemoryHeap memoryHeaps[16] (16 bytes/ea) → 256 bytes
     private const int MemoryPropertiesSize = 528;
 
-    [DllImport("vulkan-1.dll")]
+    static VulkanDeviceEnumerator()
+    {
+        NativeLibrary.SetDllImportResolver(typeof(VulkanDeviceEnumerator).Assembly, ResolveVulkanLibrary);
+    }
+
+    private static IntPtr ResolveVulkanLibrary(string libraryName, Assembly assembly, DllImportSearchPath? searchPath)
+    {
+        if (libraryName != VulkanLibraryAlias)
+            return IntPtr.Zero;
+
+        string[] candidates = OperatingSystem.IsWindows()
+            ? ["vulkan-1.dll"]
+            : OperatingSystem.IsLinux()
+                ? ["libvulkan.so.1", "libvulkan.so"]
+                : ["libvulkan.1.dylib", "libvulkan.dylib"];
+
+        foreach (var candidate in candidates)
+        {
+            if (NativeLibrary.TryLoad(candidate, assembly, searchPath, out var handle))
+                return handle;
+        }
+
+        return IntPtr.Zero;
+    }
+
+    [DllImport(VulkanLibraryAlias)]
     private static extern int vkCreateInstance(IntPtr pCreateInfo, IntPtr pAllocator, out IntPtr pInstance);
 
-    [DllImport("vulkan-1.dll")]
+    [DllImport(VulkanLibraryAlias)]
     private static extern void vkDestroyInstance(IntPtr instance, IntPtr pAllocator);
 
-    [DllImport("vulkan-1.dll")]
+    [DllImport(VulkanLibraryAlias)]
     private static extern int vkEnumeratePhysicalDevices(IntPtr instance, ref uint pPhysicalDeviceCount, IntPtr[]? pPhysicalDevices);
 
-    [DllImport("vulkan-1.dll")]
+    [DllImport(VulkanLibraryAlias)]
     private static extern void vkGetPhysicalDeviceProperties(IntPtr physicalDevice, IntPtr pProperties);
 
-    [DllImport("vulkan-1.dll")]
+    [DllImport(VulkanLibraryAlias)]
     private static extern void vkGetPhysicalDeviceMemoryProperties(IntPtr physicalDevice, IntPtr pMemoryProperties);
 
     /// <summary>

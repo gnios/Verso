@@ -95,6 +95,16 @@ public sealed class WorkerProcessTranscriptionEngine : ITranscriptionEngine
                 break;
         }
 
+        // Fecha o stdin do worker para desbloquear ListenForCancelLineAsync (Console.In
+        // ignora CancellationToken). Se mesmo assim o processo não sair, mata.
+        try
+        {
+            process.StandardInput.Close();
+        }
+        catch
+        {
+        }
+
         var exitCode = await WaitForWorkerExitAsync(process);
 
         if (errorMessage is not null)

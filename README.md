@@ -1,8 +1,8 @@
 # Verso
 
-App desktop de transcrição de áudio/vídeo com [whisper.net](https://github.com/sandrohanea/whisper.net), em português. Windows-only.
+App desktop de transcrição de áudio/vídeo com [whisper.net](https://github.com/sandrohanea/whisper.net), em português. Windows, Linux e macOS (Apple Silicon).
 
-**Stack:** .NET 10 · WPF + Blazor Hybrid (WebView2) · EF Core 10 + SQLite · whisper.net 1.9.1 · NAudio
+**Stack:** .NET 10 · Photino.Blazor (WebView2 / WebKitGTK / WKWebView) · EF Core 10 + SQLite · whisper.net 1.9.1 · NAudio
 
 ## O que faz
 
@@ -14,72 +14,38 @@ App desktop de transcrição de áudio/vídeo com [whisper.net](https://github.c
 - Gravação direto do microfone
 - Exporta em **TXT, SRT e VTT**
 - Tema claro/escuro
-- Baixa modelos do Whisper sob demanda (incl. fine-tune pt-BR)
-- Download e recomendação inteligente de modelo baseada no hardware
+- Baixa modelos de reconhecimento de fala sob demanda
+- Recomendação de precisão com base no hardware
 
-## Modelos de Transcrição
+## Precisão da transcrição
 
-Whisper é um modelo de rede neural da OpenAI para transcrição de fala, treinado com 680 mil horas de áudio multilíngue (99 idiomas). O Verso utiliza os modelos no formato **GGML** (quantizados), que são versões comprimidas para rodar eficientemente em hardware de consumo.
+O Verso oferece **três perfis** pensados para pesquisa acadêmica (sem nomes técnicos de modelo):
 
-### Tabela comparativa
+| Perfil | Tamanho | Tempo | Quando usar |
+|--------|:-------:|:-----:|-------------|
+| **Rápido** | ~142 MB | Mais rápido | Rascunho, checagem de áudio, primeira passagem |
+| **Equilibrado** | ~466 MB | Tempo médio | Maioria das entrevistas e aulas (padrão) |
+| **Preciso** | ~1,2 GB | Mais lento · maior qualidade | Citação na tese, áudio difícil, análise fina |
 
-| Modelo | Tamanho | RAM/VRAM | Velocidade | Precisão |
-|--------|:-------:|:--------:|:----------:|:--------:|
-| **Tiny** | ~75 MB | ~1 GB | Muito rápida | Baixa |
-| **Base** | ~142 MB | ~1,5 GB | Rápida | Baixa–Média |
-| **Padrão (Small)** | ~466 MB | ~2,5 GB | Moderada | Média–Alta |
-| **Medium** | ~1,5 GB | ~5 GB | Lenta | Alta |
-| **Large v3-turbo** | ~1,2 GB | ~4 GB | Rápida (GPU) | Muito alta |
-| **Large v3 (Alta)** | ~3 GB | ~6–8 GB | Muito lenta | Máxima |
-| **Pt-BR Turbo (distil)** | ~538 MB | ~2 GB | Rápida | Muito alta (pt-BR) |
-| **Large v2** | ~3 GB | ~6–8 GB | Muito lenta | Alta |
-| **Large v1** | ~3 GB | ~6–8 GB | Muito lenta | Alta (obsoleto) |
-| **Tiny/Base/Small/Medium (EN)** | — | — | Mais rápidos | Inglês apenas |
+> A escolha na interface é por **cartões**. O app recomenda um perfil em Configurações com base na memória. Hardware (CPU/GPU) fica em **Avançado**.
 
-### Qual modelo usar
-
-**CPU:**
-
-| RAM | Recomendado | Motivo |
-|:---:|:-----------:|--------|
-| < 6 GB | **Tiny** | Roda em máquinas com pouca memória |
-| 6–12 GB | **Base** | Equilíbrio para hardware modesto |
-| 12–24 GB | **Padrão (Small)** | Boa precisão sem ser lento |
-| ≥ 24 GB | **Medium** | Máxima precisão em CPU |
-
-**GPU (CUDA NVIDIA ou Vulkan):**
-
-| RAM | Recomendado | Motivo |
-|:---:|:-----------:|--------|
-| < 8 GB | **Large v3-turbo** | Equilíbrio para GPUs de entrada |
-| 8–32 GB | **Large v3-turbo** | Melhor relação velocidade/qualidade |
-| ≥ 32 GB | **Alta (Large v3)** | Máxima qualidade (VRAM 12 GB+) |
-
-**Orientações rápidas:**
-
-- **Primeiro uso:** comece com **Padrão (Small)**
-- **Português brasileiro:** use **Pt-BR Turbo (distil)** — fine-tuned para pt-BR, qualidade superior com metade do tamanho
-- **Máxima qualidade (GPU):** **Alta (Large v3)**
-- **Máxima velocidade (GPU):** **Large v3-turbo**
-- **Inglês apenas:** prefira variante **EN** (Tiny, Base, Small ou Medium)
-- **Hardware limitado (≤ 4 GB):** **Tiny** ou **Base**
-
-> O app tem um **recomendador automático** que sugere o modelo ideal na tela de Configurações com base no dispositivo e na RAM do computador.
-
-### Dispositivos de execução
+### Dispositivos de execução (Avançado)
 
 | Modo | Descrição |
 |------|-----------|
-| **Automático** | Tenta CUDA → Vulkan → CPU. Padrão recomendado. |
+| **Automático** | Tenta GPU e cai para CPU. Padrão recomendado. |
 | **CPU** | Processa apenas com CPU. Qualquer computador. |
 | **CUDA** | Aceleração por GPU NVIDIA. |
 | **Vulkan** | Aceleração por GPU via Vulkan (AMD, Intel, NVIDIA). |
 
 ## Requisitos
 
-- **Windows 10/11** (WPF + WebView2 não rodam em Linux/macOS)
-- Microsoft Edge **WebView2 Runtime** (presente por padrão no Windows 11)
-- **FFmpeg** — o app tenta localizar no `PATH`; se não achar, oferece instalar automaticamente
+- **Windows 10/11**, **Linux x64** ou **macOS Apple Silicon**
+- Runtime de WebView da plataforma:
+  - Windows: Edge **WebView2** (padrão no Windows 11)
+  - Linux: **WebKitGTK** (ex.: `libwebkit2gtk-4.1-0` no Ubuntu/Debian)
+  - macOS: **WKWebView** (nativo)
+- **FFmpeg** no `PATH` (no Windows o app pode oferecer instalação via winget)
 - Para build: [.NET 10 SDK](https://dotnet.microsoft.com/download)
 
 ## Rodar em desenvolvimento
@@ -89,6 +55,7 @@ dotnet restore
 dotnet run --project src/Verso.App
 # ou:
 dotnet publish src/Verso.App -c Release -r win-x64 --self-contained true -o ./publish
+# Linux: -r linux-x64 · macOS Apple Silicon: -r osx-arm64
 dotnet test
 ```
 
@@ -97,19 +64,23 @@ O banco SQLite, as migrations e a pasta `data/` são criados automaticamente no 
 ## Estrutura
 
 ```
-src/Verso.App    UI WPF + Blazor Hybrid (WebView2), ViewModels, serviços de UI
-src/Verso.Core   Engine (whisper.net), serviços, dados (EF Core + SQLite), export
-tests/Verso.Tests  testes xUnit
+src/Verso.App     UI Photino.Blazor, ViewModels, serviços de UI
+src/Verso.Worker  Processo isolado de transcrição (spawn automático pelo App)
+src/Verso.Core    Engine (whisper.net), serviços, dados (EF Core + SQLite), export
+tests/Verso.Tests testes xUnit
 ```
 
 ## Releases
 
-Pipeline em `.github/workflows/release.yml`. Ao publicar uma tag `v*.*.*`, ou fazer push na `main`, o CI builda **duas variantes self-contained** win-x64 e cria um GitHub Release:
+Pipeline em `.github/workflows/release.yml`. Tag `v*.*.*` ou push na `main` gera um GitHub Release com **6 zips** (cpu/gpu × win-x64 / linux-x64 / osx-arm64):
 
-- **`Verso-x.y.z-cpu-win-x64.zip`** (~200 MB) — só runtime CPU. Recomendado para quem não tem GPU NVIDIA.
-- **`Verso-x.y.z-gpu-win-x64.zip`** (~960 MB) — inclui runtimes CUDA + CUDA 12 + Vulkan para aceleração por GPU.
+| Zip | Aceleração |
+|-----|------------|
+| `*-cpu-win-x64.zip` / `*-gpu-win-x64.zip` | CPU · CUDA/Vulkan |
+| `*-cpu-linux-x64.zip` / `*-gpu-linux-x64.zip` | CPU · CUDA/Vulkan |
+| `*-cpu-osx-arm64.zip` / `*-gpu-osx-arm64.zip` | CPU · Core ML |
 
-Nenhuma exige .NET Runtime instalado — só o WebView2 Runtime. **Dados portáteis:** modelos, áudios, banco e logs ficam em `data/` ao lado do exe — mova a pasta inteira que tudo funciona.
+Cada zip tem o app + Worker (iniciado na transcrição) + `wwwroot/` + `runtimes/`. Self-contained (sem .NET instalado). **Dados portáteis** em `data/` ao lado do executável.
 
 ```bash
 git tag v0.1.0
@@ -130,7 +101,7 @@ A etapa de assinatura está no pipeline e ativa **automaticamente** quando as va
    - **Secrets:** `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`
    - **Variables:** `AZURE_SIGNING_ENDPOINT`, `AZURE_SIGNING_ACCOUNT`, `AZURE_CERTIFICATE_PROFILE`
 
-A próxima tag assina o `Verso.App.exe` automaticamente.
+A próxima tag assina os `.exe` da raiz (`Verso.App.exe` e `Verso.Worker.exe`) automaticamente.
 
 ## Roadmap
 
@@ -146,4 +117,4 @@ A próxima tag assina o `Verso.App.exe` automaticamente.
 
 ### Futuro (fora de escopo atual)
 
-- **Suporte Linux/macOS** — app é Windows-only (WPF + WebView2); exigiria reescrever a UI.
+- **macOS Intel (osx-x64)** — release atual foca em Apple Silicon (`osx-arm64`).

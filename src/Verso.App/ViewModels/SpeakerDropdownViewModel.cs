@@ -1,9 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
+using Verso.Core.Data.Entities;
 using Verso.Core.Services;
 
 namespace Verso.App.ViewModels;
@@ -46,9 +49,16 @@ public partial class SpeakerDropdownViewModel : ViewModelBase
         using var scope = _scopeFactory.CreateScope();
         var speakerService = scope.ServiceProvider.GetRequiredService<SpeakerService>();
         var speakers = await speakerService.GetSpeakersAsync(_transcriptionId);
+        SetSpeakers(speakers);
+    }
 
+    /// <summary>
+    /// Popula o dropdown a partir de speakers já carregados no detail (evita query extra na abertura).
+    /// </summary>
+    public void SetSpeakers(IEnumerable<Speaker> speakers)
+    {
         Speakers.Clear();
-        foreach (var speaker in speakers)
+        foreach (var speaker in speakers.OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase))
         {
             Speakers.Add(new SpeakerOptionViewModel(
                 speaker.Id,

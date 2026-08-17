@@ -26,7 +26,7 @@ public static class WhisperRuntimeConfigurator
         var order = ResolveRuntimeOrder(device);
         int? vulkanDeviceIndex = null;
 
-        if (device == ExecutionDevice.Vulkan && OperatingSystem.IsWindows())
+        if (device == ExecutionDevice.Vulkan && (OperatingSystem.IsWindows() || OperatingSystem.IsLinux()))
         {
             // Verifica se existe GPU dedicada visível ao Vulkan.
             // Em notebooks com Optimus, a dGPU pode não estar registrada
@@ -37,8 +37,8 @@ public static class WhisperRuntimeConfigurator
             {
                 VramFallbackReason =
                     "Nenhuma GPU dedicada (DiscreteGpu) encontrada via Vulkan. " +
-                    "Verifique se o driver NVIDIA está instalado corretamente " +
-                    "e se o Vulkan Runtime está presente. Fallback automático para CPU.";
+                    "Verifique se o driver da GPU e o Vulkan Runtime estão instalados. " +
+                    "Fallback automático para CPU.";
                 order = [RuntimeLibrary.Cpu, RuntimeLibrary.CpuNoAvx];
             }
             else if (quality.HasValue)
@@ -104,7 +104,6 @@ public static class WhisperRuntimeConfigurator
         ModelQuality.Base or ModelQuality.BaseEn => 1_000_000_000,       // ~1 GB
         ModelQuality.Standard => 1_500_000_000,                          // ~1.5 GB (Small)
         ModelQuality.SmallEn => 1_500_000_000,                           // ~1.5 GB
-        ModelQuality.PtBrTurbo => 1_500_000_000,                         // ~1.5 GB (Q5_0, compacto)
         ModelQuality.Medium or ModelQuality.MediumEn => 3_000_000_000,   // ~3 GB
         ModelQuality.High or ModelQuality.LargeV1 or ModelQuality.LargeV2
             or ModelQuality.LargeV3Turbo => 4_500_000_000,                // ~4.5 GB
@@ -125,6 +124,18 @@ public static class WhisperRuntimeConfigurator
             ExecutionDevice.Vulkan =>
             [
                 RuntimeLibrary.Vulkan,
+                RuntimeLibrary.Cpu,
+                RuntimeLibrary.CpuNoAvx,
+            ],
+            ExecutionDevice.CoreMl =>
+            [
+                RuntimeLibrary.CoreML,
+                RuntimeLibrary.Cpu,
+                RuntimeLibrary.CpuNoAvx,
+            ],
+            ExecutionDevice.Auto when OperatingSystem.IsMacOS() =>
+            [
+                RuntimeLibrary.CoreML,
                 RuntimeLibrary.Cpu,
                 RuntimeLibrary.CpuNoAvx,
             ],

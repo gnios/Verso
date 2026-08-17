@@ -139,7 +139,15 @@ public sealed class WorkerHost
 
             if (message is WorkerCancelMessage)
             {
-                jobCancellation.Cancel();
+                try
+                {
+                    jobCancellation.Cancel();
+                }
+                catch (ObjectDisposedException)
+                {
+                    // RunAsync já retornou e descartou o CancellationTokenSource.
+                }
+
                 return;
             }
         }

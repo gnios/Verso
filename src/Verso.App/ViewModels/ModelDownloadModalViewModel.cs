@@ -10,6 +10,9 @@ public partial class ModelDownloadModalViewModel : ViewModelBase
     private bool _isOpen;
 
     [ObservableProperty]
+    private string _title = "Preparando reconhecimento de fala…";
+
+    [ObservableProperty]
     private string _message = "";
 
     public void Show(string message)
@@ -20,36 +23,17 @@ public partial class ModelDownloadModalViewModel : ViewModelBase
 
     public void Show(ModelQuality quality)
     {
-        if (quality == ModelQuality.PtBrTurbo)
-        {
-            Show("O modelo pt-BR Turbo (distil, ~538 MB) está sendo baixado do HuggingFace. " +
-                "Isso pode levar alguns minutos e ocorre apenas na primeira transcrição com este modelo.");
-            return;
-        }
-
-        var ggmlType = ModelManager.MapQualityToGgmlType(quality);
+        var profile = ModelCatalog.Find(quality);
+        var ggmlType = ModelManager.MapQualityToGgmlType(profile.Value);
         var sizeMb = ModelManager.GetMinimumModelSizeBytes(ggmlType) / 1_000_000;
-        var name = QualityDisplayName(quality);
-        Show($"O modelo {name} (~{sizeMb} MB) está sendo baixado via Whisper.net. " +
-            "Isso pode levar alguns minutos e ocorre apenas na primeira transcrição com esta qualidade.");
-    }
 
-    private static string QualityDisplayName(ModelQuality quality) => quality switch
-    {
-        ModelQuality.Tiny => "Tiny",
-        ModelQuality.TinyEn => "Tiny (EN)",
-        ModelQuality.Base => "Base",
-        ModelQuality.BaseEn => "Base (EN)",
-        ModelQuality.Standard => "Padrão (Small)",
-        ModelQuality.SmallEn => "Small (EN)",
-        ModelQuality.Medium => "Medium",
-        ModelQuality.MediumEn => "Medium (EN)",
-        ModelQuality.High => "Alta (LargeV3)",
-        ModelQuality.LargeV1 => "LargeV1",
-        ModelQuality.LargeV2 => "LargeV2",
-        ModelQuality.LargeV3Turbo => "LargeV3 Turbo",
-        _ => quality.ToString(),
-    };
+        Title = "Preparando reconhecimento de fala…";
+        Message =
+            $"Na primeira vez o Verso baixa os arquivos do perfil {profile.Label} (~{sizeMb} MB). " +
+            "Isso acontece só uma vez por perfil e pode levar alguns minutos.";
+
+        IsOpen = true;
+    }
 
     public void Hide() => IsOpen = false;
 }

@@ -28,13 +28,21 @@ public partial class SettingsViewModel : ViewModelBase
         new("en", "English"),
     ];
 
-    public IReadOnlyList<DeviceOptionViewModel> DeviceOptions { get; } =
-    [
-        new(ExecutionDevice.Auto, "Automático"),
-        new(ExecutionDevice.Cpu, "CPU"),
-        new(ExecutionDevice.Cuda, "CUDA"),
-        new(ExecutionDevice.Vulkan, "Vulkan"),
-    ];
+    public IReadOnlyList<DeviceOptionViewModel> DeviceOptions { get; } = BuildDeviceOptions();
+
+    private static IReadOnlyList<DeviceOptionViewModel> BuildDeviceOptions()
+    {
+        var options = new List<DeviceOptionViewModel>
+        {
+            new(ExecutionDevice.Auto, "Automático"),
+            new(ExecutionDevice.Cpu, "Somente processador"),
+            new(ExecutionDevice.Cuda, "GPU NVIDIA"),
+            new(ExecutionDevice.Vulkan, "GPU (outras placas)"),
+        };
+        if (OperatingSystem.IsMacOS())
+            options.Add(new(ExecutionDevice.CoreMl, "Apple Silicon"));
+        return options;
+    }
 
     public IReadOnlyList<ModelOptionViewModel> ModelOptions { get; } = ModelCatalog.All;
 
@@ -78,6 +86,8 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     private string _modelRecommendationReason = "";
 
+    [ObservableProperty]
+    private bool _isAdvancedExpanded;
 
     public long DetectedRamGb { get; private set; }
 
@@ -358,10 +368,12 @@ public partial class SettingsViewModel : ViewModelBase
         try
         {
             Directory.CreateDirectory(LogDirectoryPath);
-            Process.Start(new ProcessStartInfo("explorer.exe", LogDirectoryPath)
-            {
-                UseShellExecute = true,
-            });
+            ProcessStartInfo psi = OperatingSystem.IsWindows()
+                ? new("explorer.exe", LogDirectoryPath) { UseShellExecute = true }
+                : OperatingSystem.IsMacOS()
+                    ? new("open", LogDirectoryPath) { UseShellExecute = false }
+                    : new("xdg-open", LogDirectoryPath) { UseShellExecute = false };
+            Process.Start(psi);
         }
         catch (Exception ex)
         {

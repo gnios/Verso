@@ -13,7 +13,7 @@ using Verso.Core.Services;
 
 namespace Verso.App.ViewModels;
 
-public partial class FolderViewModel : ViewModelBase
+public partial class FolderViewModel : ViewModelBase, IDisposable
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly NavigationService _navigation;
@@ -22,6 +22,7 @@ public partial class FolderViewModel : ViewModelBase
     private readonly MediaStorageService _mediaStorage;
     private readonly TranscriptionQueueService? _queueService;
     private int _folderId;
+    private bool _disposed;
 
     public ObservableCollection<TranscriptionCardViewModel> Transcriptions { get; } = [];
 
@@ -78,6 +79,8 @@ public partial class FolderViewModel : ViewModelBase
         if (serviceProvider.GetService<TranscriptionQueueService>() is { } queueService)
         {
             _queueService = queueService;
+            _queueService.StatusChanged += OnQueueStatusChanged;
+            _queueService.ProgressChanged += OnQueueProgressChanged;
         }
     }
 
@@ -224,6 +227,9 @@ public partial class FolderViewModel : ViewModelBase
             transcription.ParakeetModel));
     }
 
+    internal void CancelTranscription(Guid transcriptionId) =>
+        _queueService?.Cancel(transcriptionId);
+
     /// <summary>Filtra _allSummaries por status + busca e reconstrói a lista de cards exibida.</summary>
     private void ApplyFilter()
     {
@@ -247,11 +253,14 @@ public partial class FolderViewModel : ViewModelBase
         Transcriptions.Clear();
         foreach (var summary in filtered)
         {
-            Transcriptions.Add(new TranscriptionCardViewModel(
+            var card = new TranscriptionCardViewModel(
                 summary,
                 OpenTranscription,
                 retryHandler: id => _ = RetryTranscriptionAsync(id),
-                deleteHandler: id => _ = DeleteTranscriptionAsync(id)));
+                deleteHandler: id => _ = DeleteTranscriptionAsync(id),
+                cancelHandler: CancelTranscription);
+            RestoreProgress(card);
+            Transcriptions.Add(card);
         }
 
         IsEmpty = Transcriptions.Count == 0;
@@ -288,5 +297,125 @@ public partial class FolderViewModel : ViewModelBase
 
         _allSummaries = (await libraryService.GetTranscriptionsForFolderAsync(_folderId)).ToList();
         ApplyFilter();
+    }
+
+    private void OnQueueStatusChanged(object? sender, TranscriptionStatusChangedEventArgs e) =>
+        UiThread.Invoke(() => ApplyQueueStatusChanged(e));
+
+    private void ApplyQueueStatusChanged(TranscriptionStatusChangedEventArgs e)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        var card = Transcriptions.FirstOrDefault(t => t.Id == e.TranscriptionId);
+        var summary = _allSummaries.FirstOrDefault(s => s.Id == e.TranscriptionId);
+
+        if (summary is null && card is null)
+        {
+            if (e.Status is TranscriptionStatusChanged.Queued or TranscriptionStatusChanged.InProgress
+                or TranscriptionStatusChanged.Done or TranscriptionStatusChanged.Error)
+            {
+                _ = LoadAsync();
+            }
+
+            return;
+        }
+
+        var mapped = MapQueueStatus(e.Status);
+
+        if (summary is not null)
+        {
+            var index = _allSummaries.FindIndex(s => s.Id == e.TranscriptionId);
+            if (index >= 0)
+            {
+                _allSummaries[index] = summary with
+                {
+                    Status = mapped,
+                    ErrorMessage = e.Status == TranscriptionStatusChanged.Error ? e.ErrorMessage : null,
+                };
+            }
+        }
+
+        if (card is not null)
+        {
+            card.Status = mapped;
+            if (e.Status == TranscriptionStatusChanged.Error)
+            {
+                card.ErrorMessage = e.ErrorMessage;
+                card.ClearProgress();
+            }
+            else if (e.Status == TranscriptionStatusChanged.Done)
+            {
+                card.ErrorMessage = null;
+                card.ClearProgress();
+            }
+            else if (e.Status == TranscriptionStatusChanged.Queued)
+            {
+                card.ClearProgress();
+            }
+        }
+
+        if (e.Status is TranscriptionStatusChanged.Done or TranscriptionStatusChanged.Error)
+        {
+            ApplyFilter();
+            _ = _sidebar.LoadAsync();
+        }
+    }
+
+    private void OnQueueProgressChanged(object? sender, TranscriptionProgressEventArgs e) =>
+        UiThread.Invoke(() => ApplyQueueProgressChanged(e));
+
+    private void ApplyQueueProgressChanged(TranscriptionProgressEventArgs e)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        var card = Transcriptions.FirstOrDefault(t => t.Id == e.TranscriptionId);
+        if (card is null || !card.IsInProgress)
+        {
+            return;
+        }
+
+        card.ApplyProgress(e);
+    }
+
+    private void RestoreProgress(TranscriptionCardViewModel card)
+    {
+        if (!card.IsInProgress
+            || _queueService is null
+            || !_queueService.TryGetLatestProgress(card.Id, out var progress))
+        {
+            return;
+        }
+
+        card.ApplyProgress(progress);
+    }
+
+    private static TranscriptionStatus MapQueueStatus(TranscriptionStatusChanged status) =>
+        status switch
+        {
+            TranscriptionStatusChanged.Done => TranscriptionStatus.Done,
+            TranscriptionStatusChanged.Error => TranscriptionStatus.Error,
+            _ => TranscriptionStatus.InProgress
+        };
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
+        if (_queueService is not null)
+        {
+            _queueService.StatusChanged -= OnQueueStatusChanged;
+            _queueService.ProgressChanged -= OnQueueProgressChanged;
+        }
     }
 }

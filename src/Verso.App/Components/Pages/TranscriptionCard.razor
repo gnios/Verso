@@ -10,9 +10,9 @@
 *@
 @implements IDisposable
 
-<div class="dash-card" @onclick="() => ViewModel.OpenCommand.Execute(null)">
-    <div class="dash-card-title">@ViewModel.StatusIcon@(string.IsNullOrEmpty(ViewModel.StatusIcon) ? "" : " ")@ViewModel.Icon @ViewModel.Title</div>
-    <div class="dash-card-preview">@ViewModel.Preview</div>
+<div class="dash-card" data-testid="transcription-card" data-transcription-id="@ViewModel.Id" @onclick="() => ViewModel.OpenCommand.Execute(null)">
+    <div class="dash-card-title" data-testid="transcription-card-title">@ViewModel.StatusIcon@(string.IsNullOrEmpty(ViewModel.StatusIcon) ? "" : " ")@ViewModel.Icon @ViewModel.Title</div>
+    <div class="dash-card-preview @(ViewModel.IsDone ? "dash-card-preview-done" : "")" data-testid="transcription-card-preview">@ViewModel.Preview</div>
     <div class="tags-row">
         @foreach (var tag in ViewModel.Tags)
         {
@@ -21,9 +21,19 @@
     </div>
     <div class="dash-card-meta">
         <span class="status-badge @StatusBadgeClass">@ViewModel.StatusLabel</span>
-        <span>@ViewModel.Date</span>
-        <span>@ViewModel.Duration</span>
+        @if (ViewModel.ShowDate)
+        {
+            <span data-testid="transcription-card-date">@ViewModel.Date</span>
+        }
+        <span data-testid="transcription-card-duration">@ViewModel.Duration</span>
         <div class="dash-card-actions">
+            @if (ViewModel.CanCancel)
+            {
+                <button class="dash-card-action" title="Parar" data-testid="transcription-card-cancel" @onclick="() => ViewModel.CancelCommand.Execute(null)" @onclick:stopPropagation="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="1" /></svg>
+                    Parar
+                </button>
+            }
             @if (ViewModel.CanRetry)
             {
                 <button class="dash-card-action" title="Tentar novamente" @onclick="() => ViewModel.RetryCommand.Execute(null)" @onclick:stopPropagation="true">
@@ -46,10 +56,9 @@
             <div class="dash-card-progress">
                 <div class="dash-card-progress-fill @(ViewModel.IsProgressIndeterminate ? "indeterminate" : "")" style="@(ViewModel.IsProgressIndeterminate ? "" : $"width:{ViewModel.ProgressWidth}%")"></div>
             </div>
-            <div class="dash-card-progress-label">@ViewModel.ProgressLabel</div>
             @if (!string.IsNullOrEmpty(ViewModel.EstimatedTimeLabel))
             {
-                <div class="dash-card-estimate">@ViewModel.EstimatedTimeLabel</div>
+                <div class="dash-card-estimate" data-testid="transcription-card-estimate">@ViewModel.EstimatedTimeLabel</div>
             }
         </div>
     }

@@ -6,97 +6,113 @@
     Fiel ao `#screen-editor` do protótipo (transcriba-v2-icons-transcriptions.html).
     ViewModel recebido via `[Parameter]` (Transient resolvido pelo NavigationService).
 *@
+@using Microsoft.AspNetCore.Components.Web.Virtualization
 @using Verso.App.Components.Shared
 @implements IDisposable
 @inject IJSRuntime JS
 
-<section class="screen active" style="padding:0;overflow:hidden">
+<section class="screen active editor-screen">
     <div class="editor-shell">
-        <div class="editor-transcript" @ref="_transcriptScroll">
-            <div class="editor-transcript-inner">
-                <div class="editor-breadcrumb">
-                    <a href="#" @onclick="() => ViewModel.NavigateDashboardCommand.Execute(null)" @onclick:preventDefault="true">Biblioteca</a>
-                    @if (ViewModel.HasFolderBreadcrumb)
-                    {
-                        @: &nbsp;→&nbsp;
-                        <a href="#" @onclick="() => ViewModel.NavigateFolderCommand.Execute(null)" @onclick:preventDefault="true">@ViewModel.FolderTitle</a>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(ViewModel.Title))
-                    {
-                        @: &nbsp;→&nbsp; @(ViewModel.HasIcon ? ViewModel.Icon + " " : "")@ViewModel.Title
-                    }
+        @if (ViewModel.IsLoading)
+        {
+            <div class="editor-loading" data-testid="editor-loading" aria-busy="true" aria-live="polite">
+                <div class="editor-loading-bar" aria-hidden="true">
+                    <div class="editor-loading-bar-fill"></div>
                 </div>
-
-                <div class="editor-title-row" style="position:relative">
-                    <div class="editor-page-icon @(ViewModel.HasIcon ? "has-icon" : "")"
-                         title="Clique para trocar ícone"
-                         @onclick="() => ViewModel.ToggleIconPickerCommand.Execute(null)">
-                        @(ViewModel.HasIcon ? ViewModel.Icon : "+")
+                <p class="editor-loading-text">Abrindo transcrição…</p>
+            </div>
+        }
+        else
+        {
+            <div class="editor-transcript">
+                <div class="editor-transcript-header">
+                    <div class="editor-breadcrumb">
+                        <a href="#" @onclick="() => ViewModel.NavigateDashboardCommand.Execute(null)" @onclick:preventDefault="true">Biblioteca</a>
+                        @if (ViewModel.HasFolderBreadcrumb)
+                        {
+                            @: &nbsp;→&nbsp;
+                            <a href="#" @onclick="() => ViewModel.NavigateFolderCommand.Execute(null)" @onclick:preventDefault="true">@ViewModel.FolderTitle</a>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(ViewModel.Title))
+                        {
+                            @: &nbsp;→&nbsp; @(ViewModel.HasIcon ? ViewModel.Icon + " " : "")@ViewModel.Title
+                        }
                     </div>
-                    <input type="text" class="editor-title-input" value="@ViewModel.Title"
-                           @oninput="OnTitleInput" @onblur="async () => await ViewModel.CommitTitleCommand.ExecuteAsync(null)"
-                           @onkeydown="OnTitleKeyDown" />
-                    <div class="icon-popup @(ViewModel.IsIconPickerOpen ? "open" : "")">
-                        <div class="icon-popup-title">Ícone da transcrição</div>
-                        <IconPicker ViewModel="ViewModel.IconPicker" />
-                        <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:8px">
-                            <button type="button" style="padding:5px 12px;font-size:12px;border-radius:var(--radius);background:var(--surface);border:1px solid var(--border);color:var(--fg-secondary);cursor:pointer"
-                                    @onclick="() => ViewModel.CloseIconPickerCommand.Execute(null)">Feito</button>
+
+                    <div class="editor-title-row" style="position:relative">
+                        <div class="editor-page-icon @(ViewModel.HasIcon ? "has-icon" : "")"
+                             title="Clique para trocar ícone"
+                             @onclick="() => ViewModel.ToggleIconPickerCommand.Execute(null)">
+                            @(ViewModel.HasIcon ? ViewModel.Icon : "+")
+                        </div>
+                        <input type="text" class="editor-title-input" data-testid="editor-title" value="@ViewModel.Title"
+                               @oninput="OnTitleInput" @onblur="async () => await ViewModel.CommitTitleCommand.ExecuteAsync(null)"
+                               @onkeydown="OnTitleKeyDown" />
+                        <div class="icon-popup @(ViewModel.IsIconPickerOpen ? "open" : "")">
+                            <div class="icon-popup-title">Ícone da transcrição</div>
+                            <IconPicker ViewModel="ViewModel.IconPicker" />
+                            <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:8px">
+                                <button type="button" style="padding:5px 12px;font-size:12px;border-radius:var(--radius);background:var(--surface);border:1px solid var(--border);color:var(--fg-secondary);cursor:pointer"
+                                        @onclick="() => ViewModel.CloseIconPickerCommand.Execute(null)">Feito</button>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="editor-meta">
-                    <span>@ViewModel.MetaDate</span>
-                    <span class="editor-meta-dot"></span>
-                    <span>@ViewModel.MetaDuration</span>
-                    <span class="editor-meta-dot"></span>
-                    <span>@ViewModel.MetaSpeakerCount</span>
-                    <span class="editor-meta-dot"></span>
-                    <FolderCombobox Options="ViewModel.FolderOptions" SelectedId="ViewModel.SelectedFolderId" OnSelected="OnFolderSelected" />
-                    <span class="editor-meta-dot"></span>
-                    <button type="button" class="editor-meta-export" disabled="@(!ViewModel.CanExport)" @onclick="() => ViewModel.ExportCommand.Execute(null)">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
-                        Exportar
-                    </button>
-                </div>
-                <div class="editor-submeta">
-                    <span>@ViewModel.MetaModel</span>
-                    <span class="editor-meta-dot"></span>
-                    <span title="@ViewModel.MetaProcessingTime — tempo de transcrição">@ViewModel.MetaProcessingTime</span>
-                </div>
+                    <div class="editor-meta">
+                        <span>@ViewModel.MetaDate</span>
+                        <span class="editor-meta-dot"></span>
+                        <span>@ViewModel.MetaDuration</span>
+                        <span class="editor-meta-dot"></span>
+                        <span>@ViewModel.MetaSpeakerCount</span>
+                        <span class="editor-meta-dot"></span>
+                        <FolderCombobox Options="ViewModel.FolderOptions" SelectedId="ViewModel.SelectedFolderId" OnSelected="OnFolderSelected" />
+                        <span class="editor-meta-dot"></span>
+                        <button type="button" class="editor-meta-export" disabled="@(!ViewModel.CanExport)" @onclick="() => ViewModel.ExportCommand.Execute(null)">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+                            Exportar
+                        </button>
+                    </div>
+                    <div class="editor-submeta">
+                        <span>@ViewModel.MetaModel</span>
+                        <span class="editor-meta-dot"></span>
+                        <span title="@ViewModel.MetaProcessingTime — tempo de transcrição">@ViewModel.MetaProcessingTime</span>
+                    </div>
 
-                <div class="editor-tags editor-tags-editable">
-                    @foreach (var tag in ViewModel.Tags)
-                    {
-                        <span class="tag tag-sm tag-@tag.ColorName">
-                            @tag.Name
-                            <button type="button" class="tag-remove" title="Remover tag" @onclick="() => ViewModel.RemoveTagCommand.ExecuteAsync(tag)" @onclick:stopPropagation="true">×</button>
-                        </span>
-                    }
-                    <TagCombobox Options="ViewModel.TagOptions" AssignedNames="ViewModel.Tags.Select(t => t.Name).ToList()" OnAddTag="OnAddTagFromCombobox" />
-                </div>
-
-                @if (ViewModel.IsInProgress || ViewModel.IsError)
-                {
-                    <div style="padding:24px 0;color:@(ViewModel.IsError ? "var(--red)" : "var(--muted)")">@ViewModel.StatusMessage</div>
-                }
-                else if (ViewModel.HasSegments)
-                {
-
-                    <div id="transcript-segments">
-                        @foreach (var segment in ViewModel.Segments)
+                    <div class="editor-tags editor-tags-editable">
+                        @foreach (var tag in ViewModel.Tags)
                         {
-                            <SegmentItem @key="segment.Id" ViewModel="segment" />
+                            <span class="tag tag-sm tag-@tag.ColorName">
+                                @tag.Name
+                                <button type="button" class="tag-remove" title="Remover tag" @onclick="() => ViewModel.RemoveTagCommand.ExecuteAsync(tag)" @onclick:stopPropagation="true">×</button>
+                            </span>
                         }
+                        <TagCombobox Options="ViewModel.TagOptions" AssignedNames="ViewModel.Tags.Select(t => t.Name).ToList()" OnAddTag="OnAddTagFromCombobox" />
+                    </div>
+
+                    @if (ViewModel.IsInProgress || ViewModel.IsError)
+                    {
+                        <div style="padding:24px 0;color:@(ViewModel.IsError ? "var(--red)" : "var(--muted)")">@ViewModel.StatusMessage</div>
+                    }
+                </div>
+
+                @if (ViewModel.HasSegments)
+                {
+                    @* Virtualize: só monta ~20 SegmentItem visíveis — necessário com 1k–2k+ segmentos. *@
+                    <div id="transcript-segments" class="transcript-segments-scroll" data-testid="transcript-segments">
+                        <Virtualize Items="ViewModel.Segments"
+                                    Context="segment"
+                                    ItemSize="110"
+                                    OverscanCount="6">
+                            <SegmentItem @key="segment.Id" ViewModel="segment" />
+                        </Virtualize>
                     </div>
                 }
             </div>
-        </div>
 
-        @if (ViewModel.HasSegments || ViewModel.IsInProgress)
-        {
-            <PlayerBar ViewModel="ViewModel.PlayerBar" />
+            @if (ViewModel.HasSegments || ViewModel.IsInProgress)
+            {
+                <PlayerBar ViewModel="ViewModel.PlayerBar" />
+            }
         }
     </div>
 </section>
@@ -207,7 +223,7 @@
     public EditorViewModel ViewModel { get; set; } = null!;
 
     private EditorViewModel? _subscribed;
-    private ElementReference _transcriptScroll;
+    private System.Collections.ObjectModel.ObservableCollection<SegmentItemViewModel>? _segmentsSubscribed;
 
     protected override void OnParametersSet()
     {
@@ -219,9 +235,9 @@
         Unsubscribe();
         _subscribed = ViewModel;
         ViewModel.PropertyChanged += OnViewModelChanged;
-        ViewModel.Segments.CollectionChanged += OnSegmentsChanged;
         ViewModel.Tags.CollectionChanged += OnTagsChanged;
         ViewModel.ScrollToSegmentRequested += OnScrollToSegmentRequested;
+        SubscribeSegments(ViewModel.Segments);
     }
 
     private void OnTitleInput(ChangeEventArgs e) =>
@@ -251,6 +267,15 @@
     {
         try
         {
+            var index = ViewModel.IndexOfSegment(segment);
+            if (index >= 0)
+            {
+                await JS.InvokeVoidAsync(
+                    "versoEditor.scrollToSegmentIndex",
+                    index,
+                    EditorViewModel.SegmentItemHeightEstimate);
+            }
+
             await JS.InvokeVoidAsync("versoEditor.scrollToSegmentById", segment.Id.ToString());
         }
         catch (JSDisconnectedException)
@@ -259,14 +284,37 @@
         }
     }
 
-    private void OnViewModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) =>
+    private void OnViewModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(EditorViewModel.Segments))
+        {
+            SubscribeSegments(ViewModel.Segments);
+        }
+
         InvokeAsync(StateHasChanged);
+    }
 
     private void OnSegmentsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e) =>
         InvokeAsync(StateHasChanged);
 
     private void OnTagsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e) =>
         InvokeAsync(StateHasChanged);
+
+    private void SubscribeSegments(System.Collections.ObjectModel.ObservableCollection<SegmentItemViewModel> segments)
+    {
+        if (ReferenceEquals(_segmentsSubscribed, segments))
+        {
+            return;
+        }
+
+        if (_segmentsSubscribed is not null)
+        {
+            _segmentsSubscribed.CollectionChanged -= OnSegmentsChanged;
+        }
+
+        _segmentsSubscribed = segments;
+        _segmentsSubscribed.CollectionChanged += OnSegmentsChanged;
+    }
 
     private void Unsubscribe()
     {
@@ -276,9 +324,15 @@
         }
 
         _subscribed.PropertyChanged -= OnViewModelChanged;
-        _subscribed.Segments.CollectionChanged -= OnSegmentsChanged;
         _subscribed.Tags.CollectionChanged -= OnTagsChanged;
         _subscribed.ScrollToSegmentRequested -= OnScrollToSegmentRequested;
+        if (_segmentsSubscribed is not null)
+        {
+            _segmentsSubscribed.CollectionChanged -= OnSegmentsChanged;
+            _segmentsSubscribed = null;
+        }
+
+        _subscribed = null;
     }
 
     public void Dispose() => Unsubscribe();

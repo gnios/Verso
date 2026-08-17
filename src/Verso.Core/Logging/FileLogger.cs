@@ -55,7 +55,7 @@ public sealed class FileLoggerProvider : ILoggerProvider
             return;
         }
 
-        var line = FormatLine(categoryName, logLevel, message, exception);
+        var line = VersoLogFormatter.FormatLine(categoryName, logLevel, message, exception);
 
         lock (_lock)
         {
@@ -63,42 +63,6 @@ public sealed class FileLoggerProvider : ILoggerProvider
             _writer?.WriteLine(line);
             _writer?.Flush();
         }
-    }
-
-    private static string FormatLine(
-        string categoryName,
-        LogLevel logLevel,
-        string message,
-        Exception? exception)
-    {
-        var sb = new StringBuilder(256);
-        sb.Append(DateTime.Now.ToString("HH:mm:ss.fff"));
-        sb.Append(" [").Append(LevelTag(logLevel)).Append("] ");
-        sb.Append('[').Append(ShortCategory(categoryName)).Append("] ");
-        sb.Append(message);
-        if (exception is not null)
-        {
-            sb.Append(" — ").Append(exception.GetType().Name).Append(": ").Append(exception.Message);
-        }
-
-        return sb.ToString();
-    }
-
-    private static string LevelTag(LogLevel level) => level switch
-    {
-        LogLevel.Trace => "TRC",
-        LogLevel.Debug => "DBG",
-        LogLevel.Information => "INF",
-        LogLevel.Warning => "WRN",
-        LogLevel.Error => "ERR",
-        LogLevel.Critical => "CRT",
-        _ => "???",
-    };
-
-    private static string ShortCategory(string categoryName)
-    {
-        var idx = categoryName.LastIndexOf('.');
-        return idx >= 0 ? categoryName[(idx + 1)..] : categoryName;
     }
 
     private void EnsureWriter()

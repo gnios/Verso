@@ -57,7 +57,7 @@ public static class TranscriptionEstimator
             (ModelQuality.Medium, ExecutionDevice.Cpu) or (ModelQuality.MediumEn, ExecutionDevice.Cpu) => 3.0,
             (ModelQuality.High, ExecutionDevice.Cpu) or (ModelQuality.LargeV1, ExecutionDevice.Cpu)
                 or (ModelQuality.LargeV2, ExecutionDevice.Cpu) => 10.0,
-            (ModelQuality.LargeV3Turbo, ExecutionDevice.Cpu) or (ModelQuality.PtBrTurbo, ExecutionDevice.Cpu) => 4.0,
+            (ModelQuality.LargeV3Turbo, ExecutionDevice.Cpu) => 4.0,
 
             // CUDA
             (ModelQuality.Tiny, ExecutionDevice.Cuda) or (ModelQuality.TinyEn, ExecutionDevice.Cuda) => 0.03,
@@ -66,7 +66,7 @@ public static class TranscriptionEstimator
             (ModelQuality.Medium, ExecutionDevice.Cuda) or (ModelQuality.MediumEn, ExecutionDevice.Cuda) => 0.15,
             (ModelQuality.High, ExecutionDevice.Cuda) or (ModelQuality.LargeV1, ExecutionDevice.Cuda)
                 or (ModelQuality.LargeV2, ExecutionDevice.Cuda) => 0.50,
-            (ModelQuality.LargeV3Turbo, ExecutionDevice.Cuda) or (ModelQuality.PtBrTurbo, ExecutionDevice.Cuda) => 0.15,
+            (ModelQuality.LargeV3Turbo, ExecutionDevice.Cuda) => 0.15,
 
             // Vulkan
             (ModelQuality.Tiny, ExecutionDevice.Vulkan) or (ModelQuality.TinyEn, ExecutionDevice.Vulkan) => 0.05,
@@ -75,7 +75,7 @@ public static class TranscriptionEstimator
             (ModelQuality.Medium, ExecutionDevice.Vulkan) or (ModelQuality.MediumEn, ExecutionDevice.Vulkan) => 0.25,
             (ModelQuality.High, ExecutionDevice.Vulkan) or (ModelQuality.LargeV1, ExecutionDevice.Vulkan)
                 or (ModelQuality.LargeV2, ExecutionDevice.Vulkan) => 0.80,
-            (ModelQuality.LargeV3Turbo, ExecutionDevice.Vulkan) or (ModelQuality.PtBrTurbo, ExecutionDevice.Vulkan) => 0.25,
+            (ModelQuality.LargeV3Turbo, ExecutionDevice.Vulkan) => 0.25,
 
             _ => 2.0,
         };

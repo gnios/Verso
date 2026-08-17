@@ -276,38 +276,27 @@ public partial class FeedbackViewModel : ViewModelBase
 
     private static string GetCpuName()
     {
-        try
+        if (OperatingSystem.IsWindows())
         {
-            using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
-                @"HARDWARE\DESCRIPTION\System\CentralProcessor\0");
-            var name = key?.GetValue("ProcessorNameString")?.ToString();
-            if (!string.IsNullOrWhiteSpace(name))
-                return name.Trim();
+            try
+            {
+                using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                    @"HARDWARE\DESCRIPTION\System\CentralProcessor\0");
+                var name = key?.GetValue("ProcessorNameString")?.ToString();
+                if (!string.IsNullOrWhiteSpace(name))
+                    return name.Trim();
+            }
+            catch
+            {
+                // fallback
+            }
         }
-        catch
-        {
-            // fallback
-        }
+
         return $"Processador ({Environment.ProcessorCount} núcleos)";
     }
 
-    private static string ModelName(ModelQuality q) => q switch
-    {
-        ModelQuality.Tiny => "Tiny",
-        ModelQuality.TinyEn => "Tiny (EN)",
-        ModelQuality.Base => "Base",
-        ModelQuality.BaseEn => "Base (EN)",
-        ModelQuality.Standard => "Padrão (Small)",
-        ModelQuality.SmallEn => "Small (EN)",
-        ModelQuality.Medium => "Medium",
-        ModelQuality.MediumEn => "Medium (EN)",
-        ModelQuality.High => "Alta (LargeV3)",
-        ModelQuality.LargeV1 => "LargeV1",
-        ModelQuality.LargeV2 => "LargeV2",
-        ModelQuality.LargeV3Turbo => "LargeV3 Turbo",
-        ModelQuality.PtBrTurbo => "Pt-BR Turbo",
-        _ => q.ToString(),
-    };
+    private static string ModelName(ModelQuality q) =>
+        ModelCatalog.Find(q).Label;
 
     private static string DeviceLabel(ExecutionDevice d) => d switch
     {
@@ -315,6 +304,7 @@ public partial class FeedbackViewModel : ViewModelBase
         ExecutionDevice.Cpu => "CPU",
         ExecutionDevice.Cuda => "CUDA",
         ExecutionDevice.Vulkan => "Vulkan",
+        ExecutionDevice.CoreMl => "Core ML",
         _ => d.ToString(),
     };
 
