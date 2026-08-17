@@ -148,7 +148,9 @@ public partial class DashboardViewModel : ViewModelBase
             transcription.Language,
             transcription.Quality,
             settings.Device,
-            settings.MaxTranscriptionThreads));
+            settings.MaxTranscriptionThreads,
+            transcription.Engine,
+            transcription.ParakeetModel));
     }
 
     private void ApplyNavigationParameter(NavigationParameter? parameter)

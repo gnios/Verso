@@ -219,7 +219,9 @@ public partial class FolderViewModel : ViewModelBase
             transcription.Language,
             transcription.Quality,
             settings.Device,
-            settings.MaxTranscriptionThreads));
+            settings.MaxTranscriptionThreads,
+            transcription.Engine,
+            transcription.ParakeetModel));
     }
 
     /// <summary>Filtra _allSummaries por status + busca e reconstrói a lista de cards exibida.</summary>

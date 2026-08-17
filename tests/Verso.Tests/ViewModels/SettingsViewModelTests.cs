@@ -224,6 +224,32 @@ public class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task ChangeEngine_PersistsDefaultEngineAndParakeetModel()
+    {
+        var (provider, directory) = await CreateProviderAsync();
+        try
+        {
+            var settings = CreateSettings(provider);
+            await settings.LoadAsync();
+
+            settings.SelectedEngineOption = settings.EngineOptions.First(o => o.Value == TranscriptionEngineKind.Parakeet);
+            settings.SelectedParakeetModelOption = settings.ParakeetModelOptions.First(o => o.Value == ParakeetModel.PtBrTagarela);
+            await Task.Delay(50);
+
+            using var scope = provider.CreateScope();
+            var service = scope.ServiceProvider.GetRequiredService<SettingsService>();
+            var saved = await service.GetAsync();
+
+            Assert.Equal(TranscriptionEngineKind.Parakeet, saved.DefaultEngine);
+            Assert.Equal(ParakeetModel.PtBrTagarela, saved.DefaultParakeetModel);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
     public async Task ChangeDevice_UpdatesRecommendation()
     {
         var (provider, directory) = await CreateProviderAsync();

@@ -12,23 +12,26 @@ public partial class ModelDownloadModalViewModel : ViewModelBase
     [ObservableProperty]
     private string _message = "";
 
+    public void Show(string message)
+    {
+        Message = message;
+        IsOpen = true;
+    }
+
     public void Show(ModelQuality quality)
     {
         if (quality == ModelQuality.PtBrTurbo)
         {
-            Message = "O modelo pt-BR Turbo (distil, ~538 MB) está sendo baixado do HuggingFace. " +
-                "Isso pode levar alguns minutos e ocorre apenas na primeira transcrição com este modelo.";
-        }
-        else
-        {
-            var ggmlType = ModelManager.MapQualityToGgmlType(quality);
-            var sizeMb = ModelManager.GetMinimumModelSizeBytes(ggmlType) / 1_000_000;
-            var name = QualityDisplayName(quality);
-            Message = $"O modelo {name} (~{sizeMb} MB) está sendo baixado via Whisper.net. " +
-                "Isso pode levar alguns minutos e ocorre apenas na primeira transcrição com esta qualidade.";
+            Show("O modelo pt-BR Turbo (distil, ~538 MB) está sendo baixado do HuggingFace. " +
+                "Isso pode levar alguns minutos e ocorre apenas na primeira transcrição com este modelo.");
+            return;
         }
 
-        IsOpen = true;
+        var ggmlType = ModelManager.MapQualityToGgmlType(quality);
+        var sizeMb = ModelManager.GetMinimumModelSizeBytes(ggmlType) / 1_000_000;
+        var name = QualityDisplayName(quality);
+        Show($"O modelo {name} (~{sizeMb} MB) está sendo baixado via Whisper.net. " +
+            "Isso pode levar alguns minutos e ocorre apenas na primeira transcrição com esta qualidade.");
     }
 
     private static string QualityDisplayName(ModelQuality quality) => quality switch

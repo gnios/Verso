@@ -2,6 +2,8 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Verso.App;
@@ -172,6 +174,7 @@ public class UploadViewModelTests
             Assert.Equal(TranscriptionStatus.InProgress, transcription.Status);
             Assert.Equal(folderId, transcription.FolderId);
             Assert.Equal("es", transcription.Language);
+            Assert.Equal(TranscriptionEngineKind.Whisper, transcription.Engine);
             Assert.Equal(SpeakerMode.Off, transcription.SpeakerMode);
             Assert.False(string.IsNullOrWhiteSpace(transcription.MediaFilePath));
             Assert.True(File.Exists(transcription.MediaFilePath));
@@ -266,6 +269,44 @@ public class UploadViewModelTests
             Assert.Equal("pt", upload.Language);
             Assert.Equal("pt", upload.SelectedLanguageOption!.Code);
             Assert.True(upload.IsLanguageLocked);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task SelectParakeetTagarela_ForcesPortugueseAndPersistsEngine()
+    {
+        var (provider, directory, mediaPath, _) = await CreateUploadProviderAsync();
+        try
+        {
+            var upload = await CreateUploadAsync(provider);
+            upload.SelectedEngineOption = upload.EngineOptions.First(o => o.Value == TranscriptionEngineKind.Parakeet);
+            upload.SelectedParakeetModelOption = upload.ParakeetModelOptions.First(o => o.Value == ParakeetModel.PtBrTagarela);
+            Assert.True(upload.IsLanguageLocked);
+            Assert.Equal("pt", upload.Language);
+
+            upload.TrySelectFile(mediaPath);
+            await upload.StartTranscriptionCommand.ExecuteAsync(null);
+
+            await using var ctx = await TestDbHelper.GetFactory(provider).CreateDbContextAsync();
+            var transcription = Assert.Single(ctx.Transcriptions);
+            Assert.Equal(TranscriptionEngineKind.Parakeet, transcription.Engine);
+            Assert.Equal(ParakeetModel.PtBrTagarela, transcription.ParakeetModel);
+            Assert.Equal("pt", transcription.Language);
+
+            var queue = provider.GetRequiredService<TranscriptionQueueService>();
+            var channel = typeof(TranscriptionQueueService)
+                .GetField("_channel", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .GetValue(queue) as Channel<TranscriptionJobRequest>;
+            Assert.NotNull(channel);
+            Assert.True(channel.Reader.TryRead(out var request));
+            Assert.Equal(transcription.Id, request.TranscriptionId);
+            Assert.Equal(TranscriptionEngineKind.Parakeet, request.Engine);
+            Assert.Equal(ParakeetModel.PtBrTagarela, request.ParakeetModel);
+            Assert.Equal("pt", request.Language);
         }
         finally
         {

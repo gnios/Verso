@@ -22,3 +22,7 @@ public enum ModelQuality
 public enum SpeakerMode { Automatic, Off }
 
 public enum ExecutionDevice { Auto, Cpu, Cuda, Vulkan }
+
+public enum TranscriptionEngineKind { Whisper = 0, Parakeet = 1 }
+
+public enum ParakeetModel { MultilingualV3 = 0, PtBrTagarela = 1 }

@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.Linq;
 using Verso.Core.Data.Entities;
+using Verso.Core.Engine;
 
 namespace Verso.App.ViewModels;
 
@@ -32,9 +34,27 @@ public static class ModelCatalog
         new(ModelQuality.MediumEn, "Medium (inglês)", "~1,5 GB", true),
     ];
 
+    public static IReadOnlyList<EngineOptionViewModel> Engines { get; } =
+    [
+        new(TranscriptionEngineKind.Whisper, "Whisper", "Melhor cobertura de idiomas; mais lento em CPU"),
+        new(TranscriptionEngineKind.Parakeet, "Parakeet (leve, CPU)", "Rápido sem GPU; pt/en/es"),
+    ];
+
+    public static IReadOnlyList<ParakeetModelOptionViewModel> ParakeetModels { get; } =
+    [
+        new(ParakeetModel.PtBrTagarela, "pt-BR TAGARELA", ParakeetModelManager.GetSizeLabel(ParakeetModel.PtBrTagarela)),
+        new(ParakeetModel.MultilingualV3, "TDT v3 (pt/en/es)", ParakeetModelManager.GetSizeLabel(ParakeetModel.MultilingualV3)),
+    ];
+
     /// <summary>Localiza a opção pelo valor do enum, ou a primeira se não achar.</summary>
     public static ModelOptionViewModel Find(ModelQuality value) =>
         _lookup.TryGetValue(value, out var opt) ? opt : All[0];
+
+    public static EngineOptionViewModel FindEngine(TranscriptionEngineKind value) =>
+        Engines.FirstOrDefault(o => o.Value == value) ?? Engines[0];
+
+    public static ParakeetModelOptionViewModel FindParakeet(ParakeetModel value) =>
+        ParakeetModels.FirstOrDefault(o => o.Value == value) ?? ParakeetModels[0];
 
     private static readonly Dictionary<ModelQuality, ModelOptionViewModel> _lookup =
         BuildLookup();
@@ -49,4 +69,11 @@ public static class ModelCatalog
 
         return dict;
     }
+}
+
+public sealed record EngineOptionViewModel(TranscriptionEngineKind Value, string Label, string Hint);
+
+public sealed record ParakeetModelOptionViewModel(ParakeetModel Value, string Label, string SizeLabel)
+{
+    public override string ToString() => $"{Label} · {SizeLabel}";
 }

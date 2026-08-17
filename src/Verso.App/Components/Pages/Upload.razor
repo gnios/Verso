@@ -92,6 +92,29 @@
                 }
             </div>
             <div>
+                <label class="upload-label">Motor</label>
+                <select class="upload-select" value="@ViewModel.SelectedEngineOption?.Value" @onchange="OnEngineChanged">
+                    @foreach (var option in ViewModel.EngineOptions)
+                    {
+                        <option value="@option.Value">@option.Label</option>
+                    }
+                </select>
+            </div>
+            @if (ViewModel.IsParakeetEngine)
+            {
+            <div>
+                <label class="upload-label">Modelo Parakeet</label>
+                <select class="upload-select" value="@ViewModel.SelectedParakeetModelOption?.Value" @onchange="OnParakeetModelChanged">
+                    @foreach (var option in ViewModel.ParakeetModelOptions)
+                    {
+                        <option value="@option.Value">@option.Label · @option.SizeLabel</option>
+                    }
+                </select>
+            </div>
+            }
+            else
+            {
+            <div>
                 <label class="upload-label">Qualidade</label>
                 <select class="upload-select" value="@ViewModel.SelectedModelOption?.Value" @onchange="OnModelChanged">
                     @foreach (var option in ViewModel.ModelOptions)
@@ -100,6 +123,7 @@
                     }
                 </select>
             </div>
+            }
             <div>
                 <label class="upload-label">Locutores</label>
                 <select class="upload-select" value="@ViewModel.SelectedSpeakerModeOption?.Value" @onchange="OnSpeakerModeChanged">
@@ -176,6 +200,24 @@
         if (option is not null)
         {
             ViewModel.SelectedLanguageOption = option;
+        }
+    }
+
+    private void OnEngineChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<TranscriptionEngineKind>(e.Value?.ToString(), out var engine))
+        {
+            var option = ViewModel.EngineOptions.FirstOrDefault(o => o.Value == engine);
+            if (option is not null) ViewModel.SelectedEngineOption = option;
+        }
+    }
+
+    private void OnParakeetModelChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<ParakeetModel>(e.Value?.ToString(), out var model))
+        {
+            var option = ViewModel.ParakeetModelOptions.FirstOrDefault(o => o.Value == model);
+            if (option is not null) ViewModel.SelectedParakeetModelOption = option;
         }
     }
 

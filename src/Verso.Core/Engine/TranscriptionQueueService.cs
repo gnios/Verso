@@ -281,9 +281,18 @@ public static class EngineServiceCollectionExtensions
         return services;
     }
 
+    public static IServiceCollection AddParakeetEngine(this IServiceCollection services)
+    {
+        services.AddSingleton<ParakeetModelManager>();
+        services.AddSingleton<IParakeetRecognizerFactory, OnnxParakeetRecognizerFactory>();
+        services.AddSingleton<ParakeetTranscriptionEngine>();
+        return services;
+    }
+
     public static IServiceCollection AddVersoEngine(this IServiceCollection services)
     {
         services.AddWhisperEngine();
+        services.AddParakeetEngine();
         services.AddSingleton<IWorkerExecutableLocator, WorkerExecutableLocator>();
         services.AddSingleton<IWorkerProcessFactory, WorkerProcessFactory>();
         services.AddSingleton<ITranscriptionEngine, WorkerProcessTranscriptionEngine>();

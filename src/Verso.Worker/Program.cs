@@ -20,16 +20,19 @@ public static class Program
 
         var services = new ServiceCollection();
         services.AddWhisperEngine();
+        services.AddParakeetEngine();
 
         await using var provider = services.BuildServiceProvider();
 
-        // Resolve o motor CONCRETO (nunca ITranscriptionEngine): este processo é o worker que
+        // Resolve os motores CONCRETOS (nunca ITranscriptionEngine): este processo é o worker que
         // WorkerProcessTranscriptionEngine spawna, então resolver a interface aqui recriaria o
-        // ciclo processo-worker-de-processo-worker. WorkerHost.RunAsync espera um
-        // ITranscriptionEngine, então embrulha o motor concreto no adapter existente — puro
-        // repasse em memória, sem envolver o DI/registro de ITranscriptionEngine do T7.
-        var engine = provider.GetRequiredService<WhisperTranscriptionEngine>();
-        var innerEngine = new WhisperTranscriptionEngineAdapter(engine);
+        // ciclo processo-worker-de-processo-worker. DispatchingTranscriptionEngine escolhe Whisper
+        // ou Parakeet a partir de TranscriptionJobRequest.Engine.
+        var whisper = provider.GetRequiredService<WhisperTranscriptionEngine>();
+        var parakeet = provider.GetRequiredService<ParakeetTranscriptionEngine>();
+        var innerEngine = new DispatchingTranscriptionEngine(
+            new WhisperTranscriptionEngineAdapter(whisper),
+            parakeet);
 
         var host = new WorkerHost();
         return await host.RunAsync(Console.In, Console.Out, innerEngine, CancellationToken.None);
