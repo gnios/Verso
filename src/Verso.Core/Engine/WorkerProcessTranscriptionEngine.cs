@@ -1,5 +1,5 @@
 using System.Text.Json;
-
+using Microsoft.Extensions.Logging;
 using Verso.Core.Engine.Worker;
 
 namespace Verso.Core.Engine;
@@ -18,22 +18,26 @@ public sealed class WorkerProcessTranscriptionEngine : ITranscriptionEngine
     private readonly IWorkerExecutableLocator _locator;
     private readonly IWorkerProcessFactory _processFactory;
     private readonly TimeSpan _gracefulShutdownTimeout;
+    private readonly ILogger<WorkerProcessTranscriptionEngine>? _logger;
 
     public WorkerProcessTranscriptionEngine(
         IWorkerExecutableLocator locator,
-        IWorkerProcessFactory processFactory)
-        : this(locator, processFactory, DefaultGracefulShutdownTimeout)
+        IWorkerProcessFactory processFactory,
+        ILogger<WorkerProcessTranscriptionEngine>? logger = null)
+        : this(locator, processFactory, DefaultGracefulShutdownTimeout, logger)
     {
     }
 
     internal WorkerProcessTranscriptionEngine(
         IWorkerExecutableLocator locator,
         IWorkerProcessFactory processFactory,
-        TimeSpan gracefulShutdownTimeout)
+        TimeSpan gracefulShutdownTimeout,
+        ILogger<WorkerProcessTranscriptionEngine>? logger = null)
     {
         _locator = locator;
         _processFactory = processFactory;
         _gracefulShutdownTimeout = gracefulShutdownTimeout;
+        _logger = logger;
     }
 
     public async Task<TranscriptionResult> TranscribeAsync(
@@ -42,6 +46,10 @@ public sealed class WorkerProcessTranscriptionEngine : ITranscriptionEngine
         CancellationToken cancellationToken)
     {
         var exePath = _locator.Resolve();
+        _logger?.LogInformation(
+            "Iniciando Verso.Worker para {TranscriptionId}: {ExePath}",
+            request.TranscriptionId,
+            exePath);
         await using var process = _processFactory.Start(exePath);
 
         await WriteMessageAsync(process, new WorkerJobMessage(request));
@@ -87,7 +95,7 @@ public sealed class WorkerProcessTranscriptionEngine : ITranscriptionEngine
                 break;
         }
 
-        var exitCode = await process.WaitForExitAsync(CancellationToken.None);
+        var exitCode = await WaitForWorkerExitAsync(process);
 
         if (errorMessage is not null)
             throw new InvalidOperationException(errorMessage);
@@ -100,6 +108,22 @@ public sealed class WorkerProcessTranscriptionEngine : ITranscriptionEngine
 
         throw new InvalidOperationException(
             $"O processo worker terminou inesperadamente (exit code {exitCode}) sem devolver resultado.");
+    }
+
+    private async Task<int> WaitForWorkerExitAsync(IWorkerProcess process)
+    {
+        using var timeoutCts = new CancellationTokenSource(_gracefulShutdownTimeout);
+        try
+        {
+            return await process.WaitForExitAsync(timeoutCts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger?.LogWarning(
+                "Verso.Worker não encerrou após o resultado; forçando Kill para a UI não ficar presa.");
+            process.Kill();
+            return -1;
+        }
     }
 
     private async Task HandleCancellationAsync(IWorkerProcess process)

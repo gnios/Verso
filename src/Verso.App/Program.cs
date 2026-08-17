@@ -24,7 +24,13 @@ public class Program
     public static IServiceProvider Services =>
         _services ?? throw new InvalidOperationException("Serviços ainda não foram inicializados.");
 
-    public static async Task Main(string[] args)
+    // Photino/WebView2 no Windows exigem STA. `async Task Main` quebra [STAThread]
+    // (a continuação sai da thread STA) — entrada síncrona + GetAwaiter().GetResult().
+    [STAThread]
+    public static void Main(string[] args) =>
+        MainAsync(args).GetAwaiter().GetResult();
+
+    private static async Task MainAsync(string[] args)
     {
 #if DEBUG
         AttachDebugConsole();
@@ -45,10 +51,23 @@ public class Program
 
         app.MainWindow
             .SetTitle("Verso")
-            .SetSize(1280, 800);
+            .SetSize(1280, 800)
+            .Center();
 #if DEBUG
         app.MainWindow.SetDevToolsEnabled(true);
 #endif
+
+        AppDomain.CurrentDomain.UnhandledException += (_, error) =>
+        {
+            try
+            {
+                app.MainWindow.ShowMessage("Erro fatal", error.ExceptionObject?.ToString() ?? "(sem detalhes)");
+            }
+            catch
+            {
+                // Ignora falha ao mostrar diálogo se a janela já morreu.
+            }
+        };
 
         RouteWhisperNativeLogs(app.Services);
         await DbBootstrapper.MigrateAsync(app.Services);

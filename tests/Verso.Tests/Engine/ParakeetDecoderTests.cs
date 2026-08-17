@@ -1,3 +1,4 @@
+using Microsoft.ML.OnnxRuntime.Tensors;
 using Verso.Core.Engine;
 
 namespace Verso.Tests.Engine;
@@ -90,6 +91,112 @@ public class ParakeetTdtGreedyTests
     public void ArgMax_ReturnsHighestIndexInRange()
     {
         Assert.Equal(2, ParakeetTdtGreedy.ArgMax([0.1f, 0.2f, 0.9f, 0.4f], 3));
+    }
+}
+
+public class ParakeetEncoderFramesTests
+{
+    [Fact]
+    public void Extract_ChannelsFirstShortAudio_ReturnsOneFramePerTimeStep()
+    {
+        var tensor = ChannelsFirstTensor(channels: 1024, time: 5);
+        var frames = ParakeetEncoderFrames.Extract(tensor, encodedLength: 5);
+
+        Assert.Equal(5, frames.Count);
+        Assert.Equal(1024, frames[0].Length);
+        Assert.Equal(3f, frames[3][0]);
+        Assert.Equal(7f, frames[3][1]);
+    }
+
+    [Fact]
+    public void Extract_ChannelsFirstWhenTimeExceedsChannels_DoesNotSwapAxes()
+    {
+        // O bug: T=2000 > C=1024 fazia a heurística dims[1] >= dims[2] falhar
+        // e mandar 2000 "canais" para o decoder_joint (que espera 1024).
+        var tensor = ChannelsFirstTensor(channels: 1024, time: 2000);
+        var frames = ParakeetEncoderFrames.Extract(tensor, encodedLength: 2000);
+
+        Assert.Equal(2000, frames.Count);
+        Assert.All(frames, frame => Assert.Equal(1024, frame.Length));
+        Assert.Equal(1999f, frames[1999][0]);
+        Assert.Equal(7f, frames[3][1]);
+    }
+
+    private static DenseTensor<float> ChannelsFirstTensor(int channels, int time)
+    {
+        var data = new float[1 * channels * time];
+        var tensor = new DenseTensor<float>(data, [1, channels, time]);
+        for (var t = 0; t < time; t++)
+        {
+            tensor[0, 0, t] = t;
+            tensor[0, 1, t] = 4 + t;
+        }
+
+        return tensor;
+    }
+}
+
+public class ParakeetAudioChunkerTests
+{
+    [Fact]
+    public void Split_ShortAudio_ReturnsSingleChunk()
+    {
+        var samples = new float[AudioLoader.SampleRate * 5];
+        var chunks = ParakeetAudioChunker.Split(samples);
+
+        Assert.Single(chunks);
+        Assert.Equal(0, chunks[0].OffsetSamples);
+        Assert.Same(samples, chunks[0].Samples);
+    }
+
+    [Fact]
+    public void Split_LongAudio_UsesOverlapBetweenWindows()
+    {
+        var seconds = 50;
+        var samples = new float[AudioLoader.SampleRate * seconds];
+        var chunks = ParakeetAudioChunker.Split(samples);
+
+        Assert.True(chunks.Count >= 3);
+        Assert.Equal(0, chunks[0].OffsetSamples);
+        Assert.Equal(
+            (ParakeetAudioChunker.WindowSeconds - ParakeetAudioChunker.OverlapSeconds) * AudioLoader.SampleRate,
+            chunks[1].OffsetSamples);
+        Assert.Equal(ParakeetAudioChunker.WindowSamples(), chunks[0].Samples.Length);
+        Assert.Equal(samples.Length, chunks[^1].OffsetSamples + chunks[^1].Samples.Length);
+        Assert.Equal(chunks.Count, ParakeetAudioChunker.CountWindows(samples.Length));
+    }
+
+    [Fact]
+    public void CountWindowsFromDuration_MatchesWindowsFromDuration()
+    {
+        Assert.Equal(1, ParakeetAudioChunker.CountWindowsFromDuration(5));
+        Assert.Equal(1, ParakeetAudioChunker.CountWindowsFromDuration(20));
+        Assert.Equal(2, ParakeetAudioChunker.CountWindowsFromDuration(20.1));
+        Assert.Equal(3, ParakeetAudioChunker.CountWindowsFromDuration(50));
+        Assert.Equal(3, ParakeetAudioChunker.WindowsFromDuration(50).Count);
+        Assert.Equal(20, ParakeetAudioChunker.WindowsFromDuration(50)[0].LengthSeconds, precision: 5);
+        Assert.Equal(14, ParakeetAudioChunker.WindowsFromDuration(50)[2].LengthSeconds, precision: 5);
+    }
+
+    [Fact]
+    public void ShiftAndTrimOverlap_DropsFirstHalfOfOverlapOnLaterChunks()
+    {
+        var segments = new[]
+        {
+            new TranscriptionSegmentResult(0.2, 0.8, "drop"),
+            new TranscriptionSegmentResult(1.5, 2.0, "keep"),
+        };
+
+        var shifted = ParakeetAudioChunker.ShiftAndTrimOverlap(
+            segments,
+            chunkStartSeconds: 18,
+            isFirstChunk: false,
+            overlapSeconds: 2);
+
+        Assert.Single(shifted);
+        Assert.Equal("keep", shifted[0].Text);
+        Assert.Equal(19.5, shifted[0].StartSeconds, precision: 2);
+        Assert.Equal(20.0, shifted[0].EndSeconds, precision: 2);
     }
 }
 

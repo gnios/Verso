@@ -5,7 +5,10 @@ namespace Verso.Core.Engine;
 
 public interface IParakeetRecognizer
 {
-    IReadOnlyList<TranscriptionSegmentResult> Recognize(float[] samples16kHz, CancellationToken cancellationToken = default);
+    IReadOnlyList<TranscriptionSegmentResult> Recognize(
+        float[] samples16kHz,
+        CancellationToken cancellationToken = default,
+        IProgress<EngineProgress>? progress = null);
 }
 
 public interface IParakeetRecognizerFactory
@@ -43,10 +46,10 @@ public sealed class OnnxParakeetRecognizer : IParakeetRecognizer, IDisposable
 
     public OnnxParakeetRecognizer(string modelDirectory, int threads)
     {
-        var options = CreateOptions(Math.Max(1, threads));
-        _preprocessor = new InferenceSession(Path.Combine(modelDirectory, ParakeetModelManager.PreprocessorFileName), options);
-        _encoder = new InferenceSession(Path.Combine(modelDirectory, ParakeetModelManager.EncoderFileName), options);
-        _decoderJoint = new InferenceSession(Path.Combine(modelDirectory, ParakeetModelManager.DecoderJointFileName), options);
+        var intraOp = Math.Max(1, threads);
+        _preprocessor = CreateSession(Path.Combine(modelDirectory, ParakeetModelManager.PreprocessorFileName), intraOp);
+        _encoder = CreateSession(Path.Combine(modelDirectory, ParakeetModelManager.EncoderFileName), intraOp);
+        _decoderJoint = CreateSession(Path.Combine(modelDirectory, ParakeetModelManager.DecoderJointFileName), intraOp);
         _vocab = ParakeetVocab.Load(Path.Combine(modelDirectory, ParakeetModelManager.VocabFileName));
 
         _waveformsName = FindName(_preprocessor.InputMetadata.Keys, "waveforms", 0);
@@ -66,13 +69,39 @@ public sealed class OnnxParakeetRecognizer : IParakeetRecognizer, IDisposable
         _state2Shape = NormalizeShape(_decoderJoint.InputMetadata[_state2InName].Dimensions);
     }
 
-    public IReadOnlyList<TranscriptionSegmentResult> Recognize(float[] samples16kHz, CancellationToken cancellationToken = default)
+    public IReadOnlyList<TranscriptionSegmentResult> Recognize(
+        float[] samples16kHz,
+        CancellationToken cancellationToken = default,
+        IProgress<EngineProgress>? progress = null)
     {
         if (samples16kHz.Length == 0)
         {
             return [];
         }
 
+        var chunks = ParakeetAudioChunker.Split(samples16kHz);
+        progress?.Report(new EngineProgress("transcribing", 0, chunks.Count));
+        var segments = new List<TranscriptionSegmentResult>();
+        for (var i = 0; i < chunks.Count; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var chunk = chunks[i];
+            var part = RecognizeWindow(chunk.Samples, cancellationToken);
+            var startSeconds = chunk.OffsetSamples / (double)AudioLoader.SampleRate;
+            segments.AddRange(ParakeetAudioChunker.ShiftAndTrimOverlap(
+                part,
+                startSeconds,
+                isFirstChunk: i == 0));
+            progress?.Report(new EngineProgress("transcribing", i + 1, chunks.Count));
+        }
+
+        return segments;
+    }
+
+    private IReadOnlyList<TranscriptionSegmentResult> RecognizeWindow(
+        float[] samples16kHz,
+        CancellationToken cancellationToken)
+    {
         cancellationToken.ThrowIfCancellationRequested();
         var (features, featureLens) = RunPreprocessor(samples16kHz);
         cancellationToken.ThrowIfCancellationRequested();
@@ -107,15 +136,35 @@ public sealed class OnnxParakeetRecognizer : IParakeetRecognizer, IDisposable
         _decoderJoint.Dispose();
     }
 
-    private static SessionOptions CreateOptions(int threads)
+    private static InferenceSession CreateSession(string modelPath, int threads)
+    {
+        try
+        {
+            return new InferenceSession(modelPath, CreateOptions(threads, modelPath));
+        }
+        catch (OnnxRuntimeException)
+        {
+            return new InferenceSession(modelPath, CreateOptions(threads, optimizedModelPath: null));
+        }
+    }
+
+    private static SessionOptions CreateOptions(int threads, string? optimizedModelPath)
     {
         var options = new SessionOptions
         {
-            GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL,
+            GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_EXTENDED,
             IntraOpNumThreads = threads,
             InterOpNumThreads = 1,
         };
         options.AppendExecutionProvider_CPU();
+
+        if (!string.IsNullOrWhiteSpace(optimizedModelPath))
+        {
+            var cacheDir = Path.Combine(Path.GetDirectoryName(optimizedModelPath)!, ".ort");
+            Directory.CreateDirectory(cacheDir);
+            options.OptimizedModelFilePath = Path.Combine(cacheDir, Path.GetFileName(optimizedModelPath) + ".opt");
+        }
+
         return options;
     }
 
@@ -148,45 +197,13 @@ public sealed class OnnxParakeetRecognizer : IParakeetRecognizer, IDisposable
             ? (int)list[1].AsTensor<long>().ToArray()[0]
             : encoderOut.Dimensions[^1];
 
-        var dims = encoderOut.Dimensions.ToArray();
-        // Prefer [B, C, T] when dim1 looks like channels (1024) and dim2 is time.
-        var channelsFirst = dims.Length == 3 && dims[1] >= dims[2];
-        int time;
-        int channels;
-        if (channelsFirst)
+        var expectedChannels = _decoderJoint.InputMetadata[_encoderOutName].Dimensions[1];
+        if (expectedChannels <= 0)
         {
-            channels = dims[1];
-            time = Math.Min(encodedLength, dims[2]);
-            var frames = new List<float[]>(time);
-            for (var t = 0; t < time; t++)
-            {
-                var frame = new float[channels];
-                for (var c = 0; c < channels; c++)
-                {
-                    frame[c] = encoderOut[0, c, t];
-                }
-
-                frames.Add(frame);
-            }
-
-            return frames;
+            expectedChannels = ParakeetEncoderFrames.ParakeetEncoderChannels;
         }
 
-        time = Math.Min(encodedLength, dims[1]);
-        channels = dims[2];
-        var framesT = new List<float[]>(time);
-        for (var t = 0; t < time; t++)
-        {
-            var frame = new float[channels];
-            for (var c = 0; c < channels; c++)
-            {
-                frame[c] = encoderOut[0, t, c];
-            }
-
-            framesT.Add(frame);
-        }
-
-        return framesT;
+        return ParakeetEncoderFrames.Extract(encoderOut, encodedLength, expectedChannels);
     }
 
     private (float[] Logits, int DurationStep, (float[] S1, float[] S2) State) RunDecoderJoint(
@@ -194,6 +211,7 @@ public sealed class OnnxParakeetRecognizer : IParakeetRecognizer, IDisposable
         (float[] S1, float[] S2) state,
         float[] encoderFrame)
     {
+        // decoder_joint espera encoder_outputs [B, C, T] = [1, 1024, 1] (um frame).
         var encoderTensor = new DenseTensor<float>(encoderFrame, [1, encoderFrame.Length, 1]);
         var inputs = new List<NamedOnnxValue>
         {

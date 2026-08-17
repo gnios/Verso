@@ -333,6 +333,40 @@ public class ParakeetTranscriptionEngineTests : IDisposable
         Directory.Delete(modelsDir, recursive: true);
     }
 
+    [Fact]
+    public async Task TranscribeAsync_LongAudio_DecodesPerWindowAndReportsProgress()
+    {
+        var wavPath = CreateTempWav(seconds: 50);
+        var modelsDir = Path.Combine(Path.GetTempPath(), $"verso-pk-models-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(modelsDir);
+        var factory = new CountingParakeetRecognizerFactory();
+        var engine = new ParakeetTranscriptionEngine(
+            new AudioLoader(new FfmpegLocator()),
+            new NoOpParakeetModelEnsurer(),
+            factory,
+            logger: null,
+            modelsDirectory: modelsDir);
+        var progress = new RecordingEngineProgress();
+
+        await engine.TranscribeAsync(
+            new TranscriptionJobRequest(
+                Guid.NewGuid(),
+                wavPath,
+                "pt",
+                ModelQuality.Standard,
+                ExecutionDevice.Cpu,
+                Engine: TranscriptionEngineKind.Parakeet,
+                ParakeetModel: ParakeetModel.PtBrTagarela),
+            progress,
+            CancellationToken.None);
+
+        var expectedWindows = ParakeetAudioChunker.CountWindowsFromDuration(50);
+        Assert.Equal(expectedWindows, factory.Recognizer.Calls);
+        Assert.Contains(progress.Reports, e => e.Stage == "transcribing" && e.PartIndex == 0 && e.TotalParts == expectedWindows);
+        Assert.Contains(progress.Reports, e => e.Stage == "transcribing" && e.PartIndex == expectedWindows && e.TotalParts == expectedWindows);
+        Directory.Delete(modelsDir, recursive: true);
+    }
+
     public void Dispose()
     {
         foreach (var file in _tempFiles)
@@ -372,7 +406,10 @@ public class ParakeetTranscriptionEngineTests : IDisposable
 
     private sealed class RecordingRecognizer(List<string> order) : IParakeetRecognizer
     {
-        public IReadOnlyList<TranscriptionSegmentResult> Recognize(float[] samples16kHz, CancellationToken cancellationToken = default)
+        public IReadOnlyList<TranscriptionSegmentResult> Recognize(
+            float[] samples16kHz,
+            CancellationToken cancellationToken = default,
+            IProgress<EngineProgress>? progress = null)
         {
             order.Add("recognize");
             return [new TranscriptionSegmentResult(0, 0.4, "ok")];
@@ -394,8 +431,39 @@ public class ParakeetTranscriptionEngineTests : IDisposable
 
     private sealed class FakeRecognizer(IReadOnlyList<TranscriptionSegmentResult> segments) : IParakeetRecognizer
     {
-        public IReadOnlyList<TranscriptionSegmentResult> Recognize(float[] samples16kHz, CancellationToken cancellationToken = default) =>
+        public IReadOnlyList<TranscriptionSegmentResult> Recognize(
+            float[] samples16kHz,
+            CancellationToken cancellationToken = default,
+            IProgress<EngineProgress>? progress = null) =>
             segments;
+    }
+
+    private sealed class CountingParakeetRecognizerFactory : IParakeetRecognizerFactory
+    {
+        public CountingRecognizer Recognizer { get; } = new();
+
+        public IParakeetRecognizer Create(string modelDirectory, int threads) => Recognizer;
+    }
+
+    private sealed class CountingRecognizer : IParakeetRecognizer
+    {
+        public int Calls { get; private set; }
+
+        public IReadOnlyList<TranscriptionSegmentResult> Recognize(
+            float[] samples16kHz,
+            CancellationToken cancellationToken = default,
+            IProgress<EngineProgress>? progress = null)
+        {
+            Calls++;
+            return [new TranscriptionSegmentResult(0, 0.4, "ok")];
+        }
+    }
+
+    private sealed class RecordingEngineProgress : IProgress<EngineProgress>
+    {
+        public List<EngineProgress> Reports { get; } = [];
+
+        public void Report(EngineProgress value) => Reports.Add(value);
     }
 }
 

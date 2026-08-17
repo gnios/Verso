@@ -108,10 +108,12 @@ public sealed class TranscriptionQueueService : BackgroundService
             var progress = new Progress<EngineProgress>(e => RaiseProgressChanged(request.TranscriptionId, e.Stage, e.PartIndex, e.TotalParts));
             var stopwatch = Stopwatch.StartNew();
             _logger.LogInformation(
-                "Transcrevendo {TranscriptionId}: dispositivo={Device}, modelo={Quality}",
+                "Transcrevendo {TranscriptionId}: engine={Engine}, dispositivo={Device}, modelo={Quality}, parakeet={ParakeetModel}",
                 request.TranscriptionId,
+                request.Engine,
                 request.Device,
-                request.Quality);
+                request.Quality,
+                request.ParakeetModel);
             var result = await _engine.TranscribeAsync(request, progress, linkedCts.Token);
             stopwatch.Stop();
             _logger.LogInformation(

@@ -1,7 +1,10 @@
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Verso.Core;
 using Verso.Core.Engine;
 using Verso.Core.Engine.Worker;
+using Verso.Core.Logging;
 
 namespace Verso.Worker;
 
@@ -17,12 +20,23 @@ public static class Program
     public static async Task<int> Main()
     {
         TryLowerProcessPriority();
+        WriteStandaloneWarning();
 
         var services = new ServiceCollection();
+        services.AddLogging(logging =>
+        {
+            logging.ClearProviders();
+            logging.AddVersoFileLogger(options =>
+            {
+                options.FileNamePrefix = "verso-worker";
+            });
+            logging.SetMinimumLevel(LogLevel.Information);
+        });
         services.AddWhisperEngine();
         services.AddParakeetEngine();
 
         await using var provider = services.BuildServiceProvider();
+        var logger = provider.GetRequiredService<ILoggerFactory>().CreateLogger("Verso.Worker");
 
         // Resolve os motores CONCRETOS (nunca ITranscriptionEngine): este processo é o worker que
         // WorkerProcessTranscriptionEngine spawna, então resolver a interface aqui recriaria o
@@ -34,8 +48,18 @@ public static class Program
             new WhisperTranscriptionEngineAdapter(whisper),
             parakeet);
 
+        logger.LogInformation("Verso.Worker pronto, aguardando job NDJSON em stdin.");
         var host = new WorkerHost();
-        return await host.RunAsync(Console.In, Console.Out, innerEngine, CancellationToken.None);
+        return await host.RunAsync(Console.In, Console.Out, innerEngine, CancellationToken.None, logger);
+    }
+
+    // Stderr (nunca stdout: stdout é o protocolo NDJSON com o App). Visível só quando o
+    // processo é aberto à mão no Rider — o App dispara o worker com CreateNoWindow.
+    private static void WriteStandaloneWarning()
+    {
+        Console.Error.WriteLine("Verso.Worker aguarda um job NDJSON em stdin.");
+        Console.Error.WriteLine("Não inicie este projeto no Rider: o Verso.App dispara o worker sozinho a cada transcrição.");
+        Console.Error.WriteLine($"Logs: {Path.Combine(VersoPaths.LogsDirectory, "verso-worker-*.log")}");
     }
 
     /// <summary>

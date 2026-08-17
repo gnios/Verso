@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Verso.Core.Data.Entities;
 
@@ -73,20 +74,12 @@ public sealed class ParakeetTranscriptionEngine : ITranscriptionEngine, IDisposa
         await _modelEnsurer.EnsureModelAsync(modelDir, request.ParakeetModel, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
 
-        progress?.Report(new EngineProgress("preparing"));
-        var audioPath = await CreateAudioProcessingCopyAsync(request.MediaFilePath, cancellationToken);
-        float[] samples;
-        try
+        if (!File.Exists(request.MediaFilePath))
         {
-            samples = await Task.Run(() => _audioLoader.LoadSamples16kHz(audioPath), cancellationToken);
+            throw new FileNotFoundException(
+                $"Arquivo de mídia não encontrado: {request.MediaFilePath}",
+                request.MediaFilePath);
         }
-        finally
-        {
-            TryDeleteFile(audioPath);
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        progress?.Report(new EngineProgress("transcribing", 0, 1));
 
         var threads = TranscriptionThreadsResolver.Resolve(request.MaxTranscriptionThreads);
         if (threads <= 0)
@@ -94,12 +87,46 @@ public sealed class ParakeetTranscriptionEngine : ITranscriptionEngine, IDisposa
             threads = Math.Max(1, Environment.ProcessorCount / 2);
         }
 
+        _logger?.LogInformation(
+            "Carregando sessões ONNX Parakeet {TranscriptionId} em {ModelDir} (threads={Threads})",
+            request.TranscriptionId,
+            modelDir,
+            threads);
+        var onnxSw = Stopwatch.StartNew();
         var recognizer = GetOrCreateRecognizer(modelDir, threads);
-        var segments = await Task.Run(
-            () => recognizer.Recognize(samples, cancellationToken),
-            cancellationToken);
+        _logger?.LogInformation(
+            "Sessões ONNX prontas em {ElapsedSeconds:F1}s {TranscriptionId}",
+            onnxSw.Elapsed.TotalSeconds,
+            request.TranscriptionId);
 
-        progress?.Report(new EngineProgress("done", 1, 1));
+        progress?.Report(new EngineProgress("preparing"));
+        var duration = await Task.Run(() => _audioLoader.GetDuration(request.MediaFilePath), cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        IReadOnlyList<TranscriptionSegmentResult> segments;
+        if (duration > ParakeetAudioChunker.WindowSeconds)
+        {
+            segments = await TranscribeByWindowsAsync(
+                request,
+                recognizer,
+                duration,
+                progress,
+                cancellationToken);
+        }
+        else
+        {
+            segments = await TranscribeInMemoryAsync(
+                request,
+                recognizer,
+                duration,
+                progress,
+                cancellationToken);
+        }
+
+        var doneParts = duration > ParakeetAudioChunker.WindowSeconds
+            ? ParakeetAudioChunker.CountWindowsFromDuration(duration)
+            : 1;
+        progress?.Report(new EngineProgress("done", doneParts, doneParts));
         _logger?.LogInformation(
             "Transcrição Parakeet {TranscriptionId} concluída: {SegmentCount} segmentos",
             request.TranscriptionId,
@@ -121,6 +148,104 @@ public sealed class ParakeetTranscriptionEngine : ITranscriptionEngine, IDisposa
         }
     }
 
+    private async Task<IReadOnlyList<TranscriptionSegmentResult>> TranscribeByWindowsAsync(
+        TranscriptionJobRequest request,
+        IParakeetRecognizer recognizer,
+        double duration,
+        IProgress<EngineProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        var windows = ParakeetAudioChunker.WindowsFromDuration(duration);
+        _logger?.LogInformation(
+            "Áudio {Duration:F0}s → {WindowCount} janelas de {Window}s (overlap {Overlap}s); decode por janela {TranscriptionId}",
+            duration,
+            windows.Count,
+            ParakeetAudioChunker.WindowSeconds,
+            ParakeetAudioChunker.OverlapSeconds,
+            request.TranscriptionId);
+
+        var segments = new List<TranscriptionSegmentResult>();
+        progress?.Report(new EngineProgress("transcribing", 0, windows.Count));
+
+        for (var i = 0; i < windows.Count; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var (start, length) = windows[i];
+            _logger?.LogInformation(
+                "Parakeet janela {Index}/{Total} ({Start:F1}s–{End:F1}s) {TranscriptionId}",
+                i + 1,
+                windows.Count,
+                start,
+                start + length,
+                request.TranscriptionId);
+
+            var windowSw = Stopwatch.StartNew();
+            var samples = await Task.Run(
+                () => _audioLoader.LoadSamples16kHz(request.MediaFilePath, start, length),
+                cancellationToken);
+            var part = await Task.Run(
+                () => recognizer.Recognize(samples, cancellationToken),
+                cancellationToken);
+            segments.AddRange(ParakeetAudioChunker.ShiftAndTrimOverlap(
+                part,
+                start,
+                isFirstChunk: i == 0));
+
+            _logger?.LogInformation(
+                "Parakeet janela {Index}/{Total} concluída em {ElapsedSeconds:F1}s ({SegmentCount} segmentos) {TranscriptionId}",
+                i + 1,
+                windows.Count,
+                windowSw.Elapsed.TotalSeconds,
+                part.Count,
+                request.TranscriptionId);
+            progress?.Report(new EngineProgress("transcribing", i + 1, windows.Count));
+        }
+
+        return segments;
+    }
+
+    private async Task<IReadOnlyList<TranscriptionSegmentResult>> TranscribeInMemoryAsync(
+        TranscriptionJobRequest request,
+        IParakeetRecognizer recognizer,
+        double duration,
+        IProgress<EngineProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        if (duration > 0)
+        {
+            _logger?.LogInformation(
+                "Áudio {Duration:F1}s em uma janela; carregando PCM 16 kHz {TranscriptionId}",
+                duration,
+                request.TranscriptionId);
+        }
+        else
+        {
+            _logger?.LogWarning(
+                "Duração desconhecida; carregando o arquivo inteiro em PCM 16 kHz {TranscriptionId}",
+                request.TranscriptionId);
+        }
+
+        var decodeSw = Stopwatch.StartNew();
+        var samples = await Task.Run(
+            () => _audioLoader.LoadSamples16kHz(request.MediaFilePath),
+            cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var audioSeconds = samples.Length / (double)AudioLoader.SampleRate;
+        _logger?.LogInformation(
+            "PCM 16 kHz pronto em {ElapsedSeconds:F1}s ({SampleCount} samples, {AudioSeconds:F1}s) {TranscriptionId}",
+            decodeSw.Elapsed.TotalSeconds,
+            samples.Length,
+            audioSeconds,
+            request.TranscriptionId);
+
+        var chunkCount = Math.Max(1, ParakeetAudioChunker.CountWindows(samples.Length));
+        progress?.Report(new EngineProgress("transcribing", 0, chunkCount));
+        return await Task.Run(
+            () => recognizer.Recognize(samples, cancellationToken, progress),
+            cancellationToken);
+    }
+
     private IParakeetRecognizer GetOrCreateRecognizer(string modelDir, int threads)
     {
         lock (_recognizerLock)
@@ -133,35 +258,6 @@ public sealed class ParakeetTranscriptionEngine : ITranscriptionEngine, IDisposa
             var created = _recognizerFactory.Create(modelDir, threads);
             _recognizers[modelDir] = created;
             return created;
-        }
-    }
-
-    private static async Task<string> CreateAudioProcessingCopyAsync(string mediaPath, CancellationToken cancellationToken)
-    {
-        if (!File.Exists(mediaPath))
-        {
-            throw new FileNotFoundException($"Arquivo de mídia não encontrado: {mediaPath}", mediaPath);
-        }
-
-        var extension = Path.GetExtension(mediaPath);
-        var tempPath = Path.Combine(Path.GetTempPath(), $"verso-parakeet-{Guid.NewGuid():N}{extension}");
-        await using var source = new FileStream(mediaPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-        await using var destination = File.Create(tempPath);
-        await source.CopyToAsync(destination, cancellationToken);
-        return tempPath;
-    }
-
-    private static void TryDeleteFile(string path)
-    {
-        try
-        {
-            if (File.Exists(path))
-            {
-                File.Delete(path);
-            }
-        }
-        catch (IOException)
-        {
         }
     }
 }

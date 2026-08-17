@@ -113,7 +113,7 @@ public sealed class FileLoggerProvider : ILoggerProvider
         _writer?.Dispose();
 
         _currentDate = today;
-        var path = Path.Combine(_options.Directory, $"verso-{today}.log");
+        var path = Path.Combine(_options.Directory, $"{_options.FileNamePrefix}-{today}.log");
         _writer = new StreamWriter(path, append: true, Encoding.UTF8)
         {
             AutoFlush = false,
@@ -130,6 +130,8 @@ public sealed class FileLoggerProvider : ILoggerProvider
 public sealed class FileLoggerOptions
 {
     public string Directory { get; set; } = VersoPaths.LogsDirectory;
+
+    public string FileNamePrefix { get; set; } = "verso";
 
     public LogLevel MinLevel { get; set; } = LogLevel.Information;
 }
