@@ -48,24 +48,57 @@
     </div>
 
     <div class="settings-section">
-        <div class="settings-section-title">Precisão da transcrição</div>
-        <PrecisionProfileCards Options="ViewModel.ModelOptions"
-                              Selected="ViewModel.SelectedModelOption"
-                              Recommended="ViewModel.RecommendedModelOption"
-                              SelectedChanged="OnPrecisionSelected" />
-        @if (ViewModel.RecommendedModelOption is not null)
-        {
-            <div class="settings-recommendation">
-                <div class="settings-recommendation-title">
-                    Recomendado para seu computador
-                    <span class="settings-ram-hint">(@(ViewModel.DetectedRamGb) GB)</span>
-                </div>
-                <div class="settings-recommendation-body">
-                    <span class="rec-model">@ViewModel.RecommendedModelOption?.Label · @ViewModel.RecommendedModelOption?.SpeedHint</span>
-                    <span class="settings-recommendation-reason">@ViewModel.ModelRecommendationReason</span>
-                </div>
-                <button type="button" class="settings-recommendation-btn" @onclick="UseRecommended">Usar recomendado</button>
+        <div class="settings-section-title">Motor de transcrição</div>
+        <div class="settings-row">
+            <div>
+                <div class="settings-row-label">Motor</div>
+                <div class="settings-row-sub">@ViewModel.SelectedEngineOption?.Hint</div>
             </div>
+            <select value="@ViewModel.SelectedEngineOption?.Value" @onchange="OnEngineChanged">
+                @foreach (var option in ViewModel.EngineOptions)
+                {
+                    <option value="@option.Value">@option.Label</option>
+                }
+            </select>
+        </div>
+        @if (ViewModel.SelectedEngineOption?.Value == TranscriptionEngineKind.Parakeet)
+        {
+            <div class="settings-row">
+                <div>
+                    <div class="settings-row-label">Modelo Parakeet</div>
+                </div>
+                <select value="@ViewModel.SelectedParakeetModelOption?.Value" @onchange="OnParakeetModelChanged">
+                    @foreach (var option in ViewModel.ParakeetModelOptions)
+                    {
+                        <option value="@option.Value">@option.Label · @option.SizeLabel</option>
+                    }
+                </select>
+            </div>
+        }
+    </div>
+
+    <div class="settings-section">
+        <div class="settings-section-title">Precisão da transcrição</div>
+        @if (ViewModel.SelectedEngineOption?.Value != TranscriptionEngineKind.Parakeet)
+        {
+            <PrecisionProfileCards Options="ViewModel.ModelOptions"
+                                  Selected="ViewModel.SelectedModelOption"
+                                  Recommended="ViewModel.RecommendedModelOption"
+                                  SelectedChanged="OnPrecisionSelected" />
+            @if (ViewModel.RecommendedModelOption is not null)
+            {
+                <div class="settings-recommendation">
+                    <div class="settings-recommendation-title">
+                        Recomendado para seu computador
+                        <span class="settings-ram-hint">(@(ViewModel.DetectedRamGb) GB)</span>
+                    </div>
+                    <div class="settings-recommendation-body">
+                        <span class="rec-model">@ViewModel.RecommendedModelOption?.Label · @ViewModel.RecommendedModelOption?.SpeedHint</span>
+                        <span class="settings-recommendation-reason">@ViewModel.ModelRecommendationReason</span>
+                    </div>
+                    <button type="button" class="settings-recommendation-btn" @onclick="UseRecommended">Usar recomendado</button>
+                </div>
+            }
         }
     </div>
 
@@ -226,6 +259,30 @@
 
     private void OnPrecisionSelected(ModelOptionViewModel option) =>
         ViewModel.SelectedModelOption = option;
+
+    private void OnEngineChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<TranscriptionEngineKind>(e.Value?.ToString(), out var engine))
+        {
+            var option = ViewModel.EngineOptions.FirstOrDefault(o => o.Value == engine);
+            if (option is not null)
+            {
+                ViewModel.SelectedEngineOption = option;
+            }
+        }
+    }
+
+    private void OnParakeetModelChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<ParakeetModel>(e.Value?.ToString(), out var model))
+        {
+            var option = ViewModel.ParakeetModelOptions.FirstOrDefault(o => o.Value == model);
+            if (option is not null)
+            {
+                ViewModel.SelectedParakeetModelOption = option;
+            }
+        }
+    }
 
     private void UseRecommended() => ViewModel.UseRecommendedModelCommand.Execute(null);
     private void ToggleAdvanced() => ViewModel.IsAdvancedExpanded = !ViewModel.IsAdvancedExpanded;

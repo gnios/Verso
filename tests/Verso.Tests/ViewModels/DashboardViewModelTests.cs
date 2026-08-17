@@ -1,4 +1,6 @@
 using System.Linq;
+using System.Reflection;
+using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Verso.App;
@@ -497,6 +499,41 @@ public class DashboardViewModelTests
             var transcription = await readContext.Transcriptions.SingleAsync(t => t.Id == errorId);
             Assert.Equal(TranscriptionStatus.InProgress, transcription.Status);
             Assert.Null(transcription.ErrorMessage);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task RetryCommand_RequeuesSavedEngineAndParakeetModel()
+    {
+        var (provider, directory, _, errorId, _) = await CreateDashboardProviderAsync();
+        try
+        {
+            await using (var ctx = await TestDbHelper.GetFactory(provider).CreateDbContextAsync())
+            {
+                var seeded = await ctx.Transcriptions.SingleAsync(t => t.Id == errorId);
+                seeded.Engine = TranscriptionEngineKind.Parakeet;
+                seeded.ParakeetModel = ParakeetModel.PtBrTagarela;
+                await ctx.SaveChangesAsync();
+            }
+
+            var dashboard = await CreateDashboardAsync(provider);
+            var errorCard = Assert.Single(dashboard.Cards, card => card.Id == errorId);
+            errorCard.RetryCommand.Execute(null);
+            await Task.Delay(150);
+
+            var queue = provider.GetRequiredService<TranscriptionQueueService>();
+            var channel = typeof(TranscriptionQueueService)
+                .GetField("_channel", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .GetValue(queue) as Channel<TranscriptionJobRequest>;
+            Assert.NotNull(channel);
+            Assert.True(channel.Reader.TryRead(out var request));
+            Assert.Equal(errorId, request.TranscriptionId);
+            Assert.Equal(TranscriptionEngineKind.Parakeet, request.Engine);
+            Assert.Equal(ParakeetModel.PtBrTagarela, request.ParakeetModel);
         }
         finally
         {

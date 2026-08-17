@@ -1,5 +1,5 @@
 using System.Text.Json;
-
+using Microsoft.Extensions.Logging;
 using Verso.Core.Engine.Worker;
 
 namespace Verso.Core.Engine;
@@ -18,22 +18,26 @@ public sealed class WorkerProcessTranscriptionEngine : ITranscriptionEngine
     private readonly IWorkerExecutableLocator _locator;
     private readonly IWorkerProcessFactory _processFactory;
     private readonly TimeSpan _gracefulShutdownTimeout;
+    private readonly ILogger<WorkerProcessTranscriptionEngine>? _logger;
 
     public WorkerProcessTranscriptionEngine(
         IWorkerExecutableLocator locator,
-        IWorkerProcessFactory processFactory)
-        : this(locator, processFactory, DefaultGracefulShutdownTimeout)
+        IWorkerProcessFactory processFactory,
+        ILogger<WorkerProcessTranscriptionEngine>? logger = null)
+        : this(locator, processFactory, DefaultGracefulShutdownTimeout, logger)
     {
     }
 
     internal WorkerProcessTranscriptionEngine(
         IWorkerExecutableLocator locator,
         IWorkerProcessFactory processFactory,
-        TimeSpan gracefulShutdownTimeout)
+        TimeSpan gracefulShutdownTimeout,
+        ILogger<WorkerProcessTranscriptionEngine>? logger = null)
     {
         _locator = locator;
         _processFactory = processFactory;
         _gracefulShutdownTimeout = gracefulShutdownTimeout;
+        _logger = logger;
     }
 
     public async Task<TranscriptionResult> TranscribeAsync(
@@ -42,6 +46,10 @@ public sealed class WorkerProcessTranscriptionEngine : ITranscriptionEngine
         CancellationToken cancellationToken)
     {
         var exePath = _locator.Resolve();
+        _logger?.LogInformation(
+            "Iniciando Verso.Worker para {TranscriptionId}: {ExePath}",
+            request.TranscriptionId,
+            exePath);
         await using var process = _processFactory.Start(exePath);
 
         await WriteMessageAsync(process, new WorkerJobMessage(request));
@@ -87,24 +95,17 @@ public sealed class WorkerProcessTranscriptionEngine : ITranscriptionEngine
                 break;
         }
 
-        // Fecha o lado de escrita do stdin do worker assim que terminamos de ler a saída dele.
-        // Sem isso, o loop de escuta de "cancel" do worker (WorkerHost.ListenForCancelLineAsync)
-        // fica bloqueado para sempre numa leitura síncrona de Console.In que NÃO respeita
-        // CancellationToken (o token só é observado antes de iniciar a leitura, nunca durante) —
-        // o processo filho nunca chamaria `return exitCode`, e o WaitForExitAsync abaixo ficaria
-        // pendurado indefinidamente (deadlock: pai espera o filho sair, filho espera EOF em stdin
-        // que só o pai pode fornecer). Fechar aqui dá ao filho um EOF real, desbloqueando-o.
+        // Fecha o stdin do worker para desbloquear ListenForCancelLineAsync (Console.In
+        // ignora CancellationToken). Se mesmo assim o processo não sair, mata.
         try
         {
             process.StandardInput.Close();
         }
         catch
         {
-            // Melhor esforço — se o pipe já tiver sido fechado (ex.: cancelamento concorrente
-            // já em andamento via HandleCancellationAsync), ignora.
         }
 
-        var exitCode = await process.WaitForExitAsync(CancellationToken.None);
+        var exitCode = await WaitForWorkerExitAsync(process);
 
         if (errorMessage is not null)
             throw new InvalidOperationException(errorMessage);
@@ -117,6 +118,22 @@ public sealed class WorkerProcessTranscriptionEngine : ITranscriptionEngine
 
         throw new InvalidOperationException(
             $"O processo worker terminou inesperadamente (exit code {exitCode}) sem devolver resultado.");
+    }
+
+    private async Task<int> WaitForWorkerExitAsync(IWorkerProcess process)
+    {
+        using var timeoutCts = new CancellationTokenSource(_gracefulShutdownTimeout);
+        try
+        {
+            return await process.WaitForExitAsync(timeoutCts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger?.LogWarning(
+                "Verso.Worker não encerrou após o resultado; forçando Kill para a UI não ficar presa.");
+            process.Kill();
+            return -1;
+        }
     }
 
     private async Task HandleCancellationAsync(IWorkerProcess process)

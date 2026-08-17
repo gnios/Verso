@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace Verso.Core.Engine.Worker;
 
@@ -14,11 +15,13 @@ public sealed class WorkerHost
         TextReader input,
         TextWriter output,
         ITranscriptionEngine innerEngine,
-        CancellationToken shutdownToken)
+        CancellationToken shutdownToken,
+        ILogger? logger = null)
     {
         var jobLine = await input.ReadLineAsync(shutdownToken);
         if (string.IsNullOrWhiteSpace(jobLine))
         {
+            logger?.LogError("Nenhuma mensagem 'job' recebida via stdin.");
             WriteMessage(output, new WorkerErrorMessage("Nenhuma mensagem 'job' recebida via stdin."));
             return 1;
         }
@@ -28,6 +31,7 @@ public sealed class WorkerHost
         {
             if (JsonSerializer.Deserialize<WorkerMessage>(jobLine, WorkerProtocol.JsonOptions) is not WorkerJobMessage parsedJob)
             {
+                logger?.LogError("Mensagem inicial inválida: esperado 'job'.");
                 WriteMessage(output, new WorkerErrorMessage("Mensagem inicial inválida: esperado 'job'."));
                 return 1;
             }
@@ -36,9 +40,17 @@ public sealed class WorkerHost
         }
         catch (JsonException ex)
         {
+            logger?.LogError(ex, "Mensagem 'job' malformada.");
             WriteMessage(output, new WorkerErrorMessage($"Mensagem 'job' malformada: {ex.Message}"));
             return 1;
         }
+
+        logger?.LogInformation(
+            "Job recebido {TranscriptionId}: engine={Engine}, parakeet={ParakeetModel}, arquivo={MediaFilePath}",
+            job.Request.TranscriptionId,
+            job.Request.Engine,
+            job.Request.ParakeetModel,
+            job.Request.MediaFilePath);
 
         using var stopListeningCts = new CancellationTokenSource();
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(shutdownToken);
@@ -55,28 +67,40 @@ public sealed class WorkerHost
         try
         {
             var result = await innerEngine.TranscribeAsync(job.Request, progress, linkedCts.Token);
+            logger?.LogInformation(
+                "Job {TranscriptionId} concluído: {SegmentCount} segmentos",
+                job.Request.TranscriptionId,
+                result.Segments.Count);
             WriteMessage(output, new WorkerResultMessage(result));
             exitCode = 0;
         }
         catch (Exception ex)
         {
+            logger?.LogError(ex, "Job {TranscriptionId} falhou", job.Request.TranscriptionId);
             WriteMessage(output, new WorkerErrorMessage(ex.Message));
             exitCode = 1;
         }
         finally
         {
-            stopListeningCts.Cancel();
+            await stopListeningCts.CancelAsync();
         }
 
-        // Não aguarda cancelListenTask de forma bloqueante: sua leitura pendente em Console.In
-        // (ver ListenForCancelLineAsync) só desbloqueia com uma nova linha ou EOF real de stdin —
-        // stopListeningCts.Cancel() acima NÃO interrompe uma leitura síncrona já em andamento
-        // (limitação conhecida de Console.In/SyncTextReader). O processo pai deve fechar seu lado
-        // de escrita do stdin (dando EOF) assim que ler nosso resultado/erro — ver
-        // WorkerProcessTranscriptionEngine —, mas não faz sentido este processo, que já terminou
-        // seu trabalho e está saindo, ficar pendurado esperando essa tarefa secundária: o
-        // encerramento do processo (Environment.Exit implícito ao retornar de Main) derruba
-        // qualquer thread/task remanescente sem efeitos colaterais observáveis.
+        // Console.In.ReadLineAsync ignora cancelamento (leitura síncrona bloqueante).
+        // Se o job termina sem uma linha `cancel`, o listener fica preso em stdin e
+        // `await cancelListenTask` nunca retorna — o processo não encerra, o App fica
+        // em WaitForExit e a UI permanece em "Transcrevendo… 0%".
+        try
+        {
+            await cancelListenTask.WaitAsync(TimeSpan.FromMilliseconds(250));
+        }
+        catch (TimeoutException)
+        {
+            logger?.LogDebug("Listener de cancelamento ainda bloqueado em stdin; encerrando o worker.");
+        }
+        catch (OperationCanceledException)
+        {
+        }
+
         return exitCode;
     }
 
@@ -121,8 +145,7 @@ public sealed class WorkerHost
                 }
                 catch (ObjectDisposedException)
                 {
-                    // RunAsync já retornou (job concluído/errou antes do cancel chegar) e
-                    // descartou o CancellationTokenSource — não há mais nada a cancelar.
+                    // RunAsync já retornou e descartou o CancellationTokenSource.
                 }
 
                 return;

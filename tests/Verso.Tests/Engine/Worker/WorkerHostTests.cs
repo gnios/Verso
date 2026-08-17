@@ -62,6 +62,26 @@ public class WorkerHostTests
         Assert.True(engine.ObservedToken.IsCancellationRequested);
     }
 
+    [Fact]
+    public async Task RunAsync_WhenStdinStaysOpenAfterJob_StillReturnsResult()
+    {
+        // Simula Console.In: depois da linha `job` o ReadLine seguinte bloqueia para sempre
+        // (não há EOF nem `cancel`). O host não pode esperar esse listener.
+        var input = new FirstLineThenBlockReader(Serialize(new WorkerJobMessage(CreateRequest())));
+        var output = new StringWriter();
+        var engine = new ProgressReportingInnerEngine();
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+        var exitCode = await new WorkerHost().RunAsync(input, output, engine, timeout.Token);
+
+        Assert.Equal(0, exitCode);
+        var resultMessage = Assert.Single(
+            SplitLines(output.ToString())
+                .Select(Deserialize)
+                .OfType<WorkerResultMessage>());
+        Assert.Equal("segmento ok", resultMessage.Result.Segments[0].Text);
+    }
+
     private static TranscriptionJobRequest CreateRequest() =>
         new(Guid.NewGuid(), "sample.wav", "pt", ModelQuality.Standard, ExecutionDevice.Cpu);
 
@@ -119,6 +139,37 @@ public class WorkerHostTests
 
             cancellationToken.ThrowIfCancellationRequested();
             return new TranscriptionResult([]);
+        }
+    }
+
+    /// <summary>
+    /// Primeira linha é o job; leituras seguintes ignoram o token de cancel e bloqueiam,
+    /// como <c>Console.In</c> no Windows.
+    /// </summary>
+    private sealed class FirstLineThenBlockReader(string firstLine) : TextReader
+    {
+        private int _reads;
+
+        public override async Task<string?> ReadLineAsync()
+        {
+            if (Interlocked.Increment(ref _reads) == 1)
+            {
+                return firstLine.TrimEnd('\r', '\n');
+            }
+
+            await Task.Delay(Timeout.Infinite);
+            return null;
+        }
+
+        public override async ValueTask<string?> ReadLineAsync(CancellationToken cancellationToken)
+        {
+            if (Interlocked.Increment(ref _reads) == 1)
+            {
+                return firstLine.TrimEnd('\r', '\n');
+            }
+
+            await Task.Delay(Timeout.Infinite, CancellationToken.None);
+            return null;
         }
     }
 }

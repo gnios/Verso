@@ -25,6 +25,26 @@ public class WorkerProtocolTests
         var deserialized = JsonSerializer.Deserialize<WorkerMessage>(json, WorkerProtocol.JsonOptions);
         var typed = Assert.IsType<WorkerJobMessage>(deserialized);
         Assert.Equal(request, typed.Request);
+        Assert.Equal(TranscriptionEngineKind.Whisper, typed.Request.Engine);
+    }
+
+    [Fact]
+    public void WorkerJobMessage_RoundTripsParakeetEngineFields()
+    {
+        var request = new TranscriptionJobRequest(
+            Guid.NewGuid(),
+            "sample.wav",
+            "pt",
+            ModelQuality.Standard,
+            ExecutionDevice.Cpu,
+            MaxTranscriptionThreads: 2,
+            Engine: TranscriptionEngineKind.Parakeet,
+            ParakeetModel: ParakeetModel.PtBrTagarela);
+        var json = JsonSerializer.Serialize<WorkerMessage>(new WorkerJobMessage(request), WorkerProtocol.JsonOptions);
+        var deserialized = JsonSerializer.Deserialize<WorkerMessage>(json, WorkerProtocol.JsonOptions);
+        var typed = Assert.IsType<WorkerJobMessage>(deserialized);
+        Assert.Equal(TranscriptionEngineKind.Parakeet, typed.Request.Engine);
+        Assert.Equal(ParakeetModel.PtBrTagarela, typed.Request.ParakeetModel);
     }
 
     [Fact]

@@ -46,6 +46,10 @@ public partial class SettingsViewModel : ViewModelBase
 
     public IReadOnlyList<ModelOptionViewModel> ModelOptions { get; } = ModelCatalog.All;
 
+    public IReadOnlyList<EngineOptionViewModel> EngineOptions { get; } = ModelCatalog.Engines;
+
+    public IReadOnlyList<ParakeetModelOptionViewModel> ParakeetModelOptions { get; } = ModelCatalog.ParakeetModels;
+
     [ObservableProperty]
     private string _name = "";
 
@@ -69,6 +73,12 @@ public partial class SettingsViewModel : ViewModelBase
 
     [ObservableProperty]
     private ModelOptionViewModel? _selectedModelOption;
+
+    [ObservableProperty]
+    private EngineOptionViewModel? _selectedEngineOption;
+
+    [ObservableProperty]
+    private ParakeetModelOptionViewModel? _selectedParakeetModelOption;
 
     [ObservableProperty]
     private ModelOptionViewModel? _recommendedModelOption;
@@ -136,6 +146,8 @@ public partial class SettingsViewModel : ViewModelBase
         LiveTranscriptionEnabled = settings.LiveTranscriptionEnabled;
         SelectedDeviceOption = DeviceOptions.FirstOrDefault(option => option.Value == settings.Device)
             ?? DeviceOptions[0];
+        SelectedEngineOption = ModelCatalog.FindEngine(settings.DefaultEngine);
+        SelectedParakeetModelOption = ModelCatalog.FindParakeet(settings.DefaultParakeetModel);
         SelectedModelOption = ModelCatalog.Find(settings.DefaultQuality);
         RecomputeModelRecommendation();
         RefreshDeveloperInfoCore();
@@ -213,6 +225,26 @@ public partial class SettingsViewModel : ViewModelBase
         }
 
         _ = UpdateSettingsAsync(settings => settings.DefaultQuality = value.Value);
+    }
+
+    partial void OnSelectedEngineOptionChanged(EngineOptionViewModel? value)
+    {
+        if (_suppressPersist || value is null)
+        {
+            return;
+        }
+
+        _ = UpdateSettingsAsync(settings => settings.DefaultEngine = value.Value);
+    }
+
+    partial void OnSelectedParakeetModelOptionChanged(ParakeetModelOptionViewModel? value)
+    {
+        if (_suppressPersist || value is null)
+        {
+            return;
+        }
+
+        _ = UpdateSettingsAsync(settings => settings.DefaultParakeetModel = value.Value);
     }
 
     private void RecomputeModelRecommendation()

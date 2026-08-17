@@ -6,5 +6,7 @@ public interface IModelDownloadNotifier
 {
     void DownloadStarted(ModelQuality quality);
 
+    void DownloadStarted(string displayName, string detail);
+
     void DownloadCompleted();
 }

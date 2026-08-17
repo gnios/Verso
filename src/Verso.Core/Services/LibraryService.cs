@@ -67,7 +67,9 @@ public class LibraryService(IDbContextFactory<VersoDbContext> dbContextFactory)
         int? folderId,
         double durationSeconds,
         string? icon = null,
-        IEnumerable<string>? tagNames = null)
+        IEnumerable<string>? tagNames = null,
+        TranscriptionEngineKind engine = TranscriptionEngineKind.Whisper,
+        ParakeetModel parakeetModel = ParakeetModel.MultilingualV3)
     {
         await using var context = await dbContextFactory.CreateDbContextAsync();
         var transcription = new Transcription
@@ -79,6 +81,8 @@ public class LibraryService(IDbContextFactory<VersoDbContext> dbContextFactory)
             MediaFilePath = mediaFilePath,
             Language = language,
             Quality = quality,
+            Engine = engine,
+            ParakeetModel = parakeetModel,
             Device = device,
             SpeakerMode = speakerMode,
             FolderId = folderId,

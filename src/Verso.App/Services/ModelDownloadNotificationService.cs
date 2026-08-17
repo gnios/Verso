@@ -16,6 +16,9 @@ public sealed class ModelDownloadNotificationService : IModelDownloadNotifier
     public void DownloadStarted(ModelQuality quality) =>
         UiThread.Invoke(() => _modal.Show(quality));
 
+    public void DownloadStarted(string displayName, string detail) =>
+        UiThread.Invoke(() => _modal.Show(detail));
+
     public void DownloadCompleted() =>
         UiThread.Invoke(() => _modal.Hide());
 }

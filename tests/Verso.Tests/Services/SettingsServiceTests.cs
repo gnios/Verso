@@ -20,6 +20,8 @@ public class SettingsServiceTests
             Assert.Equal("pt", settings.DefaultLanguage);
             Assert.True(settings.IdentifySpeakersDefault);
             Assert.Equal(ExecutionDevice.Auto, settings.Device);
+            Assert.Equal(TranscriptionEngineKind.Whisper, settings.DefaultEngine);
+            Assert.Equal(ParakeetModel.MultilingualV3, settings.DefaultParakeetModel);
             Assert.False(settings.DarkTheme);
             Assert.Equal(0, settings.MaxTranscriptionThreads);
         }

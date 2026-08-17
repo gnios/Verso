@@ -43,6 +43,10 @@ public partial class UploadViewModel : ViewModelBase
 
     public IReadOnlyList<ModelOptionViewModel> ModelOptions { get; } = ModelCatalog.All;
 
+    public IReadOnlyList<EngineOptionViewModel> EngineOptions { get; } = ModelCatalog.Engines;
+
+    public IReadOnlyList<ParakeetModelOptionViewModel> ParakeetModelOptions { get; } = ModelCatalog.ParakeetModels;
+
     public IReadOnlyList<SpeakerModeOptionViewModel> SpeakerModeOptions { get; } =
     [
         new(SpeakerMode.Automatic, "Automático"),
@@ -77,6 +81,21 @@ public partial class UploadViewModel : ViewModelBase
     private ModelOptionViewModel? _selectedModelOption;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsLanguageLocked))]
+    [NotifyPropertyChangedFor(nameof(IsParakeetEngine))]
+    private TranscriptionEngineKind _engine = TranscriptionEngineKind.Whisper;
+
+    [ObservableProperty]
+    private EngineOptionViewModel? _selectedEngineOption;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsLanguageLocked))]
+    private ParakeetModel _parakeetModel = ParakeetModel.MultilingualV3;
+
+    [ObservableProperty]
+    private ParakeetModelOptionViewModel? _selectedParakeetModelOption;
+
+    [ObservableProperty]
     private SpeakerMode _speakerMode = SpeakerMode.Automatic;
 
     [ObservableProperty]
@@ -102,6 +121,9 @@ public partial class UploadViewModel : ViewModelBase
     public bool HasSelectedFile => !string.IsNullOrWhiteSpace(SelectedFilePath);
     public bool CanStart => HasSelectedFile && !IsStarting && !string.IsNullOrWhiteSpace(Title);
     public string SupportedFormatsLabel => UploadMediaFormats.DisplayList;
+    public bool IsLanguageLocked =>
+        Engine == TranscriptionEngineKind.Parakeet && ParakeetModel == ParakeetModel.PtBrTagarela;
+    public bool IsParakeetEngine => Engine == TranscriptionEngineKind.Parakeet;
 
     public UploadViewModel(
         IServiceScopeFactory scopeFactory,
@@ -202,6 +224,7 @@ public partial class UploadViewModel : ViewModelBase
         }
 
         Language = value.Code;
+        LockPortugueseIfNeeded();
     }
 
     partial void OnSelectedModelOptionChanged(ModelOptionViewModel? value)
@@ -212,6 +235,39 @@ public partial class UploadViewModel : ViewModelBase
         }
 
         Quality = value.Value;
+    }
+
+    partial void OnSelectedEngineOptionChanged(EngineOptionViewModel? value)
+    {
+        if (value is null)
+        {
+            return;
+        }
+
+        Engine = value.Value;
+        LockPortugueseIfNeeded();
+    }
+
+    partial void OnSelectedParakeetModelOptionChanged(ParakeetModelOptionViewModel? value)
+    {
+        if (value is null)
+        {
+            return;
+        }
+
+        ParakeetModel = value.Value;
+        LockPortugueseIfNeeded();
+    }
+
+    private void LockPortugueseIfNeeded()
+    {
+        if (!IsLanguageLocked)
+        {
+            return;
+        }
+
+        Language = "pt";
+        SelectedLanguageOption = LanguageOptions.First(option => option.Code == "pt");
     }
 
     partial void OnSelectedSpeakerModeOptionChanged(SpeakerModeOptionViewModel? value)
@@ -240,7 +296,7 @@ public partial class UploadViewModel : ViewModelBase
             var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
             var settingsService = scope.ServiceProvider.GetRequiredService<SettingsService>();
             var settings = await settingsService.GetAsync();
-            var language = Language;
+            var language = IsLanguageLocked ? "pt" : Language;
             var audioLoader = _services.GetRequiredService<Verso.Core.Engine.AudioLoader>();
             var durationSeconds = audioLoader.GetDuration(mediaPath);
 
@@ -255,7 +311,9 @@ public partial class UploadViewModel : ViewModelBase
                 SelectedFolder?.Id,
                 durationSeconds,
                 IconPicker.SelectedIcon,
-                ParseTags(TagsText));
+                ParseTags(TagsText),
+                Engine,
+                ParakeetModel);
 
             _queueService.Enqueue(new TranscriptionJobRequest(
                 transcriptionId,
@@ -263,7 +321,9 @@ public partial class UploadViewModel : ViewModelBase
                 language,
                 Quality,
                 settings.Device,
-                settings.MaxTranscriptionThreads));
+                settings.MaxTranscriptionThreads,
+                Engine,
+                ParakeetModel));
 
             await _services.GetRequiredService<SidebarViewModel>().LoadAsync();
 
@@ -291,8 +351,13 @@ public partial class UploadViewModel : ViewModelBase
         SelectedLanguageOption = LanguageOptions.First(option => option.Code == Language);
         Quality = settings.DefaultQuality;
         SelectedModelOption = ModelCatalog.Find(Quality);
+        Engine = settings.DefaultEngine;
+        SelectedEngineOption = ModelCatalog.FindEngine(Engine);
+        ParakeetModel = settings.DefaultParakeetModel;
+        SelectedParakeetModelOption = ModelCatalog.FindParakeet(ParakeetModel);
         // Find dispara OnSelectedModelOptionChanged e normaliza Quality para o perfil de UI.
         SelectedSpeakerModeOption = SpeakerModeOptions.First(option => option.Value == SpeakerMode);
+        LockPortugueseIfNeeded();
 
         FolderOptions.Clear();
         FolderOptions.Add(new FolderOptionViewModel { Id = null, Name = "Nenhuma pasta", Icon = "" });

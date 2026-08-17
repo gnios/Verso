@@ -180,7 +180,9 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
             transcription.Language,
             transcription.Quality,
             settings.Device,
-            settings.MaxTranscriptionThreads));
+            settings.MaxTranscriptionThreads,
+            transcription.Engine,
+            transcription.ParakeetModel));
     }
 
     internal void CancelTranscription(Guid transcriptionId) =>

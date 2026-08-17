@@ -93,6 +93,27 @@ public class WorkerProcessTranscriptionEngineTests
         Assert.True(process.Killed);
     }
 
+    [Fact]
+    public async Task TranscribeAsync_WhenResultArrivesButProcessDoesNotExit_ReturnsResultAnyway()
+    {
+        var resultMessage = new WorkerResultMessage(new TranscriptionResult(
+        [
+            new TranscriptionSegmentResult(0, 1, "segmento ok"),
+        ]));
+        var process = FakeWorkerProcess.ThatEmitsThenNeverExits(
+        [
+            Serialize(new WorkerProgressMessage("transcribing", 0, 1)),
+            Serialize(resultMessage),
+        ]);
+
+        var engine = CreateEngine(process, out _, gracefulShutdownTimeout: TimeSpan.FromMilliseconds(30));
+
+        var result = await engine.TranscribeAsync(CreateRequest(), progress: null, CancellationToken.None);
+
+        Assert.Equal("segmento ok", result.Segments[0].Text);
+        Assert.True(process.Killed);
+    }
+
     private static WorkerProcessTranscriptionEngine CreateEngine(
         IWorkerProcess process,
         out FakeWorkerProcessFactory factory,
@@ -161,6 +182,9 @@ public class WorkerProcessTranscriptionEngineTests
 
         public static FakeWorkerProcess ThatNeverExitsOnItsOwn() =>
             new(new ScriptedTextReader([]));
+
+        public static FakeWorkerProcess ThatEmitsThenNeverExits(IEnumerable<string> outputLines) =>
+            new(new ScriptedTextReader(outputLines));
 
         public TextWriter StandardInput => Input;
         public TextReader StandardOutput => _output;
