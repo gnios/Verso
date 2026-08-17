@@ -15,8 +15,8 @@ public class Transcription
     public string? MediaFilePath { get; set; }       // caminho copiado em <appdir>/data/media
     public string Language { get; set; } = "pt";
     public ModelQuality Quality { get; set; }
-    public TranscriptionEngineKind Engine { get; set; } = TranscriptionEngineKind.Whisper;
-    public ParakeetModel ParakeetModel { get; set; } = ParakeetModel.MultilingualV3;
+    public TranscriptionEngineKind Engine { get; set; } = TranscriptionEngineKind.Parakeet;
+    public ParakeetModel ParakeetModel { get; set; } = ParakeetModel.PtBrTagarela;
     public ExecutionDevice Device { get; set; }
     public SpeakerMode SpeakerMode { get; set; }
     [Column("ResearchPageId")]
