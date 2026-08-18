@@ -138,7 +138,7 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
         using var scope = scopeFactory.CreateScope();
         _updateCoordinator = scope.ServiceProvider.GetService<UpdateCoordinator>();
         _hasUpdateChannel = UpdateChannel.TryLoad(VersoPaths.AppDirectory) is not null;
-        AppVersionLabel = AppVersion.Parse(RunningAppVersion.Current).ToString();
+        AppVersionLabel = AppVersion.Display(RunningAppVersion.Current);
         RefreshUpdateStatus();
         if (_updateCoordinator is not null)
             _updateCoordinator.StatusChanged += OnUpdateStatusChanged;
@@ -156,7 +156,7 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
     private void RefreshUpdateStatus()
     {
         var status = _updateCoordinator?.Status ?? UpdateStatus.Idle;
-        UpdateStatusText = UpdateStatusMessages.For(status, _hasUpdateChannel);
+        UpdateStatusText = UpdateStatusMessages.For(status, _hasUpdateChannel, _updateCoordinator?.AvailableVersion);
         OnPropertyChanged(nameof(UpdateStatusText));
     }
 
