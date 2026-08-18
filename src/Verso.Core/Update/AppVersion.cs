@@ -26,4 +26,6 @@ public static class AppVersion
 
     public static bool IsNewer(string remoteTag, string localVersion) =>
         Parse(remoteTag) > Parse(localVersion);
+
+    public static string Display(string? value) => Parse(value).ToString();
 }

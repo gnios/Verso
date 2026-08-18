@@ -46,6 +46,7 @@ public class UpdateCoordinatorTests
             var result = await coordinator.CheckAndPrepareAsync();
 
             Assert.Equal(UpdateStatus.UpToDate, result.Status);
+            Assert.Equal("1.0.0", coordinator.AvailableVersion);
             Assert.False(downloader.Called);
         }
         finally
@@ -71,6 +72,7 @@ public class UpdateCoordinatorTests
             Assert.Equal(UpdateStatus.Ready, result.Status);
             Assert.True(result.ApplyImmediately);
             Assert.True(coordinator.HasPendingApply());
+            Assert.Equal("1.1.0", coordinator.AvailableVersion);
             Assert.True(File.Exists(Path.Combine(coordinator.PayloadDirectory, "Verso.App.exe")));
             Assert.False(Directory.Exists(Path.Combine(coordinator.PayloadDirectory, "data")));
             Assert.False(File.Exists(Path.Combine(coordinator.StagingDirectory, UpdateCoordinator.PackageFileName)));
@@ -198,6 +200,34 @@ public class UpdateCoordinatorTests
             var result = await coordinator.CheckAndPrepareAsync();
 
             Assert.Equal(UpdateStatus.Failed, result.Status);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public async Task CheckAndPrepare_PendingApplyReadsTargetVersion()
+    {
+        var root = CreateTempDir();
+        try
+        {
+            WriteChannel(root);
+            var payload = Path.Combine(root, OverlayUpdateApplier.StagingFolderName, UpdateCoordinator.PayloadFolderName);
+            Directory.CreateDirectory(payload);
+            File.WriteAllText(Path.Combine(payload, "Verso.App.exe"), "new");
+            File.WriteAllText(
+                Path.Combine(root, OverlayUpdateApplier.StagingFolderName, UpdateCoordinator.ReadyFileName),
+                """{"tag":"v1.4.0"}""");
+            var releases = new FakeReleases();
+            var coordinator = CreateCoordinator(root, releases, idle: true);
+
+            var result = await coordinator.CheckAndPrepareAsync();
+
+            Assert.Equal(UpdateStatus.Ready, result.Status);
+            Assert.Equal("1.4.0", coordinator.AvailableVersion);
+            Assert.False(releases.Called);
         }
         finally
         {

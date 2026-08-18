@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -42,6 +43,8 @@ public sealed class UpdateCoordinator
 
     public string? StatusDetail { get; private set; }
 
+    public string? AvailableVersion { get; private set; }
+
     public event EventHandler? StatusChanged;
 
     public string StagingDirectory =>
@@ -63,6 +66,7 @@ public sealed class UpdateCoordinator
         if (result.Success)
         {
             TryDeleteStaging();
+            RememberAvailable(null);
             SetStatus(UpdateStatus.Idle, null);
         }
         else
@@ -79,6 +83,7 @@ public sealed class UpdateCoordinator
         var channel = UpdateChannel.TryLoad(appDir);
         if (channel is null)
         {
+            RememberAvailable(null);
             SetStatus(UpdateStatus.Idle, "sem canal");
             return new UpdateCheckResult(UpdateStatus.Idle, false, "sem canal");
         }
@@ -107,7 +112,8 @@ public sealed class UpdateCoordinator
         {
             if (HasPendingApply())
             {
-                SetStatus(UpdateStatus.Ready, null);
+                RememberAvailable(TryReadReadyTag());
+                SetStatus(UpdateStatus.Ready, AvailableVersion);
                 return ReadyResult();
             }
 
@@ -121,6 +127,7 @@ public sealed class UpdateCoordinator
 
             if (!AppVersion.IsNewer(latest.TagName, _localVersion()))
             {
+                RememberAvailable(latest.TagName);
                 SetStatus(UpdateStatus.UpToDate, latest.TagName);
                 return new UpdateCheckResult(UpdateStatus.UpToDate, false, latest.TagName);
             }
@@ -137,6 +144,7 @@ public sealed class UpdateCoordinator
                 return new UpdateCheckResult(UpdateStatus.Failed, false, StatusDetail);
             }
 
+            RememberAvailable(latest.TagName);
             SetStatus(UpdateStatus.Downloading, asset.Name);
             Directory.CreateDirectory(StagingDirectory);
             var zipPath = Path.Combine(StagingDirectory, PackageFileName);
@@ -167,6 +175,7 @@ public sealed class UpdateCoordinator
             File.WriteAllText(
                 Path.Combine(StagingDirectory, ReadyFileName),
                 $"{{\"tag\":\"{latest.TagName}\"}}");
+            RememberAvailable(latest.TagName);
             SetStatus(UpdateStatus.Ready, latest.TagName);
             return ReadyResult();
         }
@@ -188,6 +197,33 @@ public sealed class UpdateCoordinator
         }
 
         StatusChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void RememberAvailable(string? tag)
+    {
+        lock (_statusLock)
+        {
+            AvailableVersion = string.IsNullOrWhiteSpace(tag) ? null : AppVersion.Display(tag);
+        }
+    }
+
+    private string? TryReadReadyTag()
+    {
+        var path = Path.Combine(StagingDirectory, ReadyFileName);
+        try
+        {
+            if (!File.Exists(path))
+                return null;
+
+            using var doc = JsonDocument.Parse(File.ReadAllText(path));
+            return doc.RootElement.TryGetProperty("tag", out var tag)
+                ? tag.GetString()
+                : null;
+        }
+        catch (Exception ex) when (ex is IOException or JsonException)
+        {
+            return null;
+        }
     }
 
     private static void ExtractPackage(string zipPath, string payloadDirectory)

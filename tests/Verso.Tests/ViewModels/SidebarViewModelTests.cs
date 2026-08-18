@@ -166,6 +166,8 @@ public class SidebarViewModelTests
             Assert.Equal(ScreenKey.Settings, navigation.CurrentScreen);
             Assert.False(sidebar.CanUpdateNow);
             Assert.False(sidebar.UpdateNowCommand.CanExecute(null));
+            Assert.False(string.IsNullOrWhiteSpace(sidebar.AppVersionLabel));
+            Assert.Equal("Atualizar", sidebar.UpdateButtonLabel);
         }
         finally
         {

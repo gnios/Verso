@@ -121,7 +121,7 @@ public class UpdateSessionTests
         File.WriteAllText(Path.Combine(payload, "Verso.App.exe"), "new");
         File.WriteAllText(
             Path.Combine(appDir, OverlayUpdateApplier.StagingFolderName, UpdateCoordinator.ReadyFileName),
-            "{}");
+            """{"tag":"v1.1.0"}""");
     }
 
     private static string CreateTempDir()
@@ -208,6 +208,24 @@ public class UpdateStatusMessagesTests
     public void ActionTitle_ReadyInvitesRestart()
     {
         Assert.Contains("Reiniciar", UpdateStatusMessages.ActionTitle(true, UpdateStatus.Ready));
+        Assert.Contains("1.4.0", UpdateStatusMessages.ActionTitle(true, UpdateStatus.Ready, "1.4.0"));
         Assert.Contains("instaladas", UpdateStatusMessages.ActionTitle(false, UpdateStatus.Idle));
+    }
+
+    [Fact]
+    public void ActionLabel_ReadyIncludesTargetVersion()
+    {
+        Assert.Equal("Atualizar para 1.4.0", UpdateStatusMessages.ActionLabel(true, UpdateStatus.Ready, "1.4.0"));
+        Assert.Equal("Baixando 1.4.0…", UpdateStatusMessages.ActionLabel(true, UpdateStatus.Downloading, "1.4.0"));
+        Assert.Equal("Verificar atualizações", UpdateStatusMessages.ActionLabel(true, UpdateStatus.Idle));
+        Assert.Equal("Atualizar", UpdateStatusMessages.ActionLabel(false, UpdateStatus.Idle));
+    }
+
+    [Fact]
+    public void For_ReadyIncludesTargetVersion()
+    {
+        var text = UpdateStatusMessages.For(UpdateStatus.Ready, hasChannel: true, availableVersion: "1.4.0");
+        Assert.Contains("1.4.0", text);
+        Assert.Contains("pronta", text, StringComparison.OrdinalIgnoreCase);
     }
 }

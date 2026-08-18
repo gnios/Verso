@@ -44,11 +44,15 @@ public partial class SidebarViewModel : ViewModelBase
 
     public string ThemeIcon => _themeService.IsDark ? "☀️" : "🌙";
 
+    public string AppVersionLabel { get; } = AppVersion.Display(RunningAppVersion.Current);
+
     public bool CanUpdateNow { get; private set; }
 
     public bool UpdateIsReady { get; private set; }
 
     public string UpdateButtonTitle { get; private set; } = "";
+
+    public string UpdateButtonLabel { get; private set; } = "";
 
     public SidebarViewModel(
         NavigationService navigation,
@@ -221,12 +225,15 @@ public partial class SidebarViewModel : ViewModelBase
     private void RefreshUpdateStatus()
     {
         var status = _updateCoordinator?.Status ?? UpdateStatus.Idle;
+        var available = _updateCoordinator?.AvailableVersion;
         CanUpdateNow = UpdateStatusMessages.CanRequestUpdate(_hasUpdateChannel, status);
         UpdateIsReady = _hasUpdateChannel && status == UpdateStatus.Ready;
-        UpdateButtonTitle = UpdateStatusMessages.ActionTitle(_hasUpdateChannel, status);
+        UpdateButtonTitle = UpdateStatusMessages.ActionTitle(_hasUpdateChannel, status, available);
+        UpdateButtonLabel = UpdateStatusMessages.ActionLabel(_hasUpdateChannel, status, available);
         OnPropertyChanged(nameof(CanUpdateNow));
         OnPropertyChanged(nameof(UpdateIsReady));
         OnPropertyChanged(nameof(UpdateButtonTitle));
+        OnPropertyChanged(nameof(UpdateButtonLabel));
         UpdateNowCommand.NotifyCanExecuteChanged();
     }
 }

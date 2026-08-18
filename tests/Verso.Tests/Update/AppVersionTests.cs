@@ -30,4 +30,12 @@ public class AppVersionTests
         Assert.Equal(new Version(1, 2, 3), AppVersion.Parse("1.2.3-beta"));
         Assert.Equal(new Version(0, 0, 0), AppVersion.Parse("abc"));
     }
+
+    [Fact]
+    public void Display_NormalizesTagToDottedVersion()
+    {
+        Assert.Equal("1.4.0", AppVersion.Display("v1.4.0"));
+        Assert.Equal("1.2.3", AppVersion.Display("1.2.3-beta"));
+        Assert.Equal("0.0.0", AppVersion.Display("abc"));
+    }
 }
