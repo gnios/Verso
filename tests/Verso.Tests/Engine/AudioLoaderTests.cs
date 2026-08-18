@@ -32,4 +32,34 @@ public class AudioLoaderTests
 
         Assert.Equal("ffmpeg não retornou áudio.", ex.Message);
     }
+
+    [Fact]
+    public void BuildFfmpegPcmArguments_WithoutSeek_PlacesInputBeforeResample()
+    {
+        var args = AudioLoader.BuildFfmpegPcmArguments(@"C:\a.m4a", startSeconds: null, durationSeconds: null);
+
+        Assert.Contains("-i \"C:\\a.m4a\"", args, StringComparison.Ordinal);
+        Assert.DoesNotContain(" -ss ", args, StringComparison.Ordinal);
+        Assert.Contains("-ar 16000 -ac 1 -f s16le pipe:1", args, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildFfmpegPcmArguments_WithWindow_UsesAccurateHybridSeek()
+    {
+        var args = AudioLoader.BuildFfmpegPcmArguments(@"C:\a.m4a", startSeconds: 18, durationSeconds: 20);
+        var preroll = AudioLoader.FfmpegSeekPrerollSeconds;
+        var inputSeek = (18 - preroll).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var outputSeek = preroll.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        Assert.Contains($"-ss {inputSeek} -i \"C:\\a.m4a\" -ss {outputSeek} -t 20", args, StringComparison.Ordinal);
+        Assert.DoesNotContain("-t 20 -i ", args, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildFfmpegPcmArguments_NearStart_DoesNotSeekBeforeZero()
+    {
+        var args = AudioLoader.BuildFfmpegPcmArguments("clip.mp3", startSeconds: 1, durationSeconds: 20);
+
+        Assert.Contains("-ss 0 -i \"clip.mp3\" -ss 1 -t 20", args, StringComparison.Ordinal);
+    }
 }

@@ -11,6 +11,7 @@
 @implements IDisposable
 @inject IJSRuntime JS
 
+<div class="editor-root">
 <section class="screen active editor-screen">
     <div class="editor-shell">
         @if (ViewModel.IsLoading)
@@ -120,8 +121,20 @@
 <div class="modal-overlay @(ViewModel.IsExportDialogOpen ? "open" : "")" @onclick="OnExportOverlayClick">
     <div class="modal" @onclick:stopPropagation="true">
         <div class="modal-title">Exportar transcrição</div>
-        <p class="modal-message">Escolha o formato de exportação:</p>
+        @if (!string.IsNullOrWhiteSpace(ViewModel.ExportSavedPath))
+        {
+            <p class="modal-message">Arquivo salvo na pasta Downloads:</p>
+            <p class="export-saved-path">@ViewModel.ExportSavedPath</p>
+        }
+        else
+        {
+            <p class="modal-message">Escolha o formato de exportação:</p>
+        }
         <div class="export-format-list">
+            @if (!string.IsNullOrWhiteSpace(ViewModel.ExportError))
+            {
+                <div class="upload-error">@ViewModel.ExportError</div>
+            }
             <button type="button" class="export-format-btn" @onclick="async () => await ViewModel.ExportAsTxtCommand.ExecuteAsync(null)">
                 <strong>TXT</strong>
                 <span>Texto simples</span>
@@ -140,9 +153,36 @@
         </div>
     </div>
 </div>
+</div>
 
 
 <style>
+    .editor-root {
+        flex: 1;
+        min-width: 0;
+        min-height: 0;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .editor-root .modal-overlay.open {
+        position: absolute;
+        inset: 0;
+        z-index: 2000;
+    }
+
+    .export-saved-path {
+        font-size: 12px;
+        color: var(--fg-secondary);
+        word-break: break-all;
+        margin: 0 0 12px;
+        padding: 8px 10px;
+        background: var(--surface);
+        border-radius: var(--radius);
+    }
+
     .export-format-list {
         display: flex;
         flex-direction: column;

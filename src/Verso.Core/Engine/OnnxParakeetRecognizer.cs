@@ -81,24 +81,24 @@ public sealed class OnnxParakeetRecognizer : IParakeetRecognizer, IDisposable
 
         var chunks = ParakeetAudioChunker.Split(samples16kHz);
         progress?.Report(new EngineProgress("transcribing", 0, chunks.Count));
-        var segments = new List<TranscriptionSegmentResult>();
+        var windows = new List<ParakeetAudioChunker.WindowTranscript>(chunks.Count);
         for (var i = 0; i < chunks.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var chunk = chunks[i];
-            var part = RecognizeWindow(chunk.Samples, cancellationToken);
-            var startSeconds = chunk.OffsetSamples / (double)AudioLoader.SampleRate;
-            segments.AddRange(ParakeetAudioChunker.ShiftAndTrimOverlap(
-                part,
-                startSeconds,
-                isFirstChunk: i == 0));
+            var (timestamps, tokens) = RecognizeWindowTokens(chunk.Samples, cancellationToken);
+            windows.Add(new ParakeetAudioChunker.WindowTranscript(
+                chunk.OffsetSamples / (double)AudioLoader.SampleRate,
+                chunk.Samples.Length / (double)AudioLoader.SampleRate,
+                timestamps,
+                tokens));
             progress?.Report(new EngineProgress("transcribing", i + 1, chunks.Count));
         }
 
-        return segments;
+        return ParakeetAudioChunker.StitchWindowTokens(windows);
     }
 
-    private IReadOnlyList<TranscriptionSegmentResult> RecognizeWindow(
+    private (IReadOnlyList<double> Timestamps, IReadOnlyList<string> Tokens) RecognizeWindowTokens(
         float[] samples16kHz,
         CancellationToken cancellationToken)
     {
@@ -108,7 +108,7 @@ public sealed class OnnxParakeetRecognizer : IParakeetRecognizer, IDisposable
         var frames = RunEncoder(features, featureLens);
         if (frames.Count == 0)
         {
-            return [];
+            return ([], []);
         }
 
         var state = (Zeros(_state1Shape), Zeros(_state2Shape));
@@ -125,8 +125,7 @@ public sealed class OnnxParakeetRecognizer : IParakeetRecognizer, IDisposable
 
         var tokens = tokenIds.Select(id => _vocab[id]).ToList();
         var timestamps = frameIndices.Select(f => f * SecondsPerFrame).ToList();
-        var text = _vocab.Join(tokenIds);
-        return ParakeetSegmentBuilder.Build(text, timestamps, tokens);
+        return (timestamps, tokens);
     }
 
     public void Dispose()

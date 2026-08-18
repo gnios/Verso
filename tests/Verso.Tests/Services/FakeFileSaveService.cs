@@ -5,6 +5,7 @@ namespace Verso.Tests.Services;
 internal sealed class FakeFileSaveService : IFileSaveService
 {
     public string? NextPath { get; set; }
+    public Exception? ExceptionToThrow { get; set; }
     public ExportFormat? LastFormat { get; private set; }
     public string? LastSuggestedName { get; private set; }
 
@@ -12,6 +13,11 @@ internal sealed class FakeFileSaveService : IFileSaveService
     {
         LastFormat = format;
         LastSuggestedName = suggestedFileName;
+        if (ExceptionToThrow is not null)
+        {
+            throw ExceptionToThrow;
+        }
+
         return Task.FromResult(NextPath);
     }
 }

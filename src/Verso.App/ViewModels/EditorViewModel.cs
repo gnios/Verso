@@ -109,6 +109,12 @@ public partial class EditorViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private bool _isExportDialogOpen;
 
+    [ObservableProperty]
+    private string _exportError = "";
+
+    [ObservableProperty]
+    private string _exportSavedPath = "";
+
     public bool HasIcon => !string.IsNullOrWhiteSpace(Icon);
     public bool CanExport => HasSegments;
     public bool HasActiveSegment => _playbackStarted && GetActiveSegmentEntity() is not null;
@@ -184,10 +190,20 @@ public partial class EditorViewModel : ViewModelBase, IDisposable
     private void ToggleSpeakerDropdown() => SpeakerDropdown.ToggleCommand.Execute(null);
 
     [RelayCommand(CanExecute = nameof(CanExport))]
-    private void Export() => IsExportDialogOpen = true;
+    private void Export()
+    {
+        ExportError = "";
+        ExportSavedPath = "";
+        IsExportDialogOpen = true;
+    }
 
     [RelayCommand]
-    private void CloseExportDialog() => IsExportDialogOpen = false;
+    private void CloseExportDialog()
+    {
+        IsExportDialogOpen = false;
+        ExportError = "";
+        ExportSavedPath = "";
+    }
 
     [RelayCommand]
     private Task ExportAsTxtAsync() => ExportWithFormatAsync(ExportFormat.Txt);
@@ -205,28 +221,43 @@ public partial class EditorViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        IsExportDialogOpen = false;
+        ExportError = "";
+        ExportSavedPath = "";
 
-        var destPath = await _fileSaveService.PickSavePathAsync(Title, format);
-        if (destPath is null)
+        try
         {
-            return;
+            var destPath = await _fileSaveService.PickSavePathAsync(Title, format);
+            if (string.IsNullOrWhiteSpace(destPath))
+            {
+                ExportError = "Não foi possível definir o arquivo de destino.";
+                IsExportDialogOpen = true;
+                return;
+            }
+
+            using var scope = _scopeFactory.CreateScope();
+            var exportService = scope.ServiceProvider.GetRequiredService<ExportService>();
+
+            switch (format)
+            {
+                case ExportFormat.Txt:
+                    await exportService.ExportTxtAsync(_transcriptionId, destPath);
+                    break;
+                case ExportFormat.Srt:
+                    await exportService.ExportSrtAsync(_transcriptionId, destPath);
+                    break;
+                case ExportFormat.Vtt:
+                    await exportService.ExportVttAsync(_transcriptionId, destPath);
+                    break;
+            }
+
+            ExportSavedPath = destPath;
+            IsExportDialogOpen = true;
+            _fileSaveService.Reveal(destPath);
         }
-
-        using var scope = _scopeFactory.CreateScope();
-        var exportService = scope.ServiceProvider.GetRequiredService<ExportService>();
-
-        switch (format)
+        catch (Exception ex)
         {
-            case ExportFormat.Txt:
-                await exportService.ExportTxtAsync(_transcriptionId, destPath);
-                break;
-            case ExportFormat.Srt:
-                await exportService.ExportSrtAsync(_transcriptionId, destPath);
-                break;
-            case ExportFormat.Vtt:
-                await exportService.ExportVttAsync(_transcriptionId, destPath);
-                break;
+            ExportError = ex.Message;
+            IsExportDialogOpen = true;
         }
     }
 

@@ -49,8 +49,26 @@ public static class TranscriptionTextFormatter
 
     public static string FormatTxtTimestamp(double totalSeconds)
     {
-        var time = TimeSpan.FromSeconds(totalSeconds);
+        var time = TimeSpan.FromSeconds(Math.Max(0, totalSeconds));
+        if (time.TotalHours >= 1)
+        {
+            return $"{(int)time.TotalHours:00}:{time.Minutes:00}:{time.Seconds:00}";
+        }
+
         return $"{time.Minutes:00}:{time.Seconds:00}";
+    }
+
+    public static string SanitizeFileName(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return "transcricao";
+        }
+
+        var invalid = Path.GetInvalidFileNameChars();
+        var chars = name.Trim().Select(c => Array.IndexOf(invalid, c) >= 0 ? '-' : c).ToArray();
+        var sanitized = new string(chars).Trim(' ', '.');
+        return string.IsNullOrWhiteSpace(sanitized) ? "transcricao" : sanitized;
     }
 
     public static string BuildCueText(string? speakerName, string text)
