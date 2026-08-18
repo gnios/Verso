@@ -832,6 +832,310 @@ public class EditorViewModelTests
             TestDbHelper.Cleanup(directory);
         }
     }
+
+    private static WordLikeKeyContext WordKey(
+        string key,
+        int start,
+        int end,
+        int length,
+        bool shift = false,
+        bool firstLine = true,
+        bool lastLine = true,
+        int column = 0) =>
+        new(
+            Key: key,
+            Shift: shift,
+            CaretStart: start,
+            CaretEnd: end,
+            TextLength: length,
+            IsFirstLine: firstLine,
+            IsLastLine: lastLine,
+            Column: column,
+            IsFirstSegment: false,
+            IsLastSegment: false);
+
+    private static async Task<(IServiceProvider Provider, string Directory, Guid TranscriptionId, Guid FirstId, Guid SecondId)>
+        CreateTwoSegmentEditorAsync(
+            string firstText = "primeiro",
+            string secondText = "segundo",
+            Guid? firstSpeakerId = null,
+            Guid? secondSpeakerId = null,
+            Action<Transcription>? extra = null)
+    {
+        var firstId = Guid.NewGuid();
+        var secondId = Guid.NewGuid();
+        var (provider, directory, transcriptionId) = await CreateEditorProviderAsync(
+            TranscriptionStatus.Done,
+            transcription =>
+            {
+                transcription.Segments.Clear();
+                extra?.Invoke(transcription);
+                transcription.Segments.AddRange(
+                [
+                    new Segment
+                    {
+                        Id = firstId,
+                        TranscriptionId = transcription.Id,
+                        StartSeconds = 0,
+                        EndSeconds = 5,
+                        Text = firstText,
+                        SortOrder = 0,
+                        SpeakerId = firstSpeakerId,
+                    },
+                    new Segment
+                    {
+                        Id = secondId,
+                        TranscriptionId = transcription.Id,
+                        StartSeconds = 10,
+                        EndSeconds = 15,
+                        Text = secondText,
+                        SortOrder = 1,
+                        SpeakerId = secondSpeakerId,
+                    },
+                ]);
+            });
+        return (provider, directory, transcriptionId, firstId, secondId);
+    }
+
+    [Fact]
+    public async Task ApplyWordLikeKey_Enter_SplitsAndFocusesNewSegmentAtZero()
+    {
+        var (provider, directory, transcriptionId, firstId, _) =
+            await CreateTwoSegmentEditorAsync("alpha beta", "gamma");
+        try
+        {
+            var editor = await CreateEditorAsync(provider, transcriptionId);
+            (Guid Id, int Caret)? focus = null;
+            editor.FocusSegmentRequested += (_, e) => focus = e;
+
+            await editor.ApplyWordLikeKeyAsync(
+                editor.Segments[0],
+                WordKey("Enter", start: 5, end: 5, length: 10));
+            await Task.Delay(50);
+
+            await using var ctx = await TestDbHelper.GetFactory(provider).CreateDbContextAsync();
+            var segments = await ctx.Segments
+                .Where(s => s.TranscriptionId == transcriptionId)
+                .OrderBy(s => s.SortOrder)
+                .ToListAsync();
+
+            Assert.Equal(3, segments.Count);
+            Assert.Equal("alpha", segments[0].Text);
+            Assert.Equal("beta", segments[1].Text);
+            Assert.NotNull(focus);
+            Assert.Equal(segments[1].Id, focus.Value.Id);
+            Assert.Equal(0, focus.Value.Caret);
+            Assert.NotEqual(firstId, focus.Value.Id);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task ApplyWordLikeKey_BackspaceAtStart_MergesWithPreviousAndFocusesJoin()
+    {
+        var (provider, directory, transcriptionId, firstId, _) =
+            await CreateTwoSegmentEditorAsync();
+        try
+        {
+            var editor = await CreateEditorAsync(provider, transcriptionId);
+            (Guid Id, int Caret)? focus = null;
+            editor.FocusSegmentRequested += (_, e) => focus = e;
+            var expectedCaret = SegmentEditingService.CaretAfterJoin("primeiro", "segundo");
+
+            await editor.ApplyWordLikeKeyAsync(
+                editor.Segments[1],
+                WordKey("Backspace", start: 0, end: 0, length: 7));
+            await Task.Delay(50);
+
+            await using var ctx = await TestDbHelper.GetFactory(provider).CreateDbContextAsync();
+            var segment = await ctx.Segments.SingleAsync(s => s.TranscriptionId == transcriptionId);
+            Assert.Equal("primeiro segundo", segment.Text);
+            Assert.Equal(firstId, segment.Id);
+            Assert.NotNull(focus);
+            Assert.Equal(firstId, focus.Value.Id);
+            Assert.Equal(expectedCaret, focus.Value.Caret);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task ApplyWordLikeKey_DeleteAtEnd_MergesWithNextAndFocusesJoin()
+    {
+        var (provider, directory, transcriptionId, firstId, _) =
+            await CreateTwoSegmentEditorAsync();
+        try
+        {
+            var editor = await CreateEditorAsync(provider, transcriptionId);
+            (Guid Id, int Caret)? focus = null;
+            editor.FocusSegmentRequested += (_, e) => focus = e;
+            var expectedCaret = SegmentEditingService.CaretAfterJoin("primeiro", "segundo");
+
+            await editor.ApplyWordLikeKeyAsync(
+                editor.Segments[0],
+                WordKey("Delete", start: 8, end: 8, length: 8));
+            await Task.Delay(50);
+
+            await using var ctx = await TestDbHelper.GetFactory(provider).CreateDbContextAsync();
+            var segment = await ctx.Segments.SingleAsync(s => s.TranscriptionId == transcriptionId);
+            Assert.Equal("primeiro segundo", segment.Text);
+            Assert.Equal(firstId, segment.Id);
+            Assert.NotNull(focus);
+            Assert.Equal(firstId, focus.Value.Id);
+            Assert.Equal(expectedCaret, focus.Value.Caret);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task ApplyWordLikeKey_MergeKeepsPreviousSpeakerWhenDifferent()
+    {
+        var anaId = Guid.NewGuid();
+        var betoId = Guid.NewGuid();
+        var (provider, directory, transcriptionId, firstId, _) =
+            await CreateTwoSegmentEditorAsync(
+                firstSpeakerId: anaId,
+                secondSpeakerId: betoId,
+                extra: transcription =>
+                {
+                    transcription.Speakers.Add(new Speaker
+                    {
+                        Id = anaId,
+                        TranscriptionId = transcription.Id,
+                        Name = "Ana",
+                        ColorHex = "#2eaadc",
+                    });
+                    transcription.Speakers.Add(new Speaker
+                    {
+                        Id = betoId,
+                        TranscriptionId = transcription.Id,
+                        Name = "Beto",
+                        ColorHex = "#e74c3c",
+                    });
+                });
+        try
+        {
+            var editor = await CreateEditorAsync(provider, transcriptionId);
+            await editor.ApplyWordLikeKeyAsync(
+                editor.Segments[1],
+                WordKey("Backspace", start: 0, end: 0, length: 7));
+            await Task.Delay(50);
+
+            await using var ctx = await TestDbHelper.GetFactory(provider).CreateDbContextAsync();
+            var segment = await ctx.Segments.SingleAsync(s => s.TranscriptionId == transcriptionId);
+            Assert.Equal(firstId, segment.Id);
+            Assert.Equal(anaId, segment.SpeakerId);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task ApplyWordLikeKey_ArrowRightAtEnd_FocusesNextWithoutPersisting()
+    {
+        var (provider, directory, transcriptionId, _, secondId) =
+            await CreateTwoSegmentEditorAsync();
+        try
+        {
+            var editor = await CreateEditorAsync(provider, transcriptionId);
+            (Guid Id, int Caret)? focus = null;
+            editor.FocusSegmentRequested += (_, e) => focus = e;
+
+            await editor.ApplyWordLikeKeyAsync(
+                editor.Segments[0],
+                WordKey("ArrowRight", start: 8, end: 8, length: 8));
+
+            Assert.Equal(2, editor.Segments.Count);
+            Assert.NotNull(focus);
+            Assert.Equal(secondId, focus.Value.Id);
+            Assert.Equal(0, focus.Value.Caret);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task ApplyWordLikeKey_ArrowLeftAtStart_FocusesPreviousAtEnd()
+    {
+        var (provider, directory, transcriptionId, firstId, _) =
+            await CreateTwoSegmentEditorAsync();
+        try
+        {
+            var editor = await CreateEditorAsync(provider, transcriptionId);
+            (Guid Id, int Caret)? focus = null;
+            editor.FocusSegmentRequested += (_, e) => focus = e;
+
+            await editor.ApplyWordLikeKeyAsync(
+                editor.Segments[1],
+                WordKey("ArrowLeft", start: 0, end: 0, length: 7));
+
+            Assert.NotNull(focus);
+            Assert.Equal(firstId, focus.Value.Id);
+            Assert.Equal("primeiro".Length, focus.Value.Caret);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task TryConsumePendingFocus_ReturnsOnceThenFalse()
+    {
+        var (provider, directory, transcriptionId, firstId, _) =
+            await CreateTwoSegmentEditorAsync();
+        try
+        {
+            var editor = await CreateEditorAsync(provider, transcriptionId);
+            editor.RequestFocus(firstId, 4);
+
+            Assert.True(editor.TryConsumePendingFocus(firstId, out var caret));
+            Assert.Equal(4, caret);
+            Assert.False(editor.TryConsumePendingFocus(firstId, out _));
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task SplitSegmentForAsync_RequestsFocusOnNewSegment()
+    {
+        var (provider, directory, transcriptionId, _, _) =
+            await CreateTwoSegmentEditorAsync("alpha beta", "gamma");
+        try
+        {
+            var editor = await CreateEditorAsync(provider, transcriptionId);
+            (Guid Id, int Caret)? focus = null;
+            editor.FocusSegmentRequested += (_, e) => focus = e;
+            editor.Segments[0].CaretIndex = 5;
+
+            await editor.SplitSegmentForAsync(editor.Segments[0]);
+            await Task.Delay(50);
+
+            Assert.NotNull(focus);
+            Assert.Equal(editor.Segments[1].Id, focus.Value.Id);
+            Assert.Equal(0, focus.Value.Caret);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
     [Fact]
     public async Task AddTagCommand_PersistsTagAndUpdatesObservable()
     {
