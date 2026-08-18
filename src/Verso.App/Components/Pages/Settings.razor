@@ -114,6 +114,22 @@
     </div>
 
     <div class="settings-section">
+        <div class="settings-section-title">Sobre</div>
+        <div class="settings-row">
+            <div>
+                <div class="settings-row-label">Versão</div>
+                <div class="settings-row-sub">@ViewModel.AppVersionLabel</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div>
+                <div class="settings-row-label">Atualizações</div>
+                <div class="settings-row-sub">@ViewModel.UpdateStatusText</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="settings-section">
         <button type="button" class="settings-advanced-toggle" @onclick="ToggleAdvanced">
             <span>Avançado</span>
             <span class="settings-advanced-chevron @(ViewModel.IsAdvancedExpanded ? "open" : "")">▾</span>
@@ -299,5 +315,6 @@
     {
         ViewModel.PropertyChanged -= OnObservedChanged;
         ThemeService.PropertyChanged -= OnObservedChanged;
+        ViewModel.Dispose();
     }
 }

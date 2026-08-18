@@ -349,4 +349,23 @@ public class SettingsViewModelTests
             TestDbHelper.Cleanup(directory);
         }
     }
+
+    [Fact]
+    public async Task LoadAsync_ExposesVersionAndUpdateStatusWithoutModal()
+    {
+        var (provider, directory) = await CreateProviderAsync();
+        try
+        {
+            var settings = CreateSettings(provider);
+            await settings.LoadAsync();
+
+            Assert.False(string.IsNullOrWhiteSpace(settings.AppVersionLabel));
+            Assert.False(string.IsNullOrWhiteSpace(settings.UpdateStatusText));
+            Assert.DoesNotContain("modal", settings.UpdateStatusText, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
 }

@@ -51,6 +51,10 @@
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
       <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
     </ProjectReference>
+    <ProjectReference Include="..\Verso.Updater\Verso.Updater.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
+    </ProjectReference>
   </ItemGroup>
 
   <!--
@@ -111,5 +115,32 @@
     <Exec
       Condition="'$(OS)' != 'Windows_NT'"
       Command="pwsh -NoProfile -File &quot;$(_LayoutScript)&quot; -PublishDir &quot;$(_PubDir)&quot;" />
+  </Target>
+
+  <!-- Updater na raiz (ao lado do App): o exe em execução não pode aplicar overlay no Windows. -->
+  <Target Name="PublishVersoUpdater" AfterTargets="LayoutPayloadDirectory" Condition="'$(RuntimeIdentifier)' != ''">
+    <PropertyGroup>
+      <_UpdaterProject>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\Verso.Updater\Verso.Updater.csproj'))</_UpdaterProject>
+      <_UpdaterPublishDir>$([System.IO.Path]::GetFullPath('$(PublishDir)'))</_UpdaterPublishDir>
+      <_UpdaterSelfContained Condition="'$(SelfContained)' == ''">true</_UpdaterSelfContained>
+      <_UpdaterSelfContained Condition="'$(SelfContained)' != ''">$(SelfContained)</_UpdaterSelfContained>
+      <_UpdaterPublishSingleFile Condition="'$(PublishSingleFile)' == ''">true</_UpdaterPublishSingleFile>
+      <_UpdaterPublishSingleFile Condition="'$(PublishSingleFile)' != ''">$(PublishSingleFile)</_UpdaterPublishSingleFile>
+    </PropertyGroup>
+    <Exec Command="dotnet publish &quot;$(_UpdaterProject)&quot; -c $(Configuration) -r $(RuntimeIdentifier) --self-contained $(_UpdaterSelfContained) -p:PublishSingleFile=$(_UpdaterPublishSingleFile) -p:IncludeNativeLibrariesForSelfExtract=false -p:Version=$(Version) -o &quot;$(_UpdaterPublishDir)&quot;" />
+  </Target>
+
+  <Target Name="WriteVersoChannel" AfterTargets="PublishVersoUpdater" Condition="'$(RuntimeIdentifier)' != ''">
+    <PropertyGroup>
+      <_ChannelDir>$([System.IO.Path]::GetFullPath('$(PublishDir)'))</_ChannelDir>
+      <_ChannelVariant Condition="'$(VersoIncludeGpuRuntimes)' == 'false'">cpu</_ChannelVariant>
+      <_ChannelVariant Condition="'$(_ChannelVariant)' == ''">gpu</_ChannelVariant>
+      <_ChannelJson>{"variant":"$(_ChannelVariant)","rid":"$(RuntimeIdentifier)"}</_ChannelJson>
+    </PropertyGroup>
+    <WriteLinesToFile
+      File="$(_ChannelDir)/verso-channel.json"
+      Lines="$(_ChannelJson)"
+      Overwrite="true"
+      Encoding="UTF-8" />
   </Target>
 </Project>

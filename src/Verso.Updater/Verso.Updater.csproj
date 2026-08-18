@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Verso.Updater</AssemblyName>
+    <RootNamespace>Verso.Updater</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Verso.Core\Update\OverlayApplyResult.cs" Link="OverlayApplyResult.cs" />
+    <Compile Include="..\Verso.Core\Update\OverlayUpdateApplier.cs" Link="OverlayUpdateApplier.cs" />
+    <Compile Include="..\Verso.Core\Update\UpdateApplyCommand.cs" Link="UpdateApplyCommand.cs" />
+  </ItemGroup>
+</Project>

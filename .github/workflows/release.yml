@@ -122,16 +122,18 @@ jobs:
           if [[ "${{ matrix.rid }}" == win-* ]]; then
             test -f "$OUT/Verso.App.exe"
             test -f "$OUT/engine/Verso.Worker.exe"
+            test -f "$OUT/Verso.Updater.exe"
           else
-            chmod +x "$OUT/Verso.App" "$OUT/engine/Verso.Worker"
+            chmod +x "$OUT/Verso.App" "$OUT/engine/Verso.Worker" "$OUT/Verso.Updater"
             test -f "$OUT/Verso.App"
             test -f "$OUT/engine/Verso.Worker"
+            test -f "$OUT/Verso.Updater"
           fi
           # Raiz limpa: só o App; payload em engine/ (pdbs removidos no LayoutPayloadDirectory).
-          root_extras=$(find "$OUT" -maxdepth 1 -mindepth 1 ! -name 'Verso.App' ! -name 'Verso.App.exe' ! -name 'engine' ! -name 'data' | wc -l | tr -d ' ')
+          root_extras=$(find "$OUT" -maxdepth 1 -mindepth 1 ! -name 'Verso.App' ! -name 'Verso.App.exe' ! -name 'Verso.Updater' ! -name 'Verso.Updater.exe' ! -name 'verso-channel.json' ! -name 'engine' ! -name 'data' | wc -l | tr -d ' ')
           if [[ "$root_extras" -gt 0 ]]; then
             echo "::warning::itens inesperados na raiz do publish:"
-            find "$OUT" -maxdepth 1 -mindepth 1 ! -name 'Verso.App' ! -name 'Verso.App.exe' ! -name 'engine' ! -name 'data' || true
+            find "$OUT" -maxdepth 1 -mindepth 1 ! -name 'Verso.App' ! -name 'Verso.App.exe' ! -name 'Verso.Updater' ! -name 'Verso.Updater.exe' ! -name 'verso-channel.json' ! -name 'engine' ! -name 'data' || true
           fi
 
       - name: Remover runtimes e arquivos desnecessários
@@ -258,6 +260,11 @@ jobs:
             fi
           fi
 
+          if [[ ! -f "$PUB/verso-channel.json" ]]; then
+            echo "::error::verso-channel.json ausente na raiz do publish"
+            exit 1
+          fi
+
           echo "Validação OK"
 
       - name: Assinar executáveis (Azure Trusted Signing)
@@ -301,11 +308,42 @@ jobs:
             throw "Zip GPU win suspeito ($([math]::Round($item.Length/1MB,1)) MB) — esperado > 200 MB"
           }
 
+      - name: Instalar Inno Setup
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
+
+      - name: Compilar instalador Windows
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $ver = '${{ steps.version.outputs.version }}'
+          $variant = '${{ matrix.variant }}'
+          $rid = '${{ matrix.rid }}'
+          $source = (Resolve-Path "publish/${variant}-${rid}").Path
+          $dist = (Resolve-Path dist).Path
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) { throw "ISCC.exe não encontrado: $iscc" }
+          $setupName = "Verso-${ver}-${variant}-${rid}-setup"
+          & $iscc `
+            /Q `
+            /DMyAppVersion=$ver `
+            "/DSourceDir=$source" `
+            "/DOutputDir=$dist" `
+            /DOutputBaseFilename=$setupName `
+            (Join-Path $PWD 'installer\windows\Verso.iss')
+          if ($LASTEXITCODE -ne 0) { throw "ISCC falhou ($LASTEXITCODE)" }
+          $exe = Join-Path $dist "$setupName.exe"
+          if (-not (Test-Path $exe)) { throw "Setup não gerado: $exe" }
+          Write-Host "Criado $setupName.exe ($([math]::Round((Get-Item $exe).Length/1MB,1)) MB)"
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: Verso-${{ matrix.variant }}-${{ matrix.rid }}
-          path: dist/*.zip
+          path: |
+            dist/*.zip
+            dist/*.exe
           if-no-files-found: error
           retention-days: 30
 
@@ -362,9 +400,9 @@ jobs:
         run: |
           tag="${{ steps.rel.outputs.tag }}"
           ver="${{ steps.rel.outputs.version }}"
-          mapfile -t zips < <(find assets -type f -name '*.zip' | sort)
+          mapfile -t zips < <(find assets -type f \( -name '*.zip' -o -name '*-setup.exe' \) | sort)
           if [ "${#zips[@]}" -eq 0 ]; then
-            echo "Nenhum zip encontrado em assets/" >&2
+            echo "Nenhum zip/setup encontrado em assets/" >&2
             exit 1
           fi
           gh release create "$tag" -R "${{ github.repository }}" \
@@ -373,8 +411,8 @@ jobs:
             --notes "Verso $ver
 
           ### Windows (x64)
-          - **Verso-${ver}-cpu-win-x64.zip** — CPU. WebView2.
-          - **Verso-${ver}-gpu-win-x64.zip** — CUDA/Vulkan. WebView2.
+          - **Verso-${ver}-cpu-win-x64-setup.exe** / **Verso-${ver}-gpu-win-x64-setup.exe** — instalador (sem admin). Atalho no Menu Iniciar. Update automático.
+          - **Verso-${ver}-cpu-win-x64.zip** / **Verso-${ver}-gpu-win-x64.zip** — portátil. Extraia e execute. O mesmo update automático.
 
           ### Linux (x64)
           - **Verso-${ver}-cpu-linux-x64.zip** — CPU. Requer WebKitGTK no sistema.
@@ -385,10 +423,10 @@ jobs:
           - **Verso-${ver}-gpu-osx-arm64.zip** — Core ML.
 
           Build self-contained (Photino.Blazor) — não requer .NET instalado.
-          Pasta: Verso.App(+.exe) na raiz; Worker, wwwroot/, runtimes/ e nativos em engine/.
-          Dados portáteis em data/ ao lado do app.
+          Pasta: Verso.App(+.exe) e Verso.Updater na raiz; Worker, wwwroot/, runtimes/ e nativos em engine/.
+          Dados portáteis em data/ ao lado do app — o update automático substitui só os binários e preserva data/ e arquivos extras.
 
           **Linux:** instale WebKitGTK (ex.: \`libwebkit2gtk-4.1-0\` no Ubuntu/Debian).
           **Windows:** Edge WebView2 Runtime (padrão no Windows 11).
 
-          Descompacte e execute o Verso.App da sua plataforma."
+          Descompacte o zip **ou** rode o setup da sua plataforma."

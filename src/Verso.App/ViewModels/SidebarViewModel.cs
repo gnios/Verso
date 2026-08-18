@@ -1,3 +1,4 @@
+using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Threading.Tasks;
@@ -5,7 +6,9 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Verso.App.Services;
+using Verso.Core;
 using Verso.Core.Services;
+using Verso.Core.Update;
 
 namespace Verso.App.ViewModels;
 
@@ -17,6 +20,9 @@ public partial class SidebarViewModel : ViewModelBase
     private readonly ThemeService _themeService;
     private readonly NewPageModalViewModel _newPageModal;
     private readonly IConfirmationService _confirmation;
+    private readonly UpdateCoordinator? _updateCoordinator;
+    private readonly UpdateSession? _updateSession;
+    private readonly bool _hasUpdateChannel;
 
     public ObservableCollection<SidebarFolderItemViewModel> Folders { get; } = [];
     public ObservableCollection<SidebarTagItemViewModel> Tags { get; } = [];
@@ -38,6 +44,12 @@ public partial class SidebarViewModel : ViewModelBase
 
     public string ThemeIcon => _themeService.IsDark ? "☀️" : "🌙";
 
+    public bool CanUpdateNow { get; private set; }
+
+    public bool UpdateIsReady { get; private set; }
+
+    public string UpdateButtonTitle { get; private set; } = "";
+
     public SidebarViewModel(
         NavigationService navigation,
         IServiceScopeFactory scopeFactory,
@@ -53,6 +65,13 @@ public partial class SidebarViewModel : ViewModelBase
         _confirmation = confirmation;
         _feedback = feedback;
         _themeService.PropertyChanged += OnThemePropertyChanged;
+        using var scope = scopeFactory.CreateScope();
+        _updateCoordinator = scope.ServiceProvider.GetService<UpdateCoordinator>();
+        _updateSession = scope.ServiceProvider.GetService<UpdateSession>();
+        _hasUpdateChannel = UpdateChannel.TryLoad(VersoPaths.AppDirectory) is not null;
+        RefreshUpdateStatus();
+        if (_updateCoordinator is not null)
+            _updateCoordinator.StatusChanged += OnUpdateStatusChanged;
         // LoadAsync fica a cargo do Sidebar.razor (OnInitializedAsync) para evitar load duplo no startup.
     }
 
@@ -98,6 +117,17 @@ public partial class SidebarViewModel : ViewModelBase
     [RelayCommand]
     private void NavigateSettings() =>
         _navigation.NavigateTo(ScreenKey.Settings);
+
+    [RelayCommand(CanExecute = nameof(CanExecuteUpdateNow))]
+    private async Task UpdateNowAsync()
+    {
+        if (_updateSession is null)
+            return;
+
+        await _updateSession.CheckInBackgroundAsync();
+    }
+
+    private bool CanExecuteUpdateNow() => CanUpdateNow;
 
 
     [RelayCommand]
@@ -184,5 +214,19 @@ public partial class SidebarViewModel : ViewModelBase
         {
             OnPropertyChanged(nameof(ThemeIcon));
         }
+    }
+
+    private void OnUpdateStatusChanged(object? sender, EventArgs e) => RefreshUpdateStatus();
+
+    private void RefreshUpdateStatus()
+    {
+        var status = _updateCoordinator?.Status ?? UpdateStatus.Idle;
+        CanUpdateNow = UpdateStatusMessages.CanRequestUpdate(_hasUpdateChannel, status);
+        UpdateIsReady = _hasUpdateChannel && status == UpdateStatus.Ready;
+        UpdateButtonTitle = UpdateStatusMessages.ActionTitle(_hasUpdateChannel, status);
+        OnPropertyChanged(nameof(CanUpdateNow));
+        OnPropertyChanged(nameof(UpdateIsReady));
+        OnPropertyChanged(nameof(UpdateButtonTitle));
+        UpdateNowCommand.NotifyCanExecuteChanged();
     }
 }
