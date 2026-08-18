@@ -385,6 +385,7 @@ public partial class EditorViewModel : ViewModelBase, IDisposable
             split.Value.After);
 
         await ReloadSegmentsAsync();
+        RequestFocus(split.Value.After.Id, 0);
     }
 
     [RelayCommand]
@@ -401,6 +402,8 @@ public partial class EditorViewModel : ViewModelBase, IDisposable
         {
             active.Text = activeVm.Text;
         }
+        SyncPreviousUncommittedText(active);
+        var caret = CaptureMergeCaret(active);
         var merged = _segmentEditing.MergeWithPrevious(_segmentEntities, active);
         if (merged is null)
         {
@@ -417,6 +420,7 @@ public partial class EditorViewModel : ViewModelBase, IDisposable
             active.Id);
 
         await ReloadSegmentsAsync();
+        RequestFocus(merged.Id, caret);
         UpdateActiveSegmentHighlight();
     }
 
@@ -456,6 +460,7 @@ public partial class EditorViewModel : ViewModelBase, IDisposable
             split.Value.After);
 
         await ReloadSegmentsAsync();
+        RequestFocus(split.Value.After.Id, 0);
     }
 
     internal async Task MergeSegmentForAsync(SegmentItemViewModel segment)
@@ -468,6 +473,8 @@ public partial class EditorViewModel : ViewModelBase, IDisposable
 
         // Sincroniza o texto (edição não commitada, já que Mesclar não dispara blur).
         entity.Text = segment.Text;
+        SyncPreviousUncommittedText(entity);
+        var caret = CaptureMergeCaret(entity);
         var merged = _segmentEditing.MergeWithPrevious(_segmentEntities, entity);
         if (merged is null)
         {
@@ -484,7 +491,104 @@ public partial class EditorViewModel : ViewModelBase, IDisposable
             entity.Id);
 
         await ReloadSegmentsAsync();
+        RequestFocus(merged.Id, caret);
         UpdateActiveSegmentHighlight();
+    }
+
+    internal async Task ApplyWordLikeKeyAsync(SegmentItemViewModel segment, WordLikeKeyContext ctx)
+    {
+        var index = IndexOfSegment(segment);
+        if (index < 0)
+        {
+            return;
+        }
+
+        var action = WordLikeEditResolver.Resolve(ctx with
+        {
+            IsFirstSegment = index == 0,
+            IsLastSegment = index == Segments.Count - 1,
+        });
+
+        switch (action)
+        {
+            case WordLikeEditAction.Split:
+                segment.CaretIndex = ctx.CaretStart;
+                await SplitSegmentForAsync(segment);
+                break;
+            case WordLikeEditAction.MergePrevious:
+                await MergeSegmentForAsync(segment);
+                break;
+            case WordLikeEditAction.MergeNext:
+                if (index + 1 < Segments.Count)
+                {
+                    await MergeSegmentForAsync(Segments[index + 1]);
+                }
+
+                break;
+            case WordLikeEditAction.MoveToPrevious:
+                RequestFocus(
+                    Segments[index - 1].Id,
+                    ctx.Key == "ArrowUp"
+                        ? Math.Min(ctx.Column, Segments[index - 1].Text.Length)
+                        : Segments[index - 1].Text.Length);
+                break;
+            case WordLikeEditAction.MoveToNext:
+                RequestFocus(
+                    Segments[index + 1].Id,
+                    ctx.Key == "ArrowDown"
+                        ? Math.Min(ctx.Column, Segments[index + 1].Text.Length)
+                        : 0);
+                break;
+        }
+    }
+
+    internal void RequestFocus(Guid segmentId, int caretIndex)
+    {
+        _pendingFocusSegmentId = segmentId;
+        _pendingFocusCaret = Math.Max(0, caretIndex);
+        FocusSegmentRequested?.Invoke(this, (segmentId, _pendingFocusCaret));
+    }
+
+    internal bool TryConsumePendingFocus(Guid segmentId, out int caretIndex)
+    {
+        if (_pendingFocusSegmentId != segmentId)
+        {
+            caretIndex = 0;
+            return false;
+        }
+
+        caretIndex = _pendingFocusCaret;
+        _pendingFocusSegmentId = null;
+        return true;
+    }
+
+    private void SyncPreviousUncommittedText(Segment active)
+    {
+        var previous = _segmentEntities
+            .OrderBy(s => s.SortOrder)
+            .TakeWhile(s => s.Id != active.Id)
+            .LastOrDefault();
+        if (previous is null)
+        {
+            return;
+        }
+
+        var prevVm = FindSegmentVm(previous.Id);
+        if (prevVm is not null)
+        {
+            previous.Text = prevVm.Text;
+        }
+    }
+
+    private int CaptureMergeCaret(Segment active)
+    {
+        var previous = _segmentEntities
+            .OrderBy(s => s.SortOrder)
+            .TakeWhile(s => s.Id != active.Id)
+            .LastOrDefault();
+        return previous is null
+            ? 0
+            : SegmentEditingService.CaretAfterJoin(previous.Text, active.Text);
     }
 
     internal void OpenLocutorFor(SegmentItemViewModel segment)
@@ -505,6 +609,11 @@ public partial class EditorViewModel : ViewModelBase, IDisposable
     internal event EventHandler<double>? SegmentSeekRequested;
 
     internal event EventHandler<SegmentItemViewModel>? ScrollToSegmentRequested;
+
+    internal event EventHandler<(Guid SegmentId, int CaretIndex)>? FocusSegmentRequested;
+
+    private Guid? _pendingFocusSegmentId;
+    private int _pendingFocusCaret;
 
     internal void OnSegmentClicked(SegmentItemViewModel segment)
     {
