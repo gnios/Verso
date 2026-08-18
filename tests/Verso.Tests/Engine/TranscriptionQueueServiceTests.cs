@@ -2,9 +2,11 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Verso.Core.Catalogs;
 using Verso.Core.Data;
 using Verso.Core.Data.Entities;
 using Verso.Core.Engine;
+using Verso.Core.Engine.Diarization;
 
 namespace Verso.Tests.Engine;
 
@@ -28,6 +30,130 @@ public class TranscriptionQueueServiceTests
         Assert.Equal("segmento ok", transcription.Segments[0].Text);
         Assert.True(transcription.ProcessingDurationSeconds.HasValue);
         Assert.True(transcription.ProcessingDurationSeconds!.Value > 0);
+    }
+
+    [Fact]
+    public async Task Enqueue_AutomaticTwoVoices_PersistsLocutor1And2WithCatalogColors()
+    {
+        var wavPath = WriteTwoToneWav();
+        try
+        {
+            var engine = new FixedSegmentsEngine(
+                new TranscriptionSegmentResult(0, 3, "fala um"),
+                new TranscriptionSegmentResult(3, 6, "fala dois"));
+            await using var fixture = await QueueFixture.CreateAsync(
+                engine,
+                new AudioLoader(new FfmpegLocator()),
+                new LocalDiarizer());
+            var transcriptionId = await fixture.SeedTranscriptionAsync(SpeakerMode.Automatic, wavPath);
+
+            fixture.Queue.Enqueue(fixture.CreateRequest(transcriptionId, wavPath));
+            await fixture.WaitForStatusAsync(transcriptionId, TranscriptionStatus.Done);
+
+            await using var context = await fixture.Factory.CreateDbContextAsync();
+            var transcription = await context.Transcriptions
+                .Include(t => t.Speakers)
+                .Include(t => t.Segments)
+                .SingleAsync(t => t.Id == transcriptionId);
+
+            Assert.Equal(2, transcription.Speakers.Count);
+            var locutor1 = transcription.Speakers.Single(s => s.Name == "Locutor 1");
+            var locutor2 = transcription.Speakers.Single(s => s.Name == "Locutor 2");
+            Assert.Equal(SpeakerColorCatalog.ColorAtIndex(0), locutor1.ColorHex);
+            Assert.Equal(SpeakerColorCatalog.ColorAtIndex(1), locutor2.ColorHex);
+
+            var ordered = transcription.Segments.OrderBy(s => s.SortOrder).ToList();
+            Assert.Equal(2, ordered.Count);
+            Assert.Equal(locutor1.Id, ordered[0].SpeakerId);
+            Assert.Equal(locutor2.Id, ordered[1].SpeakerId);
+            Assert.Equal("fala um", ordered[0].Text);
+            Assert.Equal("fala dois", ordered[1].Text);
+        }
+        finally
+        {
+            File.Delete(wavPath);
+        }
+    }
+
+    [Fact]
+    public async Task Enqueue_SpeakerModeOff_PersistsAsrCutsWithoutSpeakers()
+    {
+        await using var fixture = await QueueFixture.CreateAsync(new SuccessTranscriptionEngine());
+        var transcriptionId = await fixture.SeedTranscriptionAsync(SpeakerMode.Off);
+
+        fixture.Queue.Enqueue(fixture.CreateRequest(transcriptionId));
+        await fixture.WaitForStatusAsync(transcriptionId, TranscriptionStatus.Done);
+
+        await using var context = await fixture.Factory.CreateDbContextAsync();
+        var transcription = await context.Transcriptions
+            .Include(t => t.Speakers)
+            .Include(t => t.Segments)
+            .SingleAsync(t => t.Id == transcriptionId);
+
+        Assert.Empty(transcription.Speakers);
+        Assert.Single(transcription.Segments);
+        Assert.Null(transcription.Segments[0].SpeakerId);
+        Assert.Equal("segmento ok", transcription.Segments[0].Text);
+        Assert.Equal(0, transcription.Segments[0].StartSeconds);
+        Assert.Equal(1.5, transcription.Segments[0].EndSeconds);
+    }
+
+    [Fact]
+    public async Task Enqueue_AutomaticMissingMedia_CompletesWithLocutor1AndAsrCuts()
+    {
+        await using var fixture = await QueueFixture.CreateAsync(
+            new SuccessTranscriptionEngine(),
+            new AudioLoader(new FfmpegLocator()),
+            new LocalDiarizer());
+        var transcriptionId = await fixture.SeedTranscriptionAsync();
+
+        fixture.Queue.Enqueue(fixture.CreateRequest(transcriptionId));
+        await fixture.WaitForStatusAsync(transcriptionId, TranscriptionStatus.Done);
+
+        await using var context = await fixture.Factory.CreateDbContextAsync();
+        var transcription = await context.Transcriptions
+            .Include(t => t.Speakers)
+            .Include(t => t.Segments)
+            .SingleAsync(t => t.Id == transcriptionId);
+
+        Assert.Equal(TranscriptionStatus.Done, transcription.Status);
+        Assert.Single(transcription.Speakers);
+        Assert.Equal("Locutor 1", transcription.Speakers[0].Name);
+        Assert.Single(transcription.Segments);
+        Assert.Equal("segmento ok", transcription.Segments[0].Text);
+        Assert.Equal(transcription.Speakers[0].Id, transcription.Segments[0].SpeakerId);
+    }
+
+    [Fact]
+    public async Task Enqueue_AutomaticDiarizerThrows_CompletesWithLocutor1()
+    {
+        var wavPath = WriteSilenceWav();
+        try
+        {
+            await using var fixture = await QueueFixture.CreateAsync(
+                new SuccessTranscriptionEngine(),
+                new AudioLoader(new FfmpegLocator()),
+                new ThrowingDiarizer());
+            var transcriptionId = await fixture.SeedTranscriptionAsync(SpeakerMode.Automatic, wavPath);
+
+            fixture.Queue.Enqueue(fixture.CreateRequest(transcriptionId, wavPath));
+            await fixture.WaitForStatusAsync(transcriptionId, TranscriptionStatus.Done);
+
+            await using var context = await fixture.Factory.CreateDbContextAsync();
+            var transcription = await context.Transcriptions
+                .Include(t => t.Speakers)
+                .Include(t => t.Segments)
+                .SingleAsync(t => t.Id == transcriptionId);
+
+            Assert.Equal(TranscriptionStatus.Done, transcription.Status);
+            Assert.Single(transcription.Speakers);
+            Assert.Equal("Locutor 1", transcription.Speakers[0].Name);
+            Assert.Equal("segmento ok", transcription.Segments[0].Text);
+        }
+        finally
+        {
+            File.Delete(wavPath);
+        }
     }
 
     [Fact]
@@ -144,7 +270,11 @@ public class TranscriptionQueueServiceTests
         Assert.Contains(received, e => e.Stage == "loading");
         Assert.Contains(received, e => e.Stage == "transcribing" && e.PartIndex == 1 && e.TotalParts == 3);
         Assert.Contains(received, e => e.Percent == 67);
+        Assert.Contains(received, e => e.Stage == "diarizing");
         Assert.Contains(received, e => e.Stage == "saving");
+        var diarizingAt = received.FindIndex(e => e.Stage == "diarizing");
+        var savingAt = received.FindIndex(e => e.Stage == "saving");
+        Assert.True(savingAt > diarizingAt, "diarizing deve anteceder saving");
         Assert.All(received, e => Assert.Equal(transcriptionId, e.TranscriptionId));
     }
 
@@ -240,7 +370,10 @@ public class TranscriptionQueueServiceTests
         public required IDbContextFactory<VersoDbContext> Factory { get; init; }
         public required string DbPath { get; init; }
 
-        public static async Task<QueueFixture> CreateAsync(ITranscriptionEngine engine)
+        public static async Task<QueueFixture> CreateAsync(
+            ITranscriptionEngine engine,
+            AudioLoader? audioLoader = null,
+            ILocalDiarizer? diarizer = null)
         {
             var dbPath = CreateTempDbPath();
             var services = new ServiceCollection();
@@ -252,7 +385,9 @@ public class TranscriptionQueueServiceTests
             var queue = new TranscriptionQueueService(
                 factory,
                 engine,
-                NullLogger<TranscriptionQueueService>.Instance);
+                NullLogger<TranscriptionQueueService>.Instance,
+                audioLoader,
+                diarizer);
             await queue.StartAsync(CancellationToken.None);
             await queue.StartupCompleted;
 
@@ -264,7 +399,9 @@ public class TranscriptionQueueServiceTests
             };
         }
 
-        public async Task<Guid> SeedTranscriptionAsync()
+        public async Task<Guid> SeedTranscriptionAsync(
+            SpeakerMode speakerMode = SpeakerMode.Automatic,
+            string mediaFilePath = "sample.wav")
         {
             var id = Guid.NewGuid();
             await using var context = await Factory.CreateDbContextAsync();
@@ -274,17 +411,18 @@ public class TranscriptionQueueServiceTests
                 Title = "teste",
                 Status = TranscriptionStatus.InProgress,
                 CreatedAt = DateTime.UtcNow,
-                MediaFilePath = "sample.wav",
+                MediaFilePath = mediaFilePath,
                 Language = "pt",
+                SpeakerMode = speakerMode,
             });
             await context.SaveChangesAsync();
             return id;
         }
 
-        public TranscriptionJobRequest CreateRequest(Guid transcriptionId) =>
+        public TranscriptionJobRequest CreateRequest(Guid transcriptionId, string mediaFilePath = "sample.wav") =>
             new(
                 transcriptionId,
-                MediaFilePath: "sample.wav",
+                MediaFilePath: mediaFilePath,
                 Language: "pt",
                 Quality: ModelQuality.Standard,
                 Device: ExecutionDevice.Cpu);
@@ -319,6 +457,86 @@ public class TranscriptionQueueServiceTests
             await Queue.StopAsync(CancellationToken.None);
             CleanupDb(DbPath);
         }
+    }
+
+    private static string WriteTwoToneWav()
+    {
+        var audio = Concat(
+            GenerateTone(3, 120, 0.7f),
+            GenerateTone(3, 220, 0.7f));
+        return WriteMono16Wav(audio);
+    }
+
+    private static string WriteSilenceWav() => WriteMono16Wav(new float[AudioLoader.SampleRate]);
+
+    private static float[] Concat(params float[][] parts)
+    {
+        var audio = new float[parts.Sum(p => p.Length)];
+        var offset = 0;
+        foreach (var part in parts)
+        {
+            Array.Copy(part, 0, audio, offset, part.Length);
+            offset += part.Length;
+        }
+
+        return audio;
+    }
+
+    private static float[] GenerateTone(double seconds, float frequencyHz, float amplitude)
+    {
+        var length = (int)(seconds * AudioLoader.SampleRate);
+        var audio = new float[length];
+        for (var i = 0; i < length; i++)
+        {
+            audio[i] = amplitude * MathF.Sin(2 * MathF.PI * frequencyHz * i / AudioLoader.SampleRate);
+        }
+
+        return audio;
+    }
+
+    private static string WriteMono16Wav(float[] samples)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"verso-dia-{Guid.NewGuid():N}.wav");
+        using var stream = File.Create(path);
+        using var writer = new BinaryWriter(stream);
+        var dataLength = samples.Length * 2;
+        writer.Write("RIFF"u8);
+        writer.Write(36 + dataLength);
+        writer.Write("WAVE"u8);
+        writer.Write("fmt "u8);
+        writer.Write(16);
+        writer.Write((short)1);
+        writer.Write((short)1);
+        writer.Write(AudioLoader.SampleRate);
+        writer.Write(AudioLoader.SampleRate * 2);
+        writer.Write((short)2);
+        writer.Write((short)16);
+        writer.Write("data"u8);
+        writer.Write(dataLength);
+        foreach (var sample in samples)
+        {
+            var pcm = (short)Math.Clamp((int)MathF.Round(sample * 32767f), short.MinValue, short.MaxValue);
+            writer.Write(pcm);
+        }
+
+        return path;
+    }
+
+    private sealed class FixedSegmentsEngine(params TranscriptionSegmentResult[] segments) : ITranscriptionEngine
+    {
+        public Task<TranscriptionResult> TranscribeAsync(
+            TranscriptionJobRequest request,
+            IProgress<EngineProgress>? progress,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new TranscriptionResult(segments));
+    }
+
+    private sealed class ThrowingDiarizer : ILocalDiarizer
+    {
+        public IReadOnlyList<TranscriptionSegmentResult> Diarize(
+            float[] audio,
+            IReadOnlyList<TranscriptionSegmentResult> asrSegments) =>
+            throw new InvalidOperationException("falha diarizacao");
     }
 
     private sealed class SuccessTranscriptionEngine : ITranscriptionEngine
