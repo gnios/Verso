@@ -188,18 +188,15 @@ public class LibraryService(IDbContextFactory<VersoDbContext> dbContextFactory)
         {
             throw new InvalidOperationException($"Segmento {segmentId} não encontrado.");
         }
-        segment.Text = beforeText;
-        segment.EndSeconds = beforeEndSeconds;
+
         var insertOrder = segment.SortOrder + 1;
 
-        var toShift = await context.Segments
+        await context.Segments
             .Where(s => s.TranscriptionId == transcriptionId && s.SortOrder >= insertOrder)
-            .ToListAsync();
+            .ExecuteUpdateAsync(setters => setters.SetProperty(s => s.SortOrder, s => s.SortOrder + 1));
 
-        foreach (var shifted in toShift)
-        {
-            shifted.SortOrder++;
-        }
+        segment.Text = beforeText;
+        segment.EndSeconds = beforeEndSeconds;
 
         context.Segments.Add(new Segment
         {
@@ -237,14 +234,9 @@ public class LibraryService(IDbContextFactory<VersoDbContext> dbContextFactory)
         previous.EndSeconds = mergedEndSeconds;
         context.Segments.Remove(remove);
 
-        var toShift = await context.Segments
+        await context.Segments
             .Where(s => s.TranscriptionId == transcriptionId && s.SortOrder > removedOrder)
-            .ToListAsync();
-
-        foreach (var shifted in toShift)
-        {
-            shifted.SortOrder--;
-        }
+            .ExecuteUpdateAsync(setters => setters.SetProperty(s => s.SortOrder, s => s.SortOrder - 1));
 
         await context.SaveChangesAsync();
     }

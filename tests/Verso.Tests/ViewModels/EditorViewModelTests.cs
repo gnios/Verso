@@ -1187,6 +1187,104 @@ public class EditorViewModelTests
     }
 
     [Fact]
+    public async Task SplitSegmentForAsync_KeepsExistingSegmentViewModels()
+    {
+        var (provider, directory, transcriptionId, _, _) =
+            await CreateTwoSegmentEditorAsync("alpha beta", "gamma");
+        try
+        {
+            var editor = await CreateEditorAsync(provider, transcriptionId);
+            var originalFirst = editor.Segments[0];
+            var originalSecond = editor.Segments[1];
+            originalFirst.CaretIndex = 5;
+
+            await editor.SplitSegmentForAsync(originalFirst);
+
+            Assert.Equal(3, editor.Segments.Count);
+            Assert.Same(originalFirst, editor.Segments[0]);
+            Assert.Same(originalSecond, editor.Segments[2]);
+            Assert.Equal("alpha", originalFirst.Text);
+            Assert.Equal("beta", editor.Segments[1].Text);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task MergeSegmentForAsync_KeepsSurvivorViewModel()
+    {
+        var (provider, directory, transcriptionId, _, _) =
+            await CreateTwoSegmentEditorAsync();
+        try
+        {
+            var editor = await CreateEditorAsync(provider, transcriptionId);
+            var originalFirst = editor.Segments[0];
+            var absorbed = editor.Segments[1];
+
+            await editor.MergeSegmentForAsync(absorbed);
+
+            Assert.Single(editor.Segments);
+            Assert.Same(originalFirst, editor.Segments[0]);
+            Assert.Equal("primeiro segundo", originalFirst.Text);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task ApplyWordLikeKey_Enter_KeepsExistingSegmentViewModels()
+    {
+        var (provider, directory, transcriptionId, _, _) =
+            await CreateTwoSegmentEditorAsync("alpha beta", "gamma");
+        try
+        {
+            var editor = await CreateEditorAsync(provider, transcriptionId);
+            var originalFirst = editor.Segments[0];
+            var originalSecond = editor.Segments[1];
+
+            await editor.ApplyWordLikeKeyAsync(
+                originalFirst,
+                WordKey("Enter", start: 5, end: 5, length: 10));
+
+            Assert.Equal(3, editor.Segments.Count);
+            Assert.Same(originalFirst, editor.Segments[0]);
+            Assert.Same(originalSecond, editor.Segments[2]);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task ApplyWordLikeKey_Delete_KeepsSurvivorViewModel()
+    {
+        var (provider, directory, transcriptionId, _, _) =
+            await CreateTwoSegmentEditorAsync();
+        try
+        {
+            var editor = await CreateEditorAsync(provider, transcriptionId);
+            var originalFirst = editor.Segments[0];
+
+            await editor.ApplyWordLikeKeyAsync(
+                originalFirst,
+                WordKey("Delete", start: 8, end: 8, length: 8));
+
+            Assert.Single(editor.Segments);
+            Assert.Same(originalFirst, editor.Segments[0]);
+            Assert.Equal("primeiro segundo", originalFirst.Text);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
     public async Task AddTagCommand_PersistsTagAndUpdatesObservable()
     {
         var (provider, directory, transcriptionId) = await CreateEditorProviderAsync(TranscriptionStatus.Done);
