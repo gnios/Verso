@@ -39,30 +39,34 @@ public static class UpdateStatusMessages
         && status is not UpdateStatus.Downloading
         && status is not UpdateStatus.Applying;
 
-    public static string ActionLabel(bool hasChannel, UpdateStatus status, string? availableVersion = null)
+    public static string ActionLabel(bool hasChannel, UpdateStatus status, string? availableVersion = null, string? localVersion = null)
     {
         if (!hasChannel)
             return "Atualizar";
 
         var target = Normalize(availableVersion);
+        var offerTarget = target is not null
+            && (string.IsNullOrWhiteSpace(localVersion) || AppVersion.IsNewer(target, localVersion));
 
         return status switch
         {
             UpdateStatus.Checking => "Verificando…",
             UpdateStatus.Downloading => target is null ? "Baixando…" : $"Baixando {target}…",
             UpdateStatus.Applying => "Aplicando…",
-            UpdateStatus.Ready => target is null ? "Atualizar agora" : $"Atualizar para {target}",
-            UpdateStatus.Failed => target is null ? "Tentar atualizar" : $"Atualizar para {target}",
+            UpdateStatus.Ready => offerTarget ? $"Atualizar para {target}" : "Atualizar agora",
+            UpdateStatus.Failed => offerTarget ? $"Atualizar para {target}" : "Tentar atualizar",
             _ => "Verificar atualizações"
         };
     }
 
-    public static string ActionTitle(bool hasChannel, UpdateStatus status, string? availableVersion = null)
+    public static string ActionTitle(bool hasChannel, UpdateStatus status, string? availableVersion = null, string? localVersion = null)
     {
         if (!hasChannel)
             return "Atualização disponível nas versões instaladas e no zip de release";
 
         var target = Normalize(availableVersion);
+        var offerTarget = target is not null
+            && (string.IsNullOrWhiteSpace(localVersion) || AppVersion.IsNewer(target, localVersion));
 
         return status switch
         {
@@ -71,12 +75,12 @@ public static class UpdateStatusMessages
                 ? "Baixando atualização…"
                 : $"Baixando a versão {target}…",
             UpdateStatus.Applying => "Aplicando atualização…",
-            UpdateStatus.Ready => target is null
-                ? "Reiniciar e aplicar a atualização"
-                : $"Reiniciar e atualizar para {target}",
-            UpdateStatus.Failed => target is null
-                ? "Tentar baixar a atualização de novo"
-                : $"Tentar atualizar para {target}",
+            UpdateStatus.Ready => offerTarget
+                ? $"Reiniciar e atualizar para {target}"
+                : "Reiniciar e aplicar a atualização",
+            UpdateStatus.Failed => offerTarget
+                ? $"Tentar atualizar para {target}"
+                : "Tentar baixar a atualização de novo",
             _ => "Verificar e instalar a versão mais recente"
         };
     }

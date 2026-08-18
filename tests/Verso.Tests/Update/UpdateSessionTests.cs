@@ -216,6 +216,7 @@ public class UpdateStatusMessagesTests
     public void ActionLabel_ReadyIncludesTargetVersion()
     {
         Assert.Equal("Atualizar para 1.4.0", UpdateStatusMessages.ActionLabel(true, UpdateStatus.Ready, "1.4.0"));
+        Assert.Equal("Atualizar agora", UpdateStatusMessages.ActionLabel(true, UpdateStatus.Ready, "1.1.0", "1.4.0"));
         Assert.Equal("Baixando 1.4.0…", UpdateStatusMessages.ActionLabel(true, UpdateStatus.Downloading, "1.4.0"));
         Assert.Equal("Verificar atualizações", UpdateStatusMessages.ActionLabel(true, UpdateStatus.Idle));
         Assert.Equal("Atualizar", UpdateStatusMessages.ActionLabel(false, UpdateStatus.Idle));

@@ -227,7 +227,72 @@ public class UpdateCoordinatorTests
 
             Assert.Equal(UpdateStatus.Ready, result.Status);
             Assert.Equal("1.4.0", coordinator.AvailableVersion);
-            Assert.False(releases.Called);
+            Assert.True(releases.Called);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public async Task CheckAndPrepare_DiscardsPendingOlderThanLocal()
+    {
+        var root = CreateTempDir();
+        try
+        {
+            WriteChannel(root);
+            WritePending(root, "v1.1.0");
+            var releases = new FakeReleases
+            {
+                Latest = new LatestRelease("v1.4.0",
+                [
+                    new GitHubAsset("Verso-1.4.0-gpu-win-x64.zip", "https://example.test/a.zip", 1)
+                ])
+            };
+            var downloader = new FakeDownloader();
+            var coordinator = CreateCoordinator(root, releases, idle: true, downloader, localVersion: "1.4.0");
+
+            var result = await coordinator.CheckAndPrepareAsync();
+
+            Assert.Equal(UpdateStatus.UpToDate, result.Status);
+            Assert.False(downloader.Called);
+            Assert.False(coordinator.HasPendingApply());
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public async Task CheckAndPrepare_ReplacesStalePendingWhenRemoteIsNewer()
+    {
+        var root = CreateTempDir();
+        try
+        {
+            WriteChannel(root);
+            WritePending(root, "v1.1.0");
+            var zip = CreatePackageZip(root, includeData: false);
+            var releases = new FakeReleases
+            {
+                Latest = new LatestRelease("v1.2.0",
+                [
+                    new GitHubAsset("Verso-1.2.0-gpu-win-x64.zip", "https://example.test/pkg.zip", 10)
+                ])
+            };
+            var coordinator = CreateCoordinator(
+                root,
+                releases,
+                idle: true,
+                new FakeDownloader { SourceZip = zip },
+                localVersion: "1.0.0");
+
+            var result = await coordinator.CheckAndPrepareAsync();
+
+            Assert.Equal(UpdateStatus.Ready, result.Status);
+            Assert.Equal("1.2.0", coordinator.AvailableVersion);
+            Assert.Contains("v1.2.0", File.ReadAllText(Path.Combine(coordinator.StagingDirectory, UpdateCoordinator.ReadyFileName)));
         }
         finally
         {
@@ -261,6 +326,16 @@ public class UpdateCoordinatorTests
         File.WriteAllText(
             Path.Combine(dir, UpdateChannel.FileName),
             """{"variant":"gpu","rid":"win-x64"}""");
+
+    private static void WritePending(string appDir, string tag)
+    {
+        var payload = Path.Combine(appDir, OverlayUpdateApplier.StagingFolderName, UpdateCoordinator.PayloadFolderName);
+        Directory.CreateDirectory(payload);
+        File.WriteAllText(Path.Combine(payload, "Verso.App.exe"), "new");
+        File.WriteAllText(
+            Path.Combine(appDir, OverlayUpdateApplier.StagingFolderName, UpdateCoordinator.ReadyFileName),
+            $"{{\"tag\":\"{tag}\"}}");
+    }
 
     private static string CreatePackageZip(string root, bool includeData)
     {

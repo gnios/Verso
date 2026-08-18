@@ -134,9 +134,13 @@ public partial class SidebarViewModel : ViewModelBase
         if (_updateCoordinator?.Status != UpdateStatus.Ready)
             return;
 
+        var target = _updateCoordinator.AvailableVersion;
+        if (target is null || !AppVersion.IsNewer(target, AppVersionLabel))
+            return;
+
         if (!await _confirmation.ConfirmAsync(
                 UpdateStatusMessages.RestartConfirmTitle,
-                UpdateStatusMessages.RestartConfirm(_updateCoordinator.AvailableVersion),
+                UpdateStatusMessages.RestartConfirm(target),
                 danger: false))
         {
             return;
@@ -242,8 +246,8 @@ public partial class SidebarViewModel : ViewModelBase
         var available = _updateCoordinator?.AvailableVersion;
         CanUpdateNow = UpdateStatusMessages.CanRequestUpdate(_hasUpdateChannel, status);
         UpdateIsReady = _hasUpdateChannel && status == UpdateStatus.Ready;
-        UpdateButtonTitle = UpdateStatusMessages.ActionTitle(_hasUpdateChannel, status, available);
-        UpdateButtonLabel = UpdateStatusMessages.ActionLabel(_hasUpdateChannel, status, available);
+        UpdateButtonTitle = UpdateStatusMessages.ActionTitle(_hasUpdateChannel, status, available, AppVersionLabel);
+        UpdateButtonLabel = UpdateStatusMessages.ActionLabel(_hasUpdateChannel, status, available, AppVersionLabel);
         OnPropertyChanged(nameof(CanUpdateNow));
         OnPropertyChanged(nameof(UpdateIsReady));
         OnPropertyChanged(nameof(UpdateButtonTitle));

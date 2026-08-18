@@ -110,27 +110,31 @@ public sealed class UpdateCoordinator
 
         try
         {
-            if (HasPendingApply())
-            {
-                RememberAvailable(TryReadReadyTag());
-                SetStatus(UpdateStatus.Ready, AvailableVersion);
-                return ReadyResult();
-            }
+            DiscardStalePending();
 
             var latest = await _releases.GetLatestAsync(cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
             if (latest is null)
             {
+                if (TryUsePendingIfNewer())
+                    return ReadyResult();
+
                 SetStatus(UpdateStatus.Failed, "consulta à release falhou");
                 return new UpdateCheckResult(UpdateStatus.Failed, false, StatusDetail);
             }
 
             if (!AppVersion.IsNewer(latest.TagName, _localVersion()))
             {
+                TryDeleteStaging();
                 RememberAvailable(latest.TagName);
                 SetStatus(UpdateStatus.UpToDate, latest.TagName);
                 return new UpdateCheckResult(UpdateStatus.UpToDate, false, latest.TagName);
             }
+
+            if (TryUsePendingIfNewer() && !AppVersion.IsNewer(latest.TagName, TryReadReadyTag() ?? ""))
+                return ReadyResult();
+
+            TryDeleteStaging();
 
             var asset = _releases.FindChannelAsset(latest, channel);
             if (asset is null)
@@ -205,6 +209,33 @@ public sealed class UpdateCoordinator
         {
             AvailableVersion = string.IsNullOrWhiteSpace(tag) ? null : AppVersion.Display(tag);
         }
+    }
+
+    private void DiscardStalePending()
+    {
+        if (!HasPendingApply())
+            return;
+
+        var pending = TryReadReadyTag();
+        if (pending is not null && AppVersion.IsNewer(pending, _localVersion()))
+            return;
+
+        _logger.LogInformation("Ignorando update pendente {Tag} — não é mais novo que {Local}.", pending, _localVersion());
+        TryDeleteStaging();
+    }
+
+    private bool TryUsePendingIfNewer()
+    {
+        if (!HasPendingApply())
+            return false;
+
+        var pending = TryReadReadyTag();
+        if (pending is null || !AppVersion.IsNewer(pending, _localVersion()))
+            return false;
+
+        RememberAvailable(pending);
+        SetStatus(UpdateStatus.Ready, AvailableVersion);
+        return true;
     }
 
     private string? TryReadReadyTag()
