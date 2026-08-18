@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Verso.Core.Catalogs;
 using Verso.Core.Data;
 using Verso.Core.Data.Entities;
+using Verso.Core.Engine.Diarization;
 using Verso.Core.Engine.Worker;
 using Verso.Core.Update;
 
@@ -19,6 +20,8 @@ public sealed class TranscriptionQueueService : BackgroundService, IUpdateIdleSi
     private readonly IDbContextFactory<VersoDbContext> _dbContextFactory;
     private readonly ITranscriptionEngine _engine;
     private readonly ILogger<TranscriptionQueueService> _logger;
+    private readonly AudioLoader? _audioLoader;
+    private readonly ILocalDiarizer? _diarizer;
     private readonly Channel<TranscriptionJobRequest> _channel;
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _jobCancellationSources = new();
     private readonly ConcurrentDictionary<Guid, byte> _cancelledJobs = new();
@@ -34,11 +37,15 @@ public sealed class TranscriptionQueueService : BackgroundService, IUpdateIdleSi
     public TranscriptionQueueService(
         IDbContextFactory<VersoDbContext> dbContextFactory,
         ITranscriptionEngine engine,
-        ILogger<TranscriptionQueueService>? logger = null)
+        ILogger<TranscriptionQueueService>? logger = null,
+        AudioLoader? audioLoader = null,
+        ILocalDiarizer? diarizer = null)
     {
         _dbContextFactory = dbContextFactory;
         _engine = engine;
         _logger = logger ?? NullLogger<TranscriptionQueueService>.Instance;
+        _audioLoader = audioLoader;
+        _diarizer = diarizer;
         _channel = Channel.CreateUnbounded<TranscriptionJobRequest>(new UnboundedChannelOptions
         {
             SingleReader = true,
@@ -157,6 +164,14 @@ public sealed class TranscriptionQueueService : BackgroundService, IUpdateIdleSi
                 "Transcrição {TranscriptionId} concluída em {Seconds:F1}s — persistindo resultados…",
                 request.TranscriptionId,
                 stopwatch.Elapsed.TotalSeconds);
+            var speakerMode = await GetSpeakerModeAsync(request.TranscriptionId, linkedCts.Token)
+                .ConfigureAwait(false);
+            if (speakerMode == SpeakerMode.Automatic)
+            {
+                RaiseProgressChanged(request.TranscriptionId, "diarizing", null, null);
+                result = new TranscriptionResult(DiarizeOrFallback(request, result.Segments));
+            }
+
             // Whisper terminou; ainda falta gravar segmentos — UI não deve parecer “pronta”.
             RaiseProgressChanged(request.TranscriptionId, "saving", null, null);
             await PersistSuccessAsync(request, result, stopwatch.Elapsed.TotalSeconds, stoppingToken)
@@ -218,22 +233,27 @@ public sealed class TranscriptionQueueService : BackgroundService, IUpdateIdleSi
             .Where(s => s.TranscriptionId == request.TranscriptionId)
             .ExecuteDeleteAsync(cancellationToken);
 
-        Speaker? defaultSpeaker = null;
-        if (transcription.SpeakerMode == SpeakerMode.Automatic)
-        {
-            defaultSpeaker = new Speaker
-            {
-                Id = Guid.NewGuid(),
-                TranscriptionId = request.TranscriptionId,
-                Name = "Locutor 1",
-                ColorHex = SpeakerColorCatalog.ColorAtIndex(0),
-            };
-            context.Speakers.Add(defaultSpeaker);
-        }
-
+        var speakersByName = new Dictionary<string, Speaker>(StringComparer.Ordinal);
         var sortOrder = 0;
         foreach (var segment in result.Segments)
         {
+            Speaker? speaker = null;
+            if (!string.IsNullOrEmpty(segment.SpeakerName))
+            {
+                if (!speakersByName.TryGetValue(segment.SpeakerName, out speaker))
+                {
+                    speaker = new Speaker
+                    {
+                        Id = Guid.NewGuid(),
+                        TranscriptionId = request.TranscriptionId,
+                        Name = segment.SpeakerName,
+                        ColorHex = SpeakerColorCatalog.ColorAtIndex(speakersByName.Count),
+                    };
+                    speakersByName[segment.SpeakerName] = speaker;
+                    context.Speakers.Add(speaker);
+                }
+            }
+
             context.Segments.Add(new Segment
             {
                 Id = Guid.NewGuid(),
@@ -242,7 +262,7 @@ public sealed class TranscriptionQueueService : BackgroundService, IUpdateIdleSi
                 EndSeconds = segment.EndSeconds,
                 Text = segment.Text,
                 SortOrder = sortOrder++,
-                SpeakerId = defaultSpeaker?.Id,
+                SpeakerId = speaker?.Id,
             });
         }
 
@@ -269,6 +289,45 @@ public sealed class TranscriptionQueueService : BackgroundService, IUpdateIdleSi
             TranscriptionEstimator.RecordRtf(request.Quality, request.Device, actualRtf);
         }
     }
+
+    private async Task<SpeakerMode> GetSpeakerModeAsync(Guid transcriptionId, CancellationToken cancellationToken)
+    {
+        await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await context.Transcriptions
+            .Where(t => t.Id == transcriptionId)
+            .Select(t => t.SpeakerMode)
+            .SingleAsync(cancellationToken);
+    }
+
+    private IReadOnlyList<TranscriptionSegmentResult> DiarizeOrFallback(
+        TranscriptionJobRequest request,
+        IReadOnlyList<TranscriptionSegmentResult> segments)
+    {
+        try
+        {
+            if (_audioLoader is null || _diarizer is null)
+            {
+                return FallbackSingleSpeaker(segments);
+            }
+
+            var samples = _audioLoader.LoadSamples16kHz(request.MediaFilePath);
+            return _diarizer.Diarize(samples, segments);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Diarização falhou para {TranscriptionId}; usando Locutor 1",
+                request.TranscriptionId);
+            return FallbackSingleSpeaker(segments);
+        }
+    }
+
+    private static IReadOnlyList<TranscriptionSegmentResult> FallbackSingleSpeaker(
+        IReadOnlyList<TranscriptionSegmentResult> segments) =>
+        segments
+            .Select(s => s with { SpeakerName = SpeakerTurnAssembler.SpeakerOne })
+            .ToList();
 
     private async Task UpdateStatusAsync(
         Guid transcriptionId,
@@ -366,6 +425,7 @@ public static class EngineServiceCollectionExtensions
         services.AddSingleton<IWorkerExecutableLocator, WorkerExecutableLocator>();
         services.AddSingleton<IWorkerProcessFactory, WorkerProcessFactory>();
         services.AddSingleton<ITranscriptionEngine, WorkerProcessTranscriptionEngine>();
+        services.AddSingleton<ILocalDiarizer, LocalDiarizer>();
         services.AddSingleton<TranscriptionQueueService>();
         services.AddSingleton<IUpdateIdleSignal>(sp => sp.GetRequiredService<TranscriptionQueueService>());
         services.AddHostedService(sp => sp.GetRequiredService<TranscriptionQueueService>());
