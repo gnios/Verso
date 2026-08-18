@@ -91,6 +91,11 @@ public class LocalDiarizerTests
         Assert.Equal("Locutor 2", result[1].SpeakerName);
         Assert.Equal("olá mundo.", result[0].Text);
         Assert.Equal("como vai você", result[1].Text);
+        Assert.Equal(0, result[0].StartSeconds);
+        Assert.InRange(result[0].EndSeconds, 2.5, 3.5);
+        Assert.InRange(result[1].StartSeconds, 2.5, 3.5);
+        Assert.Equal(6, result[1].EndSeconds);
+        Assert.Equal(result[0].EndSeconds, result[1].StartSeconds);
     }
 
     [Fact]
