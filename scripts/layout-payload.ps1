@@ -10,7 +10,7 @@ $pub = [System.IO.Path]::GetFullPath($PublishDir).TrimEnd('\', '/')
 $engine = Join-Path $pub 'engine'
 New-Item -ItemType Directory -Force -Path $engine | Out-Null
 
-$keep = @('Verso.App.exe', 'Verso.App', 'engine', 'data')
+$keep = @('Verso.App.exe', 'Verso.App', 'Verso.Updater.exe', 'Verso.Updater', 'engine', 'data', 'verso-channel.json')
 
 Get-ChildItem -LiteralPath $pub -Force | Where-Object { $_.Name -notin $keep } | ForEach-Object {
     $dest = Join-Path $engine $_.Name

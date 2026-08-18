@@ -139,22 +139,28 @@ Verso.sln                    — Solução principal
 
 ## 5. Como baixar as releases
 
-As releases são geradas automaticamente pelo GitHub Actions ao publicar uma tag `v*.*.*` no repositório, ou ao fazer push na branch `main` (que auto-incrementa o patch). Cada release contém **seis zips** (cpu/gpu × três plataformas).
+As releases são geradas automaticamente pelo GitHub Actions ao publicar uma tag `v*.*.*` no repositório, ou ao fazer push na branch `main` (que auto-incrementa o patch). Cada release contém **seis zips** (cpu/gpu × três plataformas) e, no Windows, **dois instaladores** (`*-setup.exe`).
 
 ### 5.1 Variantes por plataforma
 
 | Arquivo | Contém | Para quem |
 |---------|--------|-----------|
-| `Verso-X.Y.Z-cpu-win-x64.zip` | CPU | Windows sem GPU NVIDIA |
+| `Verso-X.Y.Z-cpu-win-x64-setup.exe` | Instalador CPU | Windows sem GPU, atalho no Menu Iniciar |
+| `Verso-X.Y.Z-gpu-win-x64-setup.exe` | Instalador CUDA/Vulkan | Windows com NVIDIA/Vulkan |
+| `Verso-X.Y.Z-cpu-win-x64.zip` | CPU portátil | Windows sem GPU NVIDIA |
 | `Verso-X.Y.Z-gpu-win-x64.zip` | CUDA + CUDA 12 + Vulkan | Windows com NVIDIA/Vulkan |
 | `Verso-X.Y.Z-cpu-linux-x64.zip` | CPU | Linux (WebKitGTK) |
 | `Verso-X.Y.Z-gpu-linux-x64.zip` | CUDA + Vulkan | Linux com NVIDIA/Vulkan |
 | `Verso-X.Y.Z-cpu-osx-arm64.zip` | CPU | macOS Apple Silicon |
 | `Verso-X.Y.Z-gpu-osx-arm64.zip` | Core ML | macOS Apple Silicon com aceleração |
 
-Builds **self-contained** / **single-file**. O zip contém o app, o Worker (iniciado automaticamente na transcrição), `wwwroot/` e `runtimes/`.
+Builds **self-contained** / **single-file**. O pacote contém o app, o `Verso.Updater`, o Worker (iniciado automaticamente na transcrição), `wwwroot/` e `runtimes/`.
 
 ### 5.2 Instalação e execução
+
+**Windows (instalado):** baixe o `*-setup.exe` da sua variante, execute (sem administrador). O app vai para `%LOCALAPPDATA%\Programs\Verso` e ganha atalho no Menu Iniciar. Desinstalar remove os binários e **preserva** `data/`.
+
+**Portátil (Windows, Linux, macOS):**
 
 1. Baixe o `.zip` da [página de Releases](https://github.com/gnios/Verso/releases) para a sua plataforma
 2. Escolha **cpu** ou **gpu** conforme o hardware
@@ -163,6 +169,8 @@ Builds **self-contained** / **single-file**. O zip contém o app, o Worker (inic
 **Pré-requisitos:** WebView2 (Windows), WebKitGTK (Linux), WKWebView (macOS). No Linux: `sudo apt install libwebkit2gtk-4.1-0` (nome pode variar).
 
 **Dados portáteis:** modelos, áudios, banco de dados e logs ficam numa pasta `data/` ao lado do executável. Você pode mover a pasta inteira para outro local que tudo funciona — sem depender de `%AppData%`.
+
+**Atualização automática:** se o pacote tiver `verso-channel.json` (releases), o app baixa sozinho a latest GitHub Release da mesma variante e troca só os binários. `data/` e arquivos extras na pasta **não são apagados**. Uma transcrição em andamento não é cortada; o update aplica na próxima abertura. Status em **Configurações → Sobre**.
 
 > **Aviso de segurança do Windows:** por padrão os executáveis não são assinados digitalmente. Ao abrir pela primeira vez, o Windows pode mostrar o alerta do SmartScreen ("O Windows protegeu seu computador"). Clique em **Mais informações → Executar mesmo assim**. Para eliminar o alerta permanentemente, configure a assinatura via Azure Trusted Signing (opcional, veja o README).
 
@@ -181,6 +189,8 @@ Builds **self-contained** / **single-file**. O zip contém o app, o Worker (inic
 - **Tema claro/escuro**
 - **Configuração de dispositivo** (CPU, CUDA, Vulkan, Automático)
 - **Recomendação inteligente de modelo** baseada no hardware
+- **Instalador Windows** (sem administrador) **e** zip portátil
+- **Atualização automática** a partir das GitHub Releases, preservando `data/`
 
 ---
 

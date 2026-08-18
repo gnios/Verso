@@ -66,21 +66,27 @@ O banco SQLite, as migrations e a pasta `data/` são criados automaticamente no 
 ```
 src/Verso.App     UI Photino.Blazor, ViewModels, serviços de UI
 src/Verso.Worker  Processo isolado de transcrição (spawn automático pelo App)
+src/Verso.Updater Aplica update após o App sair (Windows trava o exe em uso)
 src/Verso.Core    Engine (whisper.net), serviços, dados (EF Core + SQLite), export
 tests/Verso.Tests testes xUnit
 ```
 
 ## Releases
 
-Pipeline em `.github/workflows/release.yml`. Tag `v*.*.*` ou push na `main` gera um GitHub Release com **6 zips** (cpu/gpu × win-x64 / linux-x64 / osx-arm64):
+Pipeline em `.github/workflows/release.yml`. Tag `v*.*.*` ou push na `main` gera um GitHub Release com **6 zips** (cpu/gpu × win-x64 / linux-x64 / osx-arm64) e, no Windows, **instaladores** `*-setup.exe`:
 
-| Zip | Aceleração |
-|-----|------------|
-| `*-cpu-win-x64.zip` / `*-gpu-win-x64.zip` | CPU · CUDA/Vulkan |
-| `*-cpu-linux-x64.zip` / `*-gpu-linux-x64.zip` | CPU · CUDA/Vulkan |
-| `*-cpu-osx-arm64.zip` / `*-gpu-osx-arm64.zip` | CPU · Core ML |
+| Arquivo | Aceleração |
+|---------|------------|
+| `*-cpu-win-x64-setup.exe` / `*-gpu-win-x64-setup.exe` | Instalador Windows (sem admin), Menu Iniciar |
+| `*-cpu-win-x64.zip` / `*-gpu-win-x64.zip` | Portátil Windows · CPU · CUDA/Vulkan |
+| `*-cpu-linux-x64.zip` / `*-gpu-linux-x64.zip` | Portátil Linux · CPU · CUDA/Vulkan |
+| `*-cpu-osx-arm64.zip` / `*-gpu-osx-arm64.zip` | Portátil macOS · CPU · Core ML |
 
-Cada zip tem o app + Worker (iniciado na transcrição) + `wwwroot/` + `runtimes/`. Self-contained (sem .NET instalado). **Dados portáteis** em `data/` ao lado do executável.
+O zip **portátil continua first-class**: extraia e execute. O setup só facilita atalho e pasta padrão (`%LOCALAPPDATA%\Programs\Verso`).
+
+Cada pacote tem o app + `Verso.Updater` + Worker (`engine/`) + `wwwroot/` + `runtimes/`. Self-contained (sem .NET instalado). **Dados portáteis** em `data/` ao lado do executável.
+
+**Atualização automática:** nas versões de release (`verso-channel.json` presente), o app consulta a latest GitHub Release, baixa o zip da mesma variante (cpu/gpu e SO) e substitui só os binários. A pasta `data/` (banco, modelos, mídia, logs) e qualquer arquivo extra na pasta do app **não são apagados**. Transcrição em andamento não é interrompida — o update aplica no próximo start. Em `dotnet run` (sem channel) o check não roda.
 
 ```bash
 git tag v0.1.0
@@ -101,7 +107,7 @@ A etapa de assinatura está no pipeline e ativa **automaticamente** quando as va
    - **Secrets:** `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`
    - **Variables:** `AZURE_SIGNING_ENDPOINT`, `AZURE_SIGNING_ACCOUNT`, `AZURE_CERTIFICATE_PROFILE`
 
-A próxima tag assina os `.exe` da raiz (`Verso.App.exe` e `Verso.Worker.exe`) automaticamente.
+A próxima tag assina os `.exe` da raiz (`Verso.App.exe`, `Verso.Updater.exe` e `Verso.Worker.exe` em `engine/`) automaticamente.
 
 ## Roadmap
 

@@ -12,11 +12,12 @@ using Verso.Core;
 using Verso.Core.Data.Entities;
 using Verso.Core.Engine;
 using Verso.Core.Services;
+using Verso.Core.Update;
 using Whisper.net.LibraryLoader;
 
 namespace Verso.App.ViewModels;
 
-public partial class SettingsViewModel : ViewModelBase
+public partial class SettingsViewModel : ViewModelBase, IDisposable
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private bool _suppressPersist;
@@ -121,13 +122,42 @@ public partial class SettingsViewModel : ViewModelBase
 
     public string LogDirectoryPath { get; } = VersoPaths.LogsDirectory;
 
+    public string AppVersionLabel { get; }
+
+    public string UpdateStatusText { get; private set; } = "";
+
     [ObservableProperty]
     private string _developerMessage = "";
+
+    private readonly UpdateCoordinator? _updateCoordinator;
+    private readonly bool _hasUpdateChannel;
 
     public SettingsViewModel(IServiceScopeFactory scopeFactory)
     {
         _scopeFactory = scopeFactory;
+        using var scope = scopeFactory.CreateScope();
+        _updateCoordinator = scope.ServiceProvider.GetService<UpdateCoordinator>();
+        _hasUpdateChannel = UpdateChannel.TryLoad(VersoPaths.AppDirectory) is not null;
+        AppVersionLabel = AppVersion.Parse(RunningAppVersion.Current).ToString();
+        RefreshUpdateStatus();
+        if (_updateCoordinator is not null)
+            _updateCoordinator.StatusChanged += OnUpdateStatusChanged;
         _ = LoadAsync();
+    }
+
+    public void Dispose()
+    {
+        if (_updateCoordinator is not null)
+            _updateCoordinator.StatusChanged -= OnUpdateStatusChanged;
+    }
+
+    private void OnUpdateStatusChanged(object? sender, EventArgs e) => RefreshUpdateStatus();
+
+    private void RefreshUpdateStatus()
+    {
+        var status = _updateCoordinator?.Status ?? UpdateStatus.Idle;
+        UpdateStatusText = UpdateStatusMessages.For(status, _hasUpdateChannel);
+        OnPropertyChanged(nameof(UpdateStatusText));
     }
 
     public async Task LoadAsync()

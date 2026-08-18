@@ -64,6 +64,26 @@ public class TranscriptionQueueServiceTests
     }
 
     [Fact]
+    public async Task HasActiveWork_IsTrueWhileJobRunsThenFalse()
+    {
+        var gate = new TaskCompletionSource();
+        var reached = new TaskCompletionSource();
+        await using var fixture = await QueueFixture.CreateAsync(new GatedProgressEngine(gate.Task, reached));
+        var transcriptionId = await fixture.SeedTranscriptionAsync();
+
+        Assert.False(fixture.Queue.HasActiveWork);
+        fixture.Queue.Enqueue(fixture.CreateRequest(transcriptionId));
+        Assert.True(fixture.Queue.HasActiveWork);
+
+        await reached.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.True(fixture.Queue.HasActiveWork);
+
+        gate.SetResult();
+        await fixture.WaitForStatusAsync(transcriptionId, TranscriptionStatus.Done);
+        Assert.False(fixture.Queue.HasActiveWork);
+    }
+
+    [Fact]
     public async Task Startup_WhenOrphanInProgressExists_MarksAsErrorInterrompida()
     {
         var dbPath = CreateTempDbPath();

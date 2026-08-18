@@ -164,6 +164,8 @@ public class SidebarViewModelTests
             sidebar.NavigateSettingsCommand.Execute(null);
 
             Assert.Equal(ScreenKey.Settings, navigation.CurrentScreen);
+            Assert.False(sidebar.CanUpdateNow);
+            Assert.False(sidebar.UpdateNowCommand.CanExecute(null));
         }
         finally
         {

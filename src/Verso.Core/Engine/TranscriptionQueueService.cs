@@ -10,10 +10,11 @@ using Verso.Core.Catalogs;
 using Verso.Core.Data;
 using Verso.Core.Data.Entities;
 using Verso.Core.Engine.Worker;
+using Verso.Core.Update;
 
 namespace Verso.Core.Engine;
 
-public sealed class TranscriptionQueueService : BackgroundService
+public sealed class TranscriptionQueueService : BackgroundService, IUpdateIdleSignal
 {
     private readonly IDbContextFactory<VersoDbContext> _dbContextFactory;
     private readonly ITranscriptionEngine _engine;
@@ -25,6 +26,10 @@ public sealed class TranscriptionQueueService : BackgroundService
     private readonly TaskCompletionSource _startupCompleted = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public Task StartupCompleted => _startupCompleted.Task;
+
+    private int _activeJobs;
+
+    public bool HasActiveWork => Volatile.Read(ref _activeJobs) > 0;
 
     public TranscriptionQueueService(
         IDbContextFactory<VersoDbContext> dbContextFactory,
@@ -54,9 +59,13 @@ public sealed class TranscriptionQueueService : BackgroundService
     public Guid Enqueue(TranscriptionJobRequest request)
     {
         _cancelledJobs.TryRemove(request.TranscriptionId, out _);
+        Interlocked.Increment(ref _activeJobs);
 
         if (!_channel.Writer.TryWrite(request))
+        {
+            Interlocked.Decrement(ref _activeJobs);
             throw new InvalidOperationException("Não foi possível enfileirar a transcrição.");
+        }
 
         RaiseStatusChanged(request.TranscriptionId, TranscriptionStatusChanged.Queued);
         return request.TranscriptionId;
@@ -173,6 +182,7 @@ public sealed class TranscriptionQueueService : BackgroundService
         {
             _jobCancellationSources.TryRemove(request.TranscriptionId, out _);
             _cancelledJobs.TryRemove(request.TranscriptionId, out _);
+            Interlocked.Decrement(ref _activeJobs);
         }
     }
 
@@ -357,6 +367,7 @@ public static class EngineServiceCollectionExtensions
         services.AddSingleton<IWorkerProcessFactory, WorkerProcessFactory>();
         services.AddSingleton<ITranscriptionEngine, WorkerProcessTranscriptionEngine>();
         services.AddSingleton<TranscriptionQueueService>();
+        services.AddSingleton<IUpdateIdleSignal>(sp => sp.GetRequiredService<TranscriptionQueueService>());
         services.AddHostedService(sp => sp.GetRequiredService<TranscriptionQueueService>());
         return services;
     }
