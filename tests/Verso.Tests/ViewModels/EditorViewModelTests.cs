@@ -682,6 +682,8 @@ public class EditorViewModelTests
             Assert.Equal(ExportFormat.Txt, fileSave.LastFormat);
             Assert.Equal("Entrevista teste", fileSave.LastSuggestedName);
             Assert.True(File.Exists(outputPath));
+            Assert.Equal(outputPath, editor.ExportSavedPath);
+            Assert.True(editor.IsExportDialogOpen);
 
             var lines = await File.ReadAllLinesAsync(outputPath, Encoding.UTF8);
             Assert.Contains(lines, l => l.Contains("Primeiro segmento"));
@@ -755,6 +757,52 @@ public class EditorViewModelTests
             await editor.ExportWithFormatAsync(ExportFormat.Txt);
 
             Assert.False(Directory.GetFiles(directory, "export.*").Any());
+            Assert.True(editor.IsExportDialogOpen);
+            Assert.Contains("destino", editor.ExportError, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task ExportCommand_WithSegments_OpensExportDialog()
+    {
+        var (provider, directory, transcriptionId) = await CreateEditorProviderAsync(TranscriptionStatus.Done);
+        try
+        {
+            var editor = await CreateEditorAsync(provider, transcriptionId);
+
+            Assert.True(editor.CanExport);
+            editor.ExportCommand.Execute(null);
+
+            Assert.True(editor.IsExportDialogOpen);
+            Assert.Equal("", editor.ExportError);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task ExportWithFormat_WhenSaveFails_ReopensDialogWithError()
+    {
+        var fileSave = new FakeFileSaveService
+        {
+            ExceptionToThrow = new InvalidOperationException("PhotinoWindow ainda não foi anexada."),
+        };
+        var (provider, directory, transcriptionId) =
+            await CreateEditorProviderWithFileSaveAsync(TranscriptionStatus.Done, fileSave);
+
+        try
+        {
+            var editor = await CreateEditorAsync(provider, transcriptionId);
+            await editor.ExportWithFormatAsync(ExportFormat.Txt);
+
+            Assert.True(editor.IsExportDialogOpen);
+            Assert.Contains("PhotinoWindow", editor.ExportError, StringComparison.Ordinal);
         }
         finally
         {

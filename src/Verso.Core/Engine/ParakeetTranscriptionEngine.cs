@@ -100,33 +100,12 @@ public sealed class ParakeetTranscriptionEngine : ITranscriptionEngine, IDisposa
             request.TranscriptionId);
 
         progress?.Report(new EngineProgress("preparing"));
-        var duration = await Task.Run(() => _audioLoader.GetDuration(request.MediaFilePath), cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        IReadOnlyList<TranscriptionSegmentResult> segments;
-        if (duration > ParakeetAudioChunker.WindowSeconds)
-        {
-            segments = await TranscribeByWindowsAsync(
-                request,
-                recognizer,
-                duration,
-                progress,
-                cancellationToken);
-        }
-        else
-        {
-            segments = await TranscribeInMemoryAsync(
-                request,
-                recognizer,
-                duration,
-                progress,
-                cancellationToken);
-        }
-
-        var doneParts = duration > ParakeetAudioChunker.WindowSeconds
-            ? ParakeetAudioChunker.CountWindowsFromDuration(duration)
-            : 1;
-        progress?.Report(new EngineProgress("done", doneParts, doneParts));
+        var (segments, chunkCount) = await TranscribePcmAsync(
+            request,
+            recognizer,
+            progress,
+            cancellationToken);
+        progress?.Report(new EngineProgress("done", chunkCount, chunkCount));
         _logger?.LogInformation(
             "Transcrição Parakeet {TranscriptionId} concluída: {SegmentCount} segmentos",
             request.TranscriptionId,
@@ -148,82 +127,15 @@ public sealed class ParakeetTranscriptionEngine : ITranscriptionEngine, IDisposa
         }
     }
 
-    private async Task<IReadOnlyList<TranscriptionSegmentResult>> TranscribeByWindowsAsync(
+    private async Task<(IReadOnlyList<TranscriptionSegmentResult> Segments, int ChunkCount)> TranscribePcmAsync(
         TranscriptionJobRequest request,
         IParakeetRecognizer recognizer,
-        double duration,
         IProgress<EngineProgress>? progress,
         CancellationToken cancellationToken)
     {
-        var windows = ParakeetAudioChunker.WindowsFromDuration(duration);
         _logger?.LogInformation(
-            "Áudio {Duration:F0}s → {WindowCount} janelas de {Window}s (overlap {Overlap}s); decode por janela {TranscriptionId}",
-            duration,
-            windows.Count,
-            ParakeetAudioChunker.WindowSeconds,
-            ParakeetAudioChunker.OverlapSeconds,
+            "Carregando PCM 16 kHz {TranscriptionId}",
             request.TranscriptionId);
-
-        var segments = new List<TranscriptionSegmentResult>();
-        progress?.Report(new EngineProgress("transcribing", 0, windows.Count));
-
-        for (var i = 0; i < windows.Count; i++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var (start, length) = windows[i];
-            _logger?.LogInformation(
-                "Parakeet janela {Index}/{Total} ({Start:F1}s–{End:F1}s) {TranscriptionId}",
-                i + 1,
-                windows.Count,
-                start,
-                start + length,
-                request.TranscriptionId);
-
-            var windowSw = Stopwatch.StartNew();
-            var samples = await Task.Run(
-                () => _audioLoader.LoadSamples16kHz(request.MediaFilePath, start, length),
-                cancellationToken);
-            var part = await Task.Run(
-                () => recognizer.Recognize(samples, cancellationToken),
-                cancellationToken);
-            segments.AddRange(ParakeetAudioChunker.ShiftAndTrimOverlap(
-                part,
-                start,
-                isFirstChunk: i == 0));
-
-            _logger?.LogInformation(
-                "Parakeet janela {Index}/{Total} concluída em {ElapsedSeconds:F1}s ({SegmentCount} segmentos) {TranscriptionId}",
-                i + 1,
-                windows.Count,
-                windowSw.Elapsed.TotalSeconds,
-                part.Count,
-                request.TranscriptionId);
-            progress?.Report(new EngineProgress("transcribing", i + 1, windows.Count));
-        }
-
-        return segments;
-    }
-
-    private async Task<IReadOnlyList<TranscriptionSegmentResult>> TranscribeInMemoryAsync(
-        TranscriptionJobRequest request,
-        IParakeetRecognizer recognizer,
-        double duration,
-        IProgress<EngineProgress>? progress,
-        CancellationToken cancellationToken)
-    {
-        if (duration > 0)
-        {
-            _logger?.LogInformation(
-                "Áudio {Duration:F1}s em uma janela; carregando PCM 16 kHz {TranscriptionId}",
-                duration,
-                request.TranscriptionId);
-        }
-        else
-        {
-            _logger?.LogWarning(
-                "Duração desconhecida; carregando o arquivo inteiro em PCM 16 kHz {TranscriptionId}",
-                request.TranscriptionId);
-        }
 
         var decodeSw = Stopwatch.StartNew();
         var samples = await Task.Run(
@@ -232,18 +144,22 @@ public sealed class ParakeetTranscriptionEngine : ITranscriptionEngine, IDisposa
         cancellationToken.ThrowIfCancellationRequested();
 
         var audioSeconds = samples.Length / (double)AudioLoader.SampleRate;
+        var chunkCount = Math.Max(1, ParakeetAudioChunker.CountWindows(samples.Length));
         _logger?.LogInformation(
-            "PCM 16 kHz pronto em {ElapsedSeconds:F1}s ({SampleCount} samples, {AudioSeconds:F1}s) {TranscriptionId}",
+            "PCM 16 kHz pronto em {ElapsedSeconds:F1}s ({SampleCount} samples, {AudioSeconds:F1}s, {WindowCount} janelas de {Window}s overlap {Overlap}s) {TranscriptionId}",
             decodeSw.Elapsed.TotalSeconds,
             samples.Length,
             audioSeconds,
+            chunkCount,
+            ParakeetAudioChunker.WindowSeconds,
+            ParakeetAudioChunker.OverlapSeconds,
             request.TranscriptionId);
 
-        var chunkCount = Math.Max(1, ParakeetAudioChunker.CountWindows(samples.Length));
         progress?.Report(new EngineProgress("transcribing", 0, chunkCount));
-        return await Task.Run(
+        var segments = await Task.Run(
             () => recognizer.Recognize(samples, cancellationToken, progress),
             cancellationToken);
+        return (segments, chunkCount);
     }
 
     private IParakeetRecognizer GetOrCreateRecognizer(string modelDir, int threads)

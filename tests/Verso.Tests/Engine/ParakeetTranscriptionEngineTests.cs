@@ -334,7 +334,7 @@ public class ParakeetTranscriptionEngineTests : IDisposable
     }
 
     [Fact]
-    public async Task TranscribeAsync_LongAudio_DecodesPerWindowAndReportsProgress()
+    public async Task TranscribeAsync_LongAudio_LoadsFullPcmOnceAndReportsProgress()
     {
         var wavPath = CreateTempWav(seconds: 50);
         var modelsDir = Path.Combine(Path.GetTempPath(), $"verso-pk-models-{Guid.NewGuid():N}");
@@ -361,9 +361,10 @@ public class ParakeetTranscriptionEngineTests : IDisposable
             CancellationToken.None);
 
         var expectedWindows = ParakeetAudioChunker.CountWindowsFromDuration(50);
-        Assert.Equal(expectedWindows, factory.Recognizer.Calls);
+        Assert.Equal(1, factory.Recognizer.Calls);
+        Assert.Equal(50 * AudioLoader.SampleRate, factory.Recognizer.SampleCount);
         Assert.Contains(progress.Reports, e => e.Stage == "transcribing" && e.PartIndex == 0 && e.TotalParts == expectedWindows);
-        Assert.Contains(progress.Reports, e => e.Stage == "transcribing" && e.PartIndex == expectedWindows && e.TotalParts == expectedWindows);
+        Assert.Contains(progress.Reports, e => e.Stage == "done" && e.PartIndex == expectedWindows && e.TotalParts == expectedWindows);
         Directory.Delete(modelsDir, recursive: true);
     }
 
@@ -448,6 +449,7 @@ public class ParakeetTranscriptionEngineTests : IDisposable
     private sealed class CountingRecognizer : IParakeetRecognizer
     {
         public int Calls { get; private set; }
+        public int SampleCount { get; private set; }
 
         public IReadOnlyList<TranscriptionSegmentResult> Recognize(
             float[] samples16kHz,
@@ -455,6 +457,7 @@ public class ParakeetTranscriptionEngineTests : IDisposable
             IProgress<EngineProgress>? progress = null)
         {
             Calls++;
+            SampleCount = samples16kHz.Length;
             return [new TranscriptionSegmentResult(0, 0.4, "ok")];
         }
     }
@@ -502,7 +505,8 @@ public class DispatchingTranscriptionEngineTests
             "a.wav",
             "pt",
             ModelQuality.Standard,
-            ExecutionDevice.Cpu);
+            ExecutionDevice.Cpu,
+            Engine: TranscriptionEngineKind.Whisper);
 
         var result = await dispatcher.TranscribeAsync(request, null, CancellationToken.None);
         Assert.True(whisper.Called);

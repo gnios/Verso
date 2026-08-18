@@ -111,33 +111,93 @@ public static class ParakeetAudioChunker
         return chunks;
     }
 
-    public static IReadOnlyList<TranscriptionSegmentResult> ShiftAndTrimOverlap(
-        IReadOnlyList<TranscriptionSegmentResult> segments,
+    public readonly record struct TimedToken(double TimeSeconds, string Text);
+
+    public readonly record struct WindowTranscript(
+        double StartSeconds,
+        double LengthSeconds,
+        IReadOnlyList<double> Timestamps,
+        IReadOnlyList<string> Tokens);
+
+    /// <summary>
+    /// Mantém só os tokens da região confiável da janela: depois de overlap/2 no
+    /// começo (exceto a primeira) e antes de overlap/2 no fim (exceto a última).
+    /// Recorte por token evita descartar a frase inteira quando ela começa no overlap.
+    /// </summary>
+    public static IReadOnlyList<TimedToken> TrimOwnedRegion(
+        IReadOnlyList<double> timestamps,
+        IReadOnlyList<string> tokens,
         double chunkStartSeconds,
         bool isFirstChunk,
+        bool isLastChunk,
+        double windowLengthSeconds,
         double overlapSeconds = OverlapSeconds)
     {
-        if (segments.Count == 0)
+        if (timestamps.Count == 0 || tokens.Count == 0)
         {
             return [];
         }
 
         var keepAfter = isFirstChunk ? 0 : overlapSeconds / 2.0;
-        var shifted = new List<TranscriptionSegmentResult>(segments.Count);
-        foreach (var segment in segments)
+        var keepUntil = isLastChunk
+            ? double.PositiveInfinity
+            : windowLengthSeconds - overlapSeconds / 2.0;
+        if (keepUntil < keepAfter)
         {
-            if (segment.StartSeconds < keepAfter)
+            keepUntil = keepAfter;
+        }
+
+        var count = Math.Min(timestamps.Count, tokens.Count);
+        var trimmed = new List<TimedToken>(count);
+        for (var i = 0; i < count; i++)
+        {
+            var t = timestamps[i];
+            if (t < keepAfter || t >= keepUntil)
             {
                 continue;
             }
 
-            shifted.Add(segment with
-            {
-                StartSeconds = segment.StartSeconds + chunkStartSeconds,
-                EndSeconds = segment.EndSeconds + chunkStartSeconds,
-            });
+            trimmed.Add(new TimedToken(t + chunkStartSeconds, tokens[i]));
         }
 
-        return shifted;
+        return trimmed;
+    }
+
+    public static IReadOnlyList<TranscriptionSegmentResult> StitchWindowTokens(
+        IReadOnlyList<WindowTranscript> windows)
+    {
+        if (windows.Count == 0)
+        {
+            return [];
+        }
+
+        var segments = new List<TranscriptionSegmentResult>();
+        for (var i = 0; i < windows.Count; i++)
+        {
+            var window = windows[i];
+            var trimmed = TrimOwnedRegion(
+                window.Timestamps,
+                window.Tokens,
+                window.StartSeconds,
+                isFirstChunk: i == 0,
+                isLastChunk: i == windows.Count - 1,
+                window.LengthSeconds);
+            if (trimmed.Count == 0)
+            {
+                continue;
+            }
+
+            var times = new double[trimmed.Count];
+            var toks = new string[trimmed.Count];
+            for (var t = 0; t < trimmed.Count; t++)
+            {
+                times[t] = trimmed[t].TimeSeconds;
+                toks[t] = trimmed[t].Text;
+            }
+
+            segments.AddRange(ParakeetSegmentBuilder.Build(string.Concat(toks), times, toks));
+        }
+
+        return segments;
     }
 }

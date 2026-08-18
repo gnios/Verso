@@ -10,6 +10,7 @@ namespace Verso.Core.Engine;
 public sealed class AudioLoader
 {
     public const int SampleRate = 16000;
+    internal const double FfmpegSeekPrerollSeconds = 5;
     private static readonly Regex FfmpegDurationRegex = new(
         @"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
@@ -84,17 +85,10 @@ public sealed class AudioLoader
         double? durationSeconds = null)
     {
         var ffmpeg = _ffmpegLocator.EnsureFfmpeg();
-        var seek = startSeconds is >= 0
-            ? $" -ss {startSeconds.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
-            : "";
-        var take = durationSeconds is > 0
-            ? $" -t {durationSeconds.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
-            : "";
-
         var psi = new ProcessStartInfo
         {
             FileName = ffmpeg,
-            Arguments = $"-nostdin -hide_banner -loglevel error -threads 0{seek}{take} -i \"{inputPath}\" -ar {SampleRate} -ac 1 -f s16le pipe:1",
+            Arguments = BuildFfmpegPcmArguments(inputPath, startSeconds, durationSeconds),
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -118,6 +112,38 @@ public sealed class AudioLoader
             return ConvertPcm16ToFloat(segment.AsSpan());
 
         return ConvertPcm16ToFloat(pcmStream.ToArray());
+    }
+
+    /// <summary>
+    /// Seek híbrido: -ss rápido no input (keyframe) + -ss/-t no output para cair
+    /// no timestamp pedido. -ss/-t só no input atrasava ou furava janelas em m4a/mp4.
+    /// </summary>
+    internal static string BuildFfmpegPcmArguments(
+        string inputPath,
+        double? startSeconds,
+        double? durationSeconds)
+    {
+        var inv = CultureInfo.InvariantCulture;
+        var quoted = $"\"{inputPath}\"";
+        var prefix = "-nostdin -hide_banner -loglevel error -threads 0";
+        var suffix = $"-ar {SampleRate} -ac 1 -f s16le pipe:1";
+
+        if (startSeconds is >= 0)
+        {
+            var start = startSeconds.Value;
+            var preroll = Math.Min(FfmpegSeekPrerollSeconds, start);
+            var inputSeek = (start - preroll).ToString(inv);
+            var outputSeek = preroll.ToString(inv);
+            var take = durationSeconds is > 0
+                ? $" -t {durationSeconds.Value.ToString(inv)}"
+                : "";
+            return $"{prefix} -ss {inputSeek} -i {quoted} -ss {outputSeek}{take} {suffix}";
+        }
+
+        var takeOnly = durationSeconds is > 0
+            ? $" -t {durationSeconds.Value.ToString(inv)}"
+            : "";
+        return $"{prefix} -i {quoted}{takeOnly} {suffix}";
     }
 
     private static FileStream OpenSharedRead(string inputPath) =>

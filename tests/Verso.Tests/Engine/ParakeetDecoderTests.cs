@@ -179,24 +179,131 @@ public class ParakeetAudioChunkerTests
     }
 
     [Fact]
-    public void ShiftAndTrimOverlap_DropsFirstHalfOfOverlapOnLaterChunks()
+    public void TrimOwnedRegion_LaterChunk_KeepsTokensFromOwnedHalfOfOverlap()
     {
-        var segments = new[]
-        {
-            new TranscriptionSegmentResult(0.2, 0.8, "drop"),
-            new TranscriptionSegmentResult(1.5, 2.0, "keep"),
-        };
+        var timestamps = new[] { 0.2, 1.5 };
+        var tokens = new[] { "drop ", "keep" };
 
-        var shifted = ParakeetAudioChunker.ShiftAndTrimOverlap(
-            segments,
+        var trimmed = ParakeetAudioChunker.TrimOwnedRegion(
+            timestamps,
+            tokens,
             chunkStartSeconds: 18,
             isFirstChunk: false,
+            isLastChunk: true,
+            windowLengthSeconds: 20,
             overlapSeconds: 2);
 
-        Assert.Single(shifted);
-        Assert.Equal("keep", shifted[0].Text);
-        Assert.Equal(19.5, shifted[0].StartSeconds, precision: 2);
-        Assert.Equal(20.0, shifted[0].EndSeconds, precision: 2);
+        Assert.Single(trimmed);
+        Assert.Equal("keep", trimmed[0].Text);
+        Assert.Equal(19.5, trimmed[0].TimeSeconds, precision: 2);
+    }
+
+    [Fact]
+    public void TrimOwnedRegion_LongUtteranceStartingInOverlap_KeepsOwnedTokens()
+    {
+        var timestamps = new[] { 0.2, 0.4, 1.5 };
+        var tokens = new[] { "frase ", "perdida ", "continua" };
+
+        var trimmed = ParakeetAudioChunker.TrimOwnedRegion(
+            timestamps,
+            tokens,
+            chunkStartSeconds: 18,
+            isFirstChunk: false,
+            isLastChunk: true,
+            windowLengthSeconds: 20,
+            overlapSeconds: 2);
+
+        Assert.Equal("continua", string.Concat(trimmed.Select(t => t.Text)));
+        Assert.Equal(19.5, trimmed[0].TimeSeconds, precision: 2);
+    }
+
+    [Fact]
+    public void TrimOwnedRegion_NonLastChunk_DropsTokensInLastHalfOfOverlap()
+    {
+        var timestamps = new[] { 18.5, 19.5 };
+        var tokens = new[] { "keep ", "drop" };
+
+        var trimmed = ParakeetAudioChunker.TrimOwnedRegion(
+            timestamps,
+            tokens,
+            chunkStartSeconds: 0,
+            isFirstChunk: true,
+            isLastChunk: false,
+            windowLengthSeconds: 20,
+            overlapSeconds: 2);
+
+        Assert.Single(trimmed);
+        Assert.Equal("keep ", trimmed[0].Text);
+        Assert.Equal(18.5, trimmed[0].TimeSeconds, precision: 2);
+    }
+
+    [Fact]
+    public void StitchWindowTokens_LongSentenceAcrossBoundary_DoesNotDropInteriorWords()
+    {
+        var windows = new[]
+        {
+            new ParakeetAudioChunker.WindowTranscript(
+                0,
+                20,
+                [0.5, 18.5, 19.5],
+                ["olá ", "mundo ", "perdido "]),
+            new ParakeetAudioChunker.WindowTranscript(
+                18,
+                20,
+                [0.5, 1.5, 5.0],
+                ["mundo ", "perdido ", "depois"]),
+        };
+
+        var segments = ParakeetAudioChunker.StitchWindowTokens(windows);
+        var text = string.Join(" ", segments.Select(s => s.Text.Trim()));
+
+        Assert.Contains("olá", text, StringComparison.Ordinal);
+        Assert.Contains("mundo", text, StringComparison.Ordinal);
+        Assert.Contains("perdido", text, StringComparison.Ordinal);
+        Assert.Contains("depois", text, StringComparison.Ordinal);
+        Assert.Equal(1, CountWord(text, "mundo"));
+        Assert.Equal(1, CountWord(text, "perdido"));
+    }
+
+    [Fact]
+    public void StitchWindowTokens_OldSegmentTrim_WouldHaveDroppedTheTail()
+    {
+        var timestamps = new[] { 0.2, 0.4, 0.7, 1.1, 1.5 };
+        var tokens = new[] { "frase ", "inteira ", "que ", "ainda ", "continua" };
+        var asOneSegment = ParakeetSegmentBuilder.Build(string.Concat(tokens), timestamps, tokens);
+        Assert.Single(asOneSegment);
+        Assert.True(asOneSegment[0].StartSeconds < 1.0);
+        Assert.Contains("continua", asOneSegment[0].Text, StringComparison.Ordinal);
+
+        var windows = new[]
+        {
+            new ParakeetAudioChunker.WindowTranscript(0, 20, [17.0], ["antes "]),
+            new ParakeetAudioChunker.WindowTranscript(18, 20, timestamps, tokens),
+        };
+        var stitched = ParakeetAudioChunker.StitchWindowTokens(windows);
+        var text = string.Join(" ", stitched.Select(s => s.Text));
+
+        Assert.Contains("continua", text, StringComparison.Ordinal);
+        Assert.Contains("ainda", text, StringComparison.Ordinal);
+        Assert.Contains("antes", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("frase", text, StringComparison.Ordinal);
+    }
+
+    private static int CountWord(string text, string word)
+    {
+        var count = 0;
+        var start = 0;
+        while (true)
+        {
+            var i = text.IndexOf(word, start, StringComparison.Ordinal);
+            if (i < 0)
+            {
+                return count;
+            }
+
+            count++;
+            start = i + word.Length;
+        }
     }
 }
 
