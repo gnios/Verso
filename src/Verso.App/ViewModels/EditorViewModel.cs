@@ -655,6 +655,7 @@ public partial class EditorViewModel : ViewModelBase, IDisposable
 
         var segmentVm = Segments.FirstOrDefault(s => s.Id == active.Id);
         segmentVm?.UpdateSpeaker(speaker);
+        RefreshSpeakerVisibility();
         OnPropertyChanged(nameof(HasActiveSegment));
         SpeakerDropdown.NotifyAssignAvailability();
         SpeakerDropdown.RefreshActiveIndicator();
@@ -890,7 +891,19 @@ public partial class EditorViewModel : ViewModelBase, IDisposable
     private void ReplaceSegments(IEnumerable<SegmentItemViewModel> items)
     {
         Segments = new ObservableCollection<SegmentItemViewModel>(items);
+        RefreshSpeakerVisibility();
         OnPropertyChanged(nameof(Segments));
+    }
+
+    internal void RefreshSpeakerVisibility()
+    {
+        Guid? previousSpeakerId = null;
+        for (var i = 0; i < Segments.Count; i++)
+        {
+            var segment = Segments[i];
+            segment.ShowSpeakerChip = i == 0 || segment.SpeakerId != previousSpeakerId;
+            previousSpeakerId = segment.SpeakerId;
+        }
     }
 
     private async Task LoadPlaybackAsync(string? mediaPath, TimeSpan? knownDuration)
