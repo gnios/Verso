@@ -25,7 +25,7 @@
         <p class="modal-message">@Service.Message</p>
         <div class="modal-actions">
             <button class="modal-cancel" @onclick="Service.Cancel">Cancelar</button>
-            <button class="modal-confirm modal-confirm-danger" @onclick="Service.Confirm">Confirmar</button>
+            <button class="modal-confirm @(Service.IsDanger ? "modal-confirm-danger" : "")" @onclick="Service.Confirm">Confirmar</button>
         </div>
     </div>
 </div>

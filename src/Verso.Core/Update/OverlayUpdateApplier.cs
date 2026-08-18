@@ -4,6 +4,8 @@ public sealed class OverlayUpdateApplier
 {
     public const string DataFolderName = "data";
     public const string StagingFolderName = "update-staging";
+    private const int CopyAttempts = 30;
+    private const int CopyRetryMilliseconds = 100;
 
     public OverlayApplyResult Apply(string stagingDirectory, string appDirectory)
     {
@@ -16,22 +18,30 @@ public sealed class OverlayUpdateApplier
         if (!HasAppHost(stagingDirectory))
             return OverlayApplyResult.Aborted("pacote sem Verso.App");
 
-        Directory.CreateDirectory(appDirectory);
-
-        foreach (var file in Directory.EnumerateFiles(stagingDirectory, "*", SearchOption.AllDirectories))
+        try
         {
-            var relative = Path.GetRelativePath(stagingDirectory, file);
-            if (ShouldSkipRelative(relative))
-                continue;
+            Directory.CreateDirectory(appDirectory);
 
-            var dest = Path.Combine(appDirectory, relative);
-            var destDir = Path.GetDirectoryName(dest);
-            if (!string.IsNullOrEmpty(destDir))
-                Directory.CreateDirectory(destDir);
-            File.Copy(file, dest, overwrite: true);
+            foreach (var file in Directory.EnumerateFiles(stagingDirectory, "*", SearchOption.AllDirectories))
+            {
+                var relative = Path.GetRelativePath(stagingDirectory, file);
+                if (ShouldSkipRelative(relative))
+                    continue;
+
+                var dest = Path.Combine(appDirectory, relative);
+                var destDir = Path.GetDirectoryName(dest);
+                if (!string.IsNullOrEmpty(destDir))
+                    Directory.CreateDirectory(destDir);
+                CopyWithRetry(file, dest);
+            }
+
+            TryDeleteDirectory(Path.Combine(appDirectory, StagingFolderName));
+            return OverlayApplyResult.Succeeded();
         }
-
-        return OverlayApplyResult.Succeeded();
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return OverlayApplyResult.Aborted(ex.Message);
+        }
     }
 
     public static bool ShouldSkipRelative(string relativePath)
@@ -55,4 +65,35 @@ public sealed class OverlayUpdateApplier
     public static bool HasAppHost(string directory) =>
         File.Exists(Path.Combine(directory, "Verso.App.exe"))
         || File.Exists(Path.Combine(directory, "Verso.App"));
+
+    private static void CopyWithRetry(string source, string destination)
+    {
+        for (var attempt = 1; attempt <= CopyAttempts; attempt++)
+        {
+            try
+            {
+                File.Copy(source, destination, overwrite: true);
+                return;
+            }
+            catch (Exception ex) when (attempt < CopyAttempts && ex is IOException or UnauthorizedAccessException)
+            {
+                Thread.Sleep(CopyRetryMilliseconds);
+            }
+        }
+    }
+
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
+                Directory.Delete(path, true);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+    }
 }

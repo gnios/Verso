@@ -47,7 +47,7 @@ public class UpdateSessionTests
     }
 
     [Fact]
-    public async Task CheckInBackground_AppliesPendingWhenIdle()
+    public async Task CheckInBackground_DoesNotApplyPendingWhenIdle()
     {
         var root = CreateTempDir();
         try
@@ -62,8 +62,8 @@ public class UpdateSessionTests
 
             await session.CheckInBackgroundAsync();
 
-            Assert.True(launcher.Called);
-            Assert.True(exited);
+            Assert.False(launcher.Called);
+            Assert.False(exited);
         }
         finally
         {
@@ -227,5 +227,14 @@ public class UpdateStatusMessagesTests
         var text = UpdateStatusMessages.For(UpdateStatus.Ready, hasChannel: true, availableVersion: "1.4.0");
         Assert.Contains("1.4.0", text);
         Assert.Contains("pronta", text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RestartConfirm_WarnsThatAppMustClose()
+    {
+        var text = UpdateStatusMessages.RestartConfirm("1.4.0");
+        Assert.Contains("fechar", text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("1.4.0", text);
+        Assert.Contains("Reiniciar", UpdateStatusMessages.RestartConfirmTitle);
     }
 }

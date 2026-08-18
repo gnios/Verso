@@ -68,6 +68,33 @@ public class OverlayUpdateApplierTests
     }
 
     [Fact]
+    public void Apply_RemovesUpdateStagingInsideAppDirectory()
+    {
+        var root = CreateTempDir();
+        try
+        {
+            var app = Path.Combine(root, "app");
+            var stagingRoot = Path.Combine(app, OverlayUpdateApplier.StagingFolderName);
+            var payload = Path.Combine(stagingRoot, UpdateCoordinator.PayloadFolderName);
+            Directory.CreateDirectory(app);
+            Directory.CreateDirectory(payload);
+            File.WriteAllText(Path.Combine(app, "Verso.App.exe"), "old-exe");
+            File.WriteAllText(Path.Combine(payload, "Verso.App.exe"), "new-exe");
+            File.WriteAllText(Path.Combine(stagingRoot, UpdateCoordinator.ReadyFileName), """{"tag":"v1.4.0"}""");
+
+            var result = new OverlayUpdateApplier().Apply(payload, app);
+
+            Assert.True(result.Success);
+            Assert.Equal("new-exe", File.ReadAllText(Path.Combine(app, "Verso.App.exe")));
+            Assert.False(Directory.Exists(stagingRoot));
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
     public void Apply_AcceptsUnixAppHostName()
     {
         var root = CreateTempDir();
