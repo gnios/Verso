@@ -163,6 +163,10 @@ public static class ParakeetAudioChunker
         return trimmed;
     }
 
+    /// <summary>
+    /// Concatena os tokens confiáveis de todas as janelas e só então agrupa em
+    /// trechos. Cortar por janela forçava uma quebra a cada ~18 s, no meio da frase.
+    /// </summary>
     public static IReadOnlyList<TranscriptionSegmentResult> StitchWindowTokens(
         IReadOnlyList<WindowTranscript> windows)
     {
@@ -171,33 +175,32 @@ public static class ParakeetAudioChunker
             return [];
         }
 
-        var segments = new List<TranscriptionSegmentResult>();
+        var all = new List<TimedToken>();
         for (var i = 0; i < windows.Count; i++)
         {
             var window = windows[i];
-            var trimmed = TrimOwnedRegion(
+            all.AddRange(TrimOwnedRegion(
                 window.Timestamps,
                 window.Tokens,
                 window.StartSeconds,
                 isFirstChunk: i == 0,
                 isLastChunk: i == windows.Count - 1,
-                window.LengthSeconds);
-            if (trimmed.Count == 0)
-            {
-                continue;
-            }
-
-            var times = new double[trimmed.Count];
-            var toks = new string[trimmed.Count];
-            for (var t = 0; t < trimmed.Count; t++)
-            {
-                times[t] = trimmed[t].TimeSeconds;
-                toks[t] = trimmed[t].Text;
-            }
-
-            segments.AddRange(ParakeetSegmentBuilder.Build(string.Concat(toks), times, toks));
+                window.LengthSeconds));
         }
 
-        return segments;
+        if (all.Count == 0)
+        {
+            return [];
+        }
+
+        var times = new double[all.Count];
+        var toks = new string[all.Count];
+        for (var t = 0; t < all.Count; t++)
+        {
+            times[t] = all[t].TimeSeconds;
+            toks[t] = all[t].Text;
+        }
+
+        return ParakeetSegmentBuilder.Build(string.Concat(toks), times, toks);
     }
 }

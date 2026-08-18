@@ -1,11 +1,16 @@
 namespace Verso.Core.Engine;
 
 /// <summary>
-/// Agrupa tokens timestampados em segmentos para o editor (pausa ≥ 0,6 s).
+/// Agrupa tokens timestampados em trechos para o editor.
+/// O decoder TDT avança até ~8 frames (0,64 s) entre tokens mesmo em fala contínua;
+/// um limiar de 0,6 s cortava no meio da frase. Corta só em pausa real (≥ 1,5 s)
+/// e limita a duração de um trecho para o editor não virar um bloco só.
 /// </summary>
 public static class ParakeetSegmentBuilder
 {
-    public const double DefaultPauseSeconds = 0.6;
+    public const double DefaultPauseSeconds = 1.5;
+    public const double MaxSegmentSeconds = 30;
+    public const double TokenEndPaddingSeconds = 0.08;
 
     public static IReadOnlyList<TranscriptionSegmentResult> Build(
         string fullText,
@@ -20,8 +25,10 @@ public static class ParakeetSegmentBuilder
 
         if (tokenTimestamps.Count != tokens.Count)
         {
-            var end = tokenTimestamps.Count > 0 ? tokenTimestamps[^1] + 0.08 : 0;
-            return [new TranscriptionSegmentResult(0, Math.Max(end, 0.08), fullText)];
+            var end = tokenTimestamps.Count > 0
+                ? tokenTimestamps[^1] + TokenEndPaddingSeconds
+                : 0;
+            return [new TranscriptionSegmentResult(0, Math.Max(end, TokenEndPaddingSeconds), fullText)];
         }
 
         var segments = new List<TranscriptionSegmentResult>();
@@ -30,7 +37,9 @@ public static class ParakeetSegmentBuilder
         {
             var isLast = i == tokens.Count;
             var gap = !isLast && tokenTimestamps[i] - tokenTimestamps[i - 1] >= pauseSeconds;
-            if (!isLast && !gap)
+            var tooLong = !isLast
+                && tokenTimestamps[i - 1] - tokenTimestamps[start] >= MaxSegmentSeconds;
+            if (!isLast && !gap && !tooLong)
             {
                 continue;
             }
@@ -39,10 +48,10 @@ public static class ParakeetSegmentBuilder
             if (piece.Length > 0)
             {
                 var segStart = tokenTimestamps[start];
-                var segEnd = tokenTimestamps[i - 1] + 0.08;
+                var segEnd = tokenTimestamps[i - 1] + TokenEndPaddingSeconds;
                 if (segEnd <= segStart)
                 {
-                    segEnd = segStart + 0.08;
+                    segEnd = segStart + TokenEndPaddingSeconds;
                 }
 
                 segments.Add(new TranscriptionSegmentResult(segStart, segEnd, piece));
