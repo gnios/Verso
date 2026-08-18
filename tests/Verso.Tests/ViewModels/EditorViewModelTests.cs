@@ -1092,6 +1092,56 @@ public class EditorViewModelTests
     }
 
     [Fact]
+    public async Task ApplyWordLikeKey_ArrowUpOnFirstLine_FocusesPreviousAtMinColumn()
+    {
+        var (provider, directory, transcriptionId, firstId, _) =
+            await CreateTwoSegmentEditorAsync();
+        try
+        {
+            var editor = await CreateEditorAsync(provider, transcriptionId);
+            (Guid Id, int Caret)? focus = null;
+            editor.FocusSegmentRequested += (_, e) => focus = e;
+
+            await editor.ApplyWordLikeKeyAsync(
+                editor.Segments[1],
+                WordKey("ArrowUp", start: 3, end: 3, length: 7, firstLine: true, lastLine: true, column: 3));
+
+            Assert.NotNull(focus);
+            Assert.Equal(firstId, focus.Value.Id);
+            Assert.Equal(3, focus.Value.Caret);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task ApplyWordLikeKey_ArrowDownOnLastLine_FocusesNextAtMinColumn()
+    {
+        var (provider, directory, transcriptionId, _, secondId) =
+            await CreateTwoSegmentEditorAsync();
+        try
+        {
+            var editor = await CreateEditorAsync(provider, transcriptionId);
+            (Guid Id, int Caret)? focus = null;
+            editor.FocusSegmentRequested += (_, e) => focus = e;
+
+            await editor.ApplyWordLikeKeyAsync(
+                editor.Segments[0],
+                WordKey("ArrowDown", start: 8, end: 8, length: 8, firstLine: true, lastLine: true, column: 20));
+
+            Assert.NotNull(focus);
+            Assert.Equal(secondId, focus.Value.Id);
+            Assert.Equal("segundo".Length, focus.Value.Caret);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
     public async Task TryConsumePendingFocus_ReturnsOnceThenFalse()
     {
         var (provider, directory, transcriptionId, firstId, _) =
