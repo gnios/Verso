@@ -12,7 +12,7 @@
     <div class="seg-time">@ViewModel.TimeDisplay</div>
     <div class="seg-body">
         <div class="seg-speaker-slot">
-            <button type="button" class="seg-speaker-chip @(string.IsNullOrEmpty(ViewModel.SpeakerName) ? "empty" : "")"
+            <button type="button" class="seg-speaker-chip @(string.IsNullOrEmpty(ViewModel.SpeakerName) ? "empty" : "") @(ViewModel.ShowSpeakerChip ? "" : "speaker-follow")"
                     style="@(string.IsNullOrEmpty(ViewModel.SpeakerName) ? "" : $"color:{ViewModel.SpeakerColorHex}")"
                     title="@(string.IsNullOrEmpty(ViewModel.SpeakerName) ? "Atribuir locutor" : "Mudar locutor")"
                     @onclick="OnLocutorClick" @onclick:stopPropagation="true">
