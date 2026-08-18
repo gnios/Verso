@@ -5,6 +5,7 @@ using Verso.App.Services;
 using Verso.App.ViewModels;
 using Verso.Core.Engine;
 using Verso.Core.Media;
+using Verso.Core.Update;
 using System.Net.Http;
 using Verso.Core.Services;
 
@@ -40,6 +41,7 @@ public static class AppServiceCollectionExtensions
         services.AddSingleton<MainWindowViewModel>();
         services.AddSingleton<GpuDetector>();
         services.AddSingleton<ActiveGpuResolver>();
+        services.AddVersoAutoUpdate();
 
         services.AddTransient<DashboardViewModel>();
         services.AddTransient<FolderViewModel>();
@@ -48,6 +50,25 @@ public static class AppServiceCollectionExtensions
         services.AddTransient<EditorViewModel>();
         services.AddTransient<SettingsViewModel>();
 
+        return services;
+    }
+
+    public static IServiceCollection AddVersoAutoUpdate(this IServiceCollection services)
+    {
+        services.AddSingleton(_ => new HttpClient());
+        services.AddSingleton<OverlayUpdateApplier>();
+        services.AddSingleton<IUpdateProcessLauncher, UpdateProcessLauncher>();
+        services.AddSingleton<IGitHubReleaseClient>(sp => new GitHubReleaseClient(sp.GetRequiredService<HttpClient>()));
+        services.AddSingleton<IUpdatePackageDownloader>(sp =>
+            new HttpUpdatePackageDownloader(sp.GetRequiredService<HttpClient>()));
+        services.AddSingleton(sp => new UpdateCoordinator(
+            sp.GetRequiredService<IGitHubReleaseClient>(),
+            sp.GetRequiredService<IUpdatePackageDownloader>(),
+            sp.GetRequiredService<OverlayUpdateApplier>(),
+            sp.GetRequiredService<IUpdateIdleSignal>(),
+            localVersion: () => RunningAppVersion.Current));
+        services.AddSingleton<UpdateSession>();
+        services.AddHostedService<UpdateHostedService>();
         return services;
     }
 }
