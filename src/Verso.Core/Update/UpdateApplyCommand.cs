@@ -51,7 +51,8 @@ public sealed class UpdateApplyCommand
         Func<int, bool> isProcessRunning,
         Func<string, string, bool> startProcess,
         int pollMilliseconds = 50,
-        int timeoutMilliseconds = 120_000)
+        int timeoutMilliseconds = 120_000,
+        int settleMilliseconds = 500)
     {
         var waited = 0;
         while (isProcessRunning(Pid) && waited < timeoutMilliseconds)
@@ -63,10 +64,23 @@ public sealed class UpdateApplyCommand
         if (isProcessRunning(Pid))
             return 3;
 
-        var result = applier.Apply(StagingDirectory, AppDirectory);
-        if (!result.Success)
-            return 1;
+        if (settleMilliseconds > 0)
+            Thread.Sleep(settleMilliseconds);
 
-        return startProcess(LaunchPath, AppDirectory) ? 0 : 2;
+        OverlayApplyResult result;
+        try
+        {
+            result = applier.Apply(StagingDirectory, AppDirectory);
+        }
+        catch (Exception ex)
+        {
+            result = OverlayApplyResult.Aborted(ex.Message);
+        }
+
+        var launched = startProcess(LaunchPath, AppDirectory);
+        if (!result.Success)
+            return launched ? 1 : 4;
+
+        return launched ? 0 : 2;
     }
 }

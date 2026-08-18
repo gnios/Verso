@@ -9,7 +9,7 @@ internal sealed class FakeConfirmationService : IConfirmationService
     public string? LastTitle { get; private set; }
     public string? LastMessage { get; private set; }
 
-    public Task<bool> ConfirmAsync(string title, string message)
+    public Task<bool> ConfirmAsync(string title, string message, bool danger = true)
     {
         LastTitle = title;
         LastMessage = message;

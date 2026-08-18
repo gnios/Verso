@@ -70,7 +70,8 @@ public class UpdateApplyCommandTests
                     return true;
                 },
                 pollMilliseconds: 10,
-                timeoutMilliseconds: 5_000);
+                timeoutMilliseconds: 5_000,
+                settleMilliseconds: 0);
 
             thread.Join();
             Assert.Equal(0, exit);
@@ -103,5 +104,46 @@ public class UpdateApplyCommandTests
             timeoutMilliseconds: 20);
 
         Assert.Equal(3, exit);
+    }
+
+    [Fact]
+    public void Execute_LaunchesAppEvenWhenApplyFails()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "verso-apply-fail-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var app = Path.Combine(root, "app");
+            Directory.CreateDirectory(app);
+            File.WriteAllText(Path.Combine(app, "Verso.App.exe"), "old");
+            var launched = false;
+            var cmd = new UpdateApplyCommand
+            {
+                Pid = 1,
+                AppDirectory = app,
+                StagingDirectory = Path.Combine(root, "missing"),
+                LaunchPath = Path.Combine(app, "Verso.App.exe")
+            };
+
+            var exit = cmd.Execute(
+                new OverlayUpdateApplier(),
+                _ => false,
+                (_, _) =>
+                {
+                    launched = true;
+                    return true;
+                },
+                pollMilliseconds: 5,
+                timeoutMilliseconds: 20,
+                settleMilliseconds: 0);
+
+            Assert.Equal(1, exit);
+            Assert.True(launched);
+            Assert.Equal("old", File.ReadAllText(Path.Combine(app, "Verso.App.exe")));
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
     }
 }

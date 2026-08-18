@@ -30,7 +30,9 @@ public sealed class BlazorConfirmationService : IConfirmationService, INotifyPro
 
     public string Message { get; private set; } = "";
 
-    public Task<bool> ConfirmAsync(string title, string message)
+    public bool IsDanger { get; private set; } = true;
+
+    public Task<bool> ConfirmAsync(string title, string message, bool danger = true)
     {
         // Nenhum fluxo real do app dispara duas confirmações em paralelo, mas por segurança
         // resolve qualquer pendência anterior como "cancelada" em vez de perdê-la silenciosamente.
@@ -38,11 +40,13 @@ public sealed class BlazorConfirmationService : IConfirmationService, INotifyPro
 
         Title = title;
         Message = message;
+        IsDanger = danger;
         IsOpen = true;
         _pending = new TaskCompletionSource<bool>();
 
         OnPropertyChanged(nameof(Title));
         OnPropertyChanged(nameof(Message));
+        OnPropertyChanged(nameof(IsDanger));
         OnPropertyChanged(nameof(IsOpen));
 
         return _pending.Task;

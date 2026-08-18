@@ -116,10 +116,6 @@ public sealed class UpdateSession
         return true;
     }
 
-    public async Task CheckInBackgroundAsync(CancellationToken cancellationToken = default)
-    {
-        var result = await _coordinator.CheckAndPrepareAsync(cancellationToken).ConfigureAwait(false);
-        if (result.ApplyImmediately)
-            TryApplyPendingAndRequestExit();
-    }
+    public async Task CheckInBackgroundAsync(CancellationToken cancellationToken = default) =>
+        await _coordinator.CheckAndPrepareAsync(cancellationToken).ConfigureAwait(false);
 }

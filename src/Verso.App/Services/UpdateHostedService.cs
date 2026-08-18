@@ -21,12 +21,6 @@ public sealed class UpdateHostedService : IHostedService
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        if (_session.TryApplyPendingAndRequestExit())
-        {
-            _logger.LogInformation("Update pendente: updater iniciado, encerrando o app.");
-            return Task.CompletedTask;
-        }
-
         _run = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _ = CheckSafeAsync(_run.Token);
         return Task.CompletedTask;

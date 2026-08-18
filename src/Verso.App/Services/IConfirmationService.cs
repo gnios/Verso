@@ -4,5 +4,5 @@ namespace Verso.App.Services;
 
 public interface IConfirmationService
 {
-    Task<bool> ConfirmAsync(string title, string message);
+    Task<bool> ConfirmAsync(string title, string message, bool danger = true);
 }

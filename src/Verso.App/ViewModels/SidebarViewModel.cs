@@ -128,7 +128,21 @@ public partial class SidebarViewModel : ViewModelBase
         if (_updateSession is null)
             return;
 
-        await _updateSession.CheckInBackgroundAsync();
+        if (_updateCoordinator?.Status != UpdateStatus.Ready)
+            await _updateSession.CheckInBackgroundAsync();
+
+        if (_updateCoordinator?.Status != UpdateStatus.Ready)
+            return;
+
+        if (!await _confirmation.ConfirmAsync(
+                UpdateStatusMessages.RestartConfirmTitle,
+                UpdateStatusMessages.RestartConfirm(_updateCoordinator.AvailableVersion),
+                danger: false))
+        {
+            return;
+        }
+
+        _updateSession.TryApplyPendingAndRequestExit();
     }
 
     private bool CanExecuteUpdateNow() => CanUpdateNow;

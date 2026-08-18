@@ -25,6 +25,14 @@ public static class UpdateStatusMessages
         };
     }
 
+    public static string RestartConfirmTitle => "Reiniciar para atualizar";
+
+    public static string RestartConfirm(string? availableVersion)
+    {
+        var target = Normalize(availableVersion) ?? "nova versão";
+        return $"O Verso precisa fechar para instalar a versão {target} e vai abrir de novo em seguida. Continuar?";
+    }
+
     public static bool CanRequestUpdate(bool hasChannel, UpdateStatus status) =>
         hasChannel
         && status is not UpdateStatus.Checking
