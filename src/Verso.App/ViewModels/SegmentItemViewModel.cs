@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Verso.Core.Data.Entities;
+using Verso.Core.Services;
 
 namespace Verso.App.ViewModels;
 
@@ -85,4 +86,10 @@ public partial class SegmentItemViewModel : ViewModelBase
     }
 
     internal void CommitText() => _editor.OnSegmentTextCommitted(this, Text);
+
+    internal Task ApplyWordLikeKeyAsync(WordLikeKeyContext ctx) =>
+        _editor.ApplyWordLikeKeyAsync(this, ctx);
+
+    internal bool TryConsumePendingFocus(out int caretIndex) =>
+        _editor.TryConsumePendingFocus(Id, out caretIndex);
 }

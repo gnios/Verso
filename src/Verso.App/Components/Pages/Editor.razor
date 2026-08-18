@@ -277,6 +277,7 @@
         ViewModel.PropertyChanged += OnViewModelChanged;
         ViewModel.Tags.CollectionChanged += OnTagsChanged;
         ViewModel.ScrollToSegmentRequested += OnScrollToSegmentRequested;
+        ViewModel.FocusSegmentRequested += OnFocusSegmentRequested;
         SubscribeSegments(ViewModel.Segments);
     }
 
@@ -317,6 +318,34 @@
             }
 
             await JS.InvokeVoidAsync("versoEditor.scrollToSegmentById", segment.Id.ToString());
+        }
+        catch (JSDisconnectedException)
+        {
+            // WebView fechado — ignorar.
+        }
+    }
+
+    private async void OnFocusSegmentRequested(object? sender, (Guid SegmentId, int CaretIndex) focus)
+    {
+        try
+        {
+            var segment = ViewModel.Segments.FirstOrDefault(s => s.Id == focus.SegmentId);
+            if (segment is not null)
+            {
+                var index = ViewModel.IndexOfSegment(segment);
+                if (index >= 0)
+                {
+                    await JS.InvokeVoidAsync(
+                        "versoEditor.scrollToSegmentIndex",
+                        index,
+                        EditorViewModel.SegmentItemHeightEstimate);
+                }
+            }
+
+            await JS.InvokeVoidAsync(
+                "versoEditor.focusSegment",
+                focus.SegmentId.ToString(),
+                focus.CaretIndex);
         }
         catch (JSDisconnectedException)
         {
@@ -366,6 +395,7 @@
         _subscribed.PropertyChanged -= OnViewModelChanged;
         _subscribed.Tags.CollectionChanged -= OnTagsChanged;
         _subscribed.ScrollToSegmentRequested -= OnScrollToSegmentRequested;
+        _subscribed.FocusSegmentRequested -= OnFocusSegmentRequested;
         if (_segmentsSubscribed is not null)
         {
             _segmentsSubscribed.CollectionChanged -= OnSegmentsChanged;
