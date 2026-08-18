@@ -38,15 +38,50 @@ public class ParakeetSegmentBuilderTests
     public void Build_SplitsWhenPauseIsAtLeastDefault()
     {
         var tokens = new[] { "olá ", "mundo", " depois" };
-        var timestamps = new[] { 0.0, 0.16, 1.0 };
+        var timestamps = new[] { 0.0, 0.16, 2.0 };
         var segments = ParakeetSegmentBuilder.Build("olá mundo depois", timestamps, tokens);
 
         Assert.Equal(2, segments.Count);
         Assert.Equal("olá mundo", segments[0].Text);
         Assert.Equal(0, segments[0].StartSeconds, precision: 2);
         Assert.Equal("depois", segments[1].Text);
-        Assert.Equal(1.0, segments[1].StartSeconds, precision: 2);
+        Assert.Equal(2.0, segments[1].StartSeconds, precision: 2);
         Assert.True(segments[1].EndSeconds > segments[1].StartSeconds);
+    }
+
+    [Fact]
+    public void Build_DoesNotSplitOnTypicalTdtTokenDuration()
+    {
+        var tokens = new[] { "fala ", "contínua" };
+        var timestamps = new[] { 0.0, 0.64 };
+        var segments = ParakeetSegmentBuilder.Build("fala contínua", timestamps, tokens);
+
+        Assert.Single(segments);
+        Assert.Equal("fala contínua", segments[0].Text);
+    }
+
+    [Fact]
+    public void Build_DoesNotSplitOnGapBelowPause()
+    {
+        var tokens = new[] { "ainda ", "junto" };
+        var timestamps = new[] { 0.0, 1.2 };
+        var segments = ParakeetSegmentBuilder.Build("ainda junto", timestamps, tokens);
+
+        Assert.Single(segments);
+        Assert.Equal("ainda junto", segments[0].Text);
+    }
+
+    [Fact]
+    public void Build_SplitsWhenSegmentExceedsMaxDuration()
+    {
+        var timestamps = Enumerable.Range(0, 32).Select(i => (double)i).ToArray();
+        var tokens = timestamps.Select((_, i) => i == 31 ? "fim" : "x ").ToArray();
+        var segments = ParakeetSegmentBuilder.Build(string.Concat(tokens), timestamps, tokens);
+
+        Assert.Equal(2, segments.Count);
+        Assert.Equal("fim", segments[1].Text);
+        Assert.Equal(31.0, segments[1].StartSeconds, precision: 2);
+        Assert.DoesNotContain("fim", segments[0].Text, StringComparison.Ordinal);
     }
 }
 
@@ -287,6 +322,30 @@ public class ParakeetAudioChunkerTests
         Assert.Contains("ainda", text, StringComparison.Ordinal);
         Assert.Contains("antes", text, StringComparison.Ordinal);
         Assert.DoesNotContain("frase", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StitchWindowTokens_ContinuousSpeechAcrossWindows_StaysOneSegment()
+    {
+        var windows = new[]
+        {
+            new ParakeetAudioChunker.WindowTranscript(
+                0,
+                20,
+                [17.5, 18.5],
+                ["fala ", "continua "]),
+            new ParakeetAudioChunker.WindowTranscript(
+                18,
+                20,
+                [0.8, 1.2],
+                ["continua ", "aqui"]),
+        };
+
+        var segments = ParakeetAudioChunker.StitchWindowTokens(windows);
+
+        Assert.Single(segments);
+        Assert.Equal("fala continua aqui", segments[0].Text);
+        Assert.Equal(17.5, segments[0].StartSeconds, precision: 2);
     }
 
     private static int CountWord(string text, string word)
