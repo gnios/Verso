@@ -173,4 +173,100 @@ public class SegmentEditingServiceTests
         // O segmento mesclado deve cobrir até o fim do segundo: [0, 12], não [0, 5].
         Assert.Equal(12, merged.EndSeconds);
     }
+
+    [Fact]
+    public void JoinTexts_InsertsSingleSpaceWhenNeitherSideHasBoundaryWhitespace()
+    {
+        Assert.Equal("hello world", SegmentEditingService.JoinTexts("hello", "world"));
+    }
+
+    [Fact]
+    public void JoinTexts_DoesNotInsertExtraSpaceWhenLeftAlreadyEndsWithWhitespace()
+    {
+        Assert.Equal("hello world", SegmentEditingService.JoinTexts("hello ", "world"));
+    }
+
+    [Fact]
+    public void JoinTexts_DoesNotInsertExtraSpaceWhenRightAlreadyStartsWithWhitespace()
+    {
+        Assert.Equal("hello world", SegmentEditingService.JoinTexts("hello", " world"));
+    }
+
+    [Fact]
+    public void JoinTexts_KeepsLeftOnlyWhenRightIsEmpty()
+    {
+        Assert.Equal("hello", SegmentEditingService.JoinTexts("hello", ""));
+        Assert.Equal("hello", SegmentEditingService.JoinTexts("hello", null));
+    }
+
+    [Fact]
+    public void JoinTexts_KeepsRightOnlyWhenLeftIsEmpty()
+    {
+        Assert.Equal("world", SegmentEditingService.JoinTexts("", "world"));
+        Assert.Equal("world", SegmentEditingService.JoinTexts(null, "world"));
+    }
+
+    [Fact]
+    public void CaretAfterJoin_LandsAtStartOfAbsorbedText()
+    {
+        Assert.Equal(6, SegmentEditingService.CaretAfterJoin("hello", "world"));
+        Assert.Equal(6, SegmentEditingService.CaretAfterJoin("hello ", "world"));
+        Assert.Equal(5, SegmentEditingService.CaretAfterJoin("hello", " world"));
+    }
+
+    [Fact]
+    public void CaretAfterJoin_LandsAtEndOfLeftWhenAbsorbedTextIsEmpty()
+    {
+        Assert.Equal(5, SegmentEditingService.CaretAfterJoin("hello", ""));
+    }
+
+    [Fact]
+    public void MergeWithPrevious_DoesNotInsertExtraSpaceWhenPreviousAlreadyEndsWithSpace()
+    {
+        var segments = new List<Segment>
+        {
+            CreateSegment(0, "hello ", 0),
+            CreateSegment(5, "world", 1),
+        };
+
+        var merged = _service.MergeWithPrevious(segments, segments[1]);
+
+        Assert.NotNull(merged);
+        Assert.Equal("hello world", merged!.Text);
+    }
+
+    [Fact]
+    public void MergeWithPrevious_RemovesEmptyActiveAndKeepsPreviousText()
+    {
+        var segments = new List<Segment>
+        {
+            CreateSegment(0, "hello", 0),
+            CreateSegment(5, "", 1),
+        };
+
+        var merged = _service.MergeWithPrevious(segments, segments[1]);
+
+        Assert.NotNull(merged);
+        Assert.Equal("hello", merged!.Text);
+        Assert.Equal(10, merged.EndSeconds);
+    }
+
+    [Fact]
+    public void MergeWithPrevious_KeepsPreviousSpeakerWhenActiveHasDifferentSpeaker()
+    {
+        var previousSpeaker = new Speaker { Id = Guid.NewGuid(), Name = "Ana" };
+        var activeSpeaker = new Speaker { Id = Guid.NewGuid(), Name = "Beto" };
+        var previous = CreateSegment(0, "ola", 0);
+        previous.SpeakerId = previousSpeaker.Id;
+        previous.Speaker = previousSpeaker;
+        var active = CreateSegment(5, "mundo", 1);
+        active.SpeakerId = activeSpeaker.Id;
+        active.Speaker = activeSpeaker;
+
+        var merged = _service.MergeWithPrevious([previous, active], active);
+
+        Assert.NotNull(merged);
+        Assert.Equal(previousSpeaker.Id, merged!.SpeakerId);
+        Assert.Same(previousSpeaker, merged.Speaker);
+    }
 }

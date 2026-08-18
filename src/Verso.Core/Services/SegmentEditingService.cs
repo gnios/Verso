@@ -73,12 +73,49 @@ public class SegmentEditingService
         }
 
         var previous = ordered[index - 1];
-        previous.Text = $"{previous.Text} {active.Text}".Trim();
+        previous.Text = JoinTexts(previous.Text, active.Text);
         // Estende o intervalo do segmento anterior até o fim do segmento mesclado, para
         // que o resultado cubra todo o áudio [previous.Start, active.End] — antes o fim
         // permanecia em previous.End, deixando a segunda metade do áudio sem sincronia.
         previous.EndSeconds = active.EndSeconds;
         return previous;
+    }
+
+    /// <summary>
+    /// Junta dois textos como parágrafos do Word: insere um espaço só quando ambos têm
+    /// conteúdo e ainda não há whitespace na borda.
+    /// </summary>
+    public static string JoinTexts(string? left, string? right)
+    {
+        left ??= "";
+        right ??= "";
+        if (left.Length == 0)
+        {
+            return right;
+        }
+
+        if (right.Length == 0)
+        {
+            return left;
+        }
+
+        if (char.IsWhiteSpace(left[^1]) || char.IsWhiteSpace(right[0]))
+        {
+            return left + right;
+        }
+
+        return left + " " + right;
+    }
+
+    /// <summary>
+    /// Índice do cursor na junta: início do texto absorvido dentro do resultado de
+    /// <see cref="JoinTexts"/>.
+    /// </summary>
+    public static int CaretAfterJoin(string? left, string? right)
+    {
+        right ??= "";
+        var joined = JoinTexts(left, right);
+        return Math.Max(0, joined.Length - right.Length);
     }
 
     public void AssignSpeaker(Segment segment, Speaker speaker)
