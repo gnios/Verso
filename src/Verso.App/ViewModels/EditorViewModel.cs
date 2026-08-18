@@ -33,7 +33,7 @@ public partial class EditorViewModel : ViewModelBase, IDisposable
     private bool _playbackStarted;
     private Guid? _highlightedSegmentId;
     private bool _disposed;
-    private IReadOnlyList<Segment> _segmentEntities = [];
+    private List<Segment> _segmentEntities = [];
 
     /// <summary>
     /// Coleção trocada atomicamente via <see cref="ReplaceSegments"/> — evita N× CollectionChanged
@@ -375,6 +375,9 @@ public partial class EditorViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        ApplySplitLocally(entity, split.Value.Before, split.Value.After);
+        RequestFocus(split.Value.After.Id, 0);
+
         using var scope = _scopeFactory.CreateScope();
         var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
         await libraryService.ApplySegmentSplitAsync(
@@ -383,9 +386,6 @@ public partial class EditorViewModel : ViewModelBase, IDisposable
             split.Value.Before.Text,
             split.Value.Before.EndSeconds,
             split.Value.After);
-
-        await ReloadSegmentsAsync();
-        RequestFocus(split.Value.After.Id, 0);
     }
 
     [RelayCommand]
@@ -410,6 +410,10 @@ public partial class EditorViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        ApplyMergeLocally(active, merged);
+        RequestFocus(merged.Id, caret);
+        UpdateActiveSegmentHighlight();
+
         using var scope = _scopeFactory.CreateScope();
         var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
         await libraryService.ApplySegmentMergeAsync(
@@ -418,10 +422,6 @@ public partial class EditorViewModel : ViewModelBase, IDisposable
             merged.Text,
             active.EndSeconds,
             active.Id);
-
-        await ReloadSegmentsAsync();
-        RequestFocus(merged.Id, caret);
-        UpdateActiveSegmentHighlight();
     }
 
     internal void OnSegmentFocused(SegmentItemViewModel segment, int caretIndex)
@@ -450,6 +450,9 @@ public partial class EditorViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        ApplySplitLocally(entity, split.Value.Before, split.Value.After);
+        RequestFocus(split.Value.After.Id, 0);
+
         using var scope = _scopeFactory.CreateScope();
         var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
         await libraryService.ApplySegmentSplitAsync(
@@ -458,9 +461,6 @@ public partial class EditorViewModel : ViewModelBase, IDisposable
             split.Value.Before.Text,
             split.Value.Before.EndSeconds,
             split.Value.After);
-
-        await ReloadSegmentsAsync();
-        RequestFocus(split.Value.After.Id, 0);
     }
 
     internal async Task MergeSegmentForAsync(SegmentItemViewModel segment)
@@ -481,6 +481,10 @@ public partial class EditorViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        ApplyMergeLocally(entity, merged);
+        RequestFocus(merged.Id, caret);
+        UpdateActiveSegmentHighlight();
+
         using var scope = _scopeFactory.CreateScope();
         var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();
         await libraryService.ApplySegmentMergeAsync(
@@ -489,10 +493,6 @@ public partial class EditorViewModel : ViewModelBase, IDisposable
             merged.Text,
             entity.EndSeconds,
             entity.Id);
-
-        await ReloadSegmentsAsync();
-        RequestFocus(merged.Id, caret);
-        UpdateActiveSegmentHighlight();
     }
 
     internal async Task ApplyWordLikeKeyAsync(SegmentItemViewModel segment, WordLikeKeyContext ctx)
@@ -881,11 +881,90 @@ public partial class EditorViewModel : ViewModelBase, IDisposable
             _ => "",
         };
 
-        _segmentEntities = entities;
+        _segmentEntities = entities as List<Segment> ?? entities.ToList();
         ReplaceSegments(segmentVms);
         HasSegments = Segments.Count > 0;
         NotifyExportAvailability();
         IsLoading = false;
+    }
+
+    private void ApplySplitLocally(Segment original, Segment before, Segment after)
+    {
+        original.Text = before.Text;
+        original.EndSeconds = before.EndSeconds;
+
+        var index = _segmentEntities.FindIndex(s => s.Id == original.Id);
+        if (index < 0)
+        {
+            return;
+        }
+
+        var insertOrder = original.SortOrder + 1;
+        foreach (var segment in _segmentEntities)
+        {
+            if (segment.SortOrder >= insertOrder)
+            {
+                segment.SortOrder++;
+            }
+        }
+
+        after.SortOrder = insertOrder;
+        after.TranscriptionId = _transcriptionId;
+        _segmentEntities.Insert(index + 1, after);
+
+        var originalVm = FindSegmentVm(original.Id);
+        if (originalVm is not null)
+        {
+            originalVm.Text = before.Text;
+        }
+
+        Segments.Insert(index + 1, new SegmentItemViewModel(this, after));
+        RefreshSpeakerVisibility();
+        HasSegments = true;
+        NotifyExportAvailability();
+    }
+
+    private void ApplyMergeLocally(Segment absorbed, Segment survivor)
+    {
+        var absorbedIndex = _segmentEntities.FindIndex(s => s.Id == absorbed.Id);
+        if (absorbedIndex <= 0)
+        {
+            return;
+        }
+
+        var removedOrder = absorbed.SortOrder;
+        _segmentEntities.RemoveAt(absorbedIndex);
+        foreach (var segment in _segmentEntities)
+        {
+            if (segment.SortOrder > removedOrder)
+            {
+                segment.SortOrder--;
+            }
+        }
+
+        var absorbedVmIndex = IndexOfSegmentById(absorbed.Id);
+        if (absorbedVmIndex > 0)
+        {
+            Segments[absorbedVmIndex - 1].Text = survivor.Text;
+            Segments.RemoveAt(absorbedVmIndex);
+        }
+
+        RefreshSpeakerVisibility();
+        HasSegments = Segments.Count > 0;
+        NotifyExportAvailability();
+    }
+
+    private int IndexOfSegmentById(Guid id)
+    {
+        for (var i = 0; i < Segments.Count; i++)
+        {
+            if (Segments[i].Id == id)
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     private void ReplaceSegments(IEnumerable<SegmentItemViewModel> items)
