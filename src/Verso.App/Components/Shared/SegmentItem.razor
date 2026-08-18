@@ -1,13 +1,10 @@
 @*
-    Item de segmento da transcrição (T64): tempo, badge de locutor, texto editável e
-    destaque `.active-seg` quando `IsActive` — fiel ao protótipo (`renderSegments` em
-    transcriba-v2-icons-transcriptions.html).
-
-    Texto via `<textarea>` estilizado como `.seg-text` (não `contenteditable`): o split no
-    cursor usa `selectionStart`, mesma semântica de `sel.anchorOffset` do protótipo, com
-    binding Blazor estável (`@bind` + `CommitText` no blur). `NotifyFocused(caretIndex)`
-    é chamado em focus/click/keyup via `versoEditor.caretIndex` (editor.js).
+    Item de segmento da transcrição: tempo, badge de locutor, texto editável.
+    Teclado estilo Word interceptado em JS (preventDefault síncrono) e aplicado
+    via ApplyWordLikeKeyAsync. Foco pendente após split/merge é consumido no
+    OnAfterRender — necessário com Virtualize.
 *@
+@using Microsoft.JSInterop
 @implements IDisposable
 @inject IJSRuntime JS
 
@@ -76,6 +73,7 @@
 
     private SegmentItemViewModel? _subscribed;
     private ElementReference _textArea;
+    private DotNetObjectReference<SegmentItem>? _dotNetRef;
 
     protected override void OnParametersSet()
     {
@@ -87,6 +85,35 @@
         Unsubscribe();
         _subscribed = ViewModel;
         ViewModel.PropertyChanged += OnViewModelChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        _dotNetRef ??= DotNetObjectReference.Create(this);
+        try
+        {
+            await JS.InvokeVoidAsync("versoEditor.attachWordLikeKeys", _textArea, _dotNetRef);
+            if (ViewModel.TryConsumePendingFocus(out var caret))
+            {
+                await JS.InvokeVoidAsync("versoEditor.focusTextarea", _textArea, caret);
+            }
+        }
+        catch (JSDisconnectedException)
+        {
+            // WebView fechado — ignorar.
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnWordLikeKey(WordLikeKeyPayload payload)
+    {
+        if (payload is null)
+        {
+            return;
+        }
+
+        ViewModel.NotifyFocused(payload.CaretStart);
+        await ViewModel.ApplyWordLikeKeyAsync(payload.ToContext());
     }
 
     private void OnSegmentClick() => ViewModel.ClickCommand.Execute(null);
@@ -134,6 +161,8 @@
         }
 
         _subscribed.PropertyChanged -= OnViewModelChanged;
+        _dotNetRef?.Dispose();
+        _dotNetRef = null;
     }
 
     public void Dispose() => Unsubscribe();
