@@ -29,6 +29,9 @@ public partial class SegmentItemViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isEditing;
 
+    [ObservableProperty]
+    private bool _showSpeakerChip = true;
+
     public Guid? SpeakerId { get; private set; }
 
     internal int CaretIndex;
@@ -42,13 +45,21 @@ public partial class SegmentItemViewModel : ViewModelBase
         StartSeconds = segment.StartSeconds;
         TimeDisplay = EditorViewModel.FormatSegmentTime(segment.StartSeconds);
         _text = segment.Text;
+        SpeakerId = segment.SpeakerId;
         UpdateSpeaker(segment.Speaker);
     }
     internal void UpdateSpeaker(Speaker? speaker)
     {
-        SpeakerId = speaker?.Id;
-        SpeakerName = speaker?.Name ?? "";
-        SpeakerColorHex = speaker?.ColorHex ?? "#2eaadc";
+        if (speaker is not null)
+        {
+            SpeakerId = speaker.Id;
+            SpeakerName = speaker.Name;
+            SpeakerColorHex = speaker.ColorHex;
+            return;
+        }
+
+        SpeakerName = "";
+        SpeakerColorHex = "#2eaadc";
     }
 
     internal void RenameSpeaker(string newName)
