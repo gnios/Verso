@@ -7,15 +7,17 @@ public class WordBoundaryTextSplitterTests
     [Fact]
     public void Split_PrefersPunctuationWithinPointFourSeconds()
     {
-        // 5 palavras × 1 s; "mundo." termina em 2,0 s. Troca acústica em 2,1 s.
+        // 8 palavras em 2 s (0,25 s cada). "c." cai em 0,75 s; a troca em 0,95 s
+        // fica a 0,20 s da pontuação e a 0,05 s da fronteira seguinte ("d").
+        // Sem a janela ±0,4 s o corte iria para depois de "d".
         var (left, right) = WordBoundaryTextSplitter.Split(
-            "olá mundo. como vai você",
+            "a b c. d e f g h",
             startSeconds: 0,
-            endSeconds: 5,
-            splitSeconds: 2.1);
+            endSeconds: 2,
+            splitSeconds: 0.95);
 
-        Assert.Equal("olá mundo.", left);
-        Assert.Equal("como vai você", right);
+        Assert.Equal("a b c.", left);
+        Assert.Equal("d e f g h", right);
     }
 
     [Fact]

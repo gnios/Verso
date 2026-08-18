@@ -121,6 +121,8 @@ public class TranscriptionQueueServiceTests
         Assert.Equal("Locutor 1", transcription.Speakers[0].Name);
         Assert.Single(transcription.Segments);
         Assert.Equal("segmento ok", transcription.Segments[0].Text);
+        Assert.Equal(0, transcription.Segments[0].StartSeconds);
+        Assert.Equal(1.5, transcription.Segments[0].EndSeconds);
         Assert.Equal(transcription.Speakers[0].Id, transcription.Segments[0].SpeakerId);
     }
 
@@ -149,6 +151,8 @@ public class TranscriptionQueueServiceTests
             Assert.Single(transcription.Speakers);
             Assert.Equal("Locutor 1", transcription.Speakers[0].Name);
             Assert.Equal("segmento ok", transcription.Segments[0].Text);
+            Assert.Equal(0, transcription.Segments[0].StartSeconds);
+            Assert.Equal(1.5, transcription.Segments[0].EndSeconds);
         }
         finally
         {
