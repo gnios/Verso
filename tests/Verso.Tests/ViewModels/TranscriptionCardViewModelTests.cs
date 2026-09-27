@@ -200,6 +200,17 @@ public class TranscriptionCardViewModelTests
     }
 
     [Fact]
+    public void Preview_WhenDiarizing_ShowsSpeakerIdentification()
+    {
+        var card = CreateCard(TranscriptionStatus.InProgress);
+        card.ApplyProgress(new TranscriptionProgressEventArgs(card.Id, "diarizing", null, null));
+
+        Assert.Equal("Identificando locutores…", card.ProgressLabel);
+        Assert.Equal(card.ProgressLabel, card.Preview);
+        Assert.True(card.IsProgressIndeterminate);
+    }
+
+    [Fact]
     public void Preview_WhenDoneAndEmpty_IsEmpty()
     {
         var card = CreateCard(TranscriptionStatus.Done, preview: "");

@@ -86,6 +86,7 @@ public partial class TranscriptionCardViewModel : ViewModelBase
         "transcribing" => ProgressPercent is int p
             ? $"Transcrevendo… {p}%"
             : "Transcrevendo…",
+        "diarizing" => "Identificando locutores…",
         // "done" do motor = Whisper terminou; persistência ainda pode estar em andamento.
         "done" or "saving" => "Salvando resultados…",
         _ => "Em andamento…"
