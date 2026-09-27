@@ -6,7 +6,7 @@ namespace Verso.Tests.Engine.Diarization;
 public class LocalDiarizerTests
 {
     private const int SampleRate = AcousticFeatureExtractor.SampleRate;
-    private readonly LocalDiarizer _diarizer = new();
+    private readonly LocalDiarizer _diarizer = new(new PitchSplitSpeakerEmbedder());
 
     [Fact]
     public void Diarize_TwoTonesTwoAsrSegments_ReturnsTwoTurns()

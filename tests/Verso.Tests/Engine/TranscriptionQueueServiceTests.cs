@@ -7,6 +7,7 @@ using Verso.Core.Data;
 using Verso.Core.Data.Entities;
 using Verso.Core.Engine;
 using Verso.Core.Engine.Diarization;
+using Verso.Tests.Engine.Diarization;
 
 namespace Verso.Tests.Engine;
 
@@ -44,7 +45,7 @@ public class TranscriptionQueueServiceTests
             await using var fixture = await QueueFixture.CreateAsync(
                 engine,
                 new AudioLoader(new FfmpegLocator()),
-                new LocalDiarizer());
+                new LocalDiarizer(new PitchSplitSpeakerEmbedder()));
             var transcriptionId = await fixture.SeedTranscriptionAsync(SpeakerMode.Automatic, wavPath);
 
             fixture.Queue.Enqueue(fixture.CreateRequest(transcriptionId, wavPath));
@@ -104,7 +105,7 @@ public class TranscriptionQueueServiceTests
         await using var fixture = await QueueFixture.CreateAsync(
             new SuccessTranscriptionEngine(),
             new AudioLoader(new FfmpegLocator()),
-            new LocalDiarizer());
+            new LocalDiarizer(new PitchSplitSpeakerEmbedder()));
         var transcriptionId = await fixture.SeedTranscriptionAsync();
 
         fixture.Queue.Enqueue(fixture.CreateRequest(transcriptionId));
@@ -537,6 +538,8 @@ public class TranscriptionQueueServiceTests
 
     private sealed class ThrowingDiarizer : ILocalDiarizer
     {
+        public Task EnsureReadyAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
         public IReadOnlyList<TranscriptionSegmentResult> Diarize(
             float[] audio,
             IReadOnlyList<TranscriptionSegmentResult> asrSegments) =>

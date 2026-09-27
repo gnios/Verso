@@ -169,7 +169,9 @@ public sealed class TranscriptionQueueService : BackgroundService, IUpdateIdleSi
             if (speakerMode == SpeakerMode.Automatic)
             {
                 RaiseProgressChanged(request.TranscriptionId, "diarizing", null, null);
-                result = new TranscriptionResult(DiarizeOrFallback(request, result.Segments));
+                result = new TranscriptionResult(
+                    await DiarizeOrFallbackAsync(request, result.Segments, linkedCts.Token)
+                        .ConfigureAwait(false));
             }
 
             // Whisper terminou; ainda falta gravar segmentos — UI não deve parecer “pronta”.
@@ -299,9 +301,10 @@ public sealed class TranscriptionQueueService : BackgroundService, IUpdateIdleSi
             .SingleAsync(cancellationToken);
     }
 
-    private IReadOnlyList<TranscriptionSegmentResult> DiarizeOrFallback(
+    private async Task<IReadOnlyList<TranscriptionSegmentResult>> DiarizeOrFallbackAsync(
         TranscriptionJobRequest request,
-        IReadOnlyList<TranscriptionSegmentResult> segments)
+        IReadOnlyList<TranscriptionSegmentResult> segments,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -310,6 +313,7 @@ public sealed class TranscriptionQueueService : BackgroundService, IUpdateIdleSi
                 return FallbackSingleSpeaker(segments);
             }
 
+            await _diarizer.EnsureReadyAsync(cancellationToken).ConfigureAwait(false);
             var samples = _audioLoader.LoadSamples16kHz(request.MediaFilePath);
             return _diarizer.Diarize(samples, segments);
         }
@@ -425,6 +429,10 @@ public static class EngineServiceCollectionExtensions
         services.AddSingleton<IWorkerExecutableLocator, WorkerExecutableLocator>();
         services.AddSingleton<IWorkerProcessFactory, WorkerProcessFactory>();
         services.AddSingleton<ITranscriptionEngine, WorkerProcessTranscriptionEngine>();
+        services.AddSingleton(sp => new EcapaSpeakerModelManager(
+            sp.GetService<ILogger<EcapaSpeakerModelManager>>(),
+            sp.GetService<IModelDownloadNotifier>()));
+        services.AddSingleton<ISpeakerEmbedder, EcapaSpeakerEmbedder>();
         services.AddSingleton<ILocalDiarizer, LocalDiarizer>();
         services.AddSingleton<TranscriptionQueueService>();
         services.AddSingleton<IUpdateIdleSignal>(sp => sp.GetRequiredService<TranscriptionQueueService>());

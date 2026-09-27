@@ -6,8 +6,8 @@ public static class SpeakerTurnAssembler
 {
     public const string SpeakerOne = "Locutor 1";
     public const string SpeakerTwo = "Locutor 2";
+    public const float MaxCentroidCosine = 0.5f;
     public const float SeparabilityRatio = 1.5f;
-    public const float MinCentroidDistance = 40f;
     private const int KmeansIterations = 24;
 
     public static IReadOnlyList<TranscriptionSegmentResult> Assemble(
@@ -48,26 +48,35 @@ public static class SpeakerTurnAssembler
             return labels;
         }
 
-        var (i0, i1) = FarthestPair(embeddings);
-        if (i0 == i1)
+        var unit = new float[n][];
+        for (var i = 0; i < n; i++)
+        {
+            unit[i] = L2Normalize(embeddings[i]);
+        }
+
+        var (i0, i1) = FarthestPair(unit);
+        if (i0 == i1 || Cosine(unit[i0], unit[i1]) >= 0.999f)
         {
             return labels;
         }
 
-        var c0 = (float[])embeddings[i0].Clone();
-        var c1 = (float[])embeddings[i1].Clone();
+        var c0 = (float[])unit[i0].Clone();
+        var c1 = (float[])unit[i1].Clone();
 
         for (var iter = 0; iter < KmeansIterations; iter++)
         {
             for (var i = 0; i < n; i++)
             {
-                labels[i] = EuclideanSq(embeddings[i], c0) <= EuclideanSq(embeddings[i], c1) ? 0 : 1;
+                labels[i] = Cosine(unit[i], c0) >= Cosine(unit[i], c1) ? 0 : 1;
             }
 
-            if (!TryCentroid(embeddings, labels, 0, c0) || !TryCentroid(embeddings, labels, 1, c1))
+            if (!TryCentroid(unit, labels, 0, c0) || !TryCentroid(unit, labels, 1, c1))
             {
                 return new int[n];
             }
+
+            L2NormalizeInPlace(c0);
+            L2NormalizeInPlace(c1);
         }
 
         var n0 = labels.Count(l => l == 0);
@@ -77,9 +86,9 @@ public static class SpeakerTurnAssembler
             return new int[n];
         }
 
-        var intra = MeanIntra(embeddings, labels, c0, c1);
-        var between = MathF.Sqrt(EuclideanSq(c0, c1));
-        separable = between >= MinCentroidDistance
+        var intra = MeanIntraDistance(unit, labels, c0, c1);
+        var between = 1f - Cosine(c0, c1);
+        separable = Cosine(c0, c1) <= MaxCentroidCosine
             && between > SeparabilityRatio * Math.Max(intra, 1e-6f);
         if (!separable)
         {
@@ -89,7 +98,7 @@ public static class SpeakerTurnAssembler
         return labels;
     }
 
-    private static IReadOnlyList<TranscriptionSegmentResult> MergeConsecutive(
+    internal static IReadOnlyList<TranscriptionSegmentResult> MergeConsecutive(
         IReadOnlyList<TranscriptionSegmentResult> named)
     {
         var merged = new List<TranscriptionSegmentResult>();
@@ -118,15 +127,15 @@ public static class SpeakerTurnAssembler
     {
         var bestA = 0;
         var bestB = 0;
-        var best = -1f;
+        var best = float.MaxValue;
         for (var i = 0; i < embeddings.Count; i++)
         {
             for (var j = i + 1; j < embeddings.Count; j++)
             {
-                var d = EuclideanSq(embeddings[i], embeddings[j]);
-                if (d > best)
+                var cosine = Cosine(embeddings[i], embeddings[j]);
+                if (cosine < best)
                 {
-                    best = d;
+                    best = cosine;
                     bestA = i;
                     bestB = j;
                 }
@@ -175,7 +184,7 @@ public static class SpeakerTurnAssembler
         return true;
     }
 
-    private static float MeanIntra(
+    private static float MeanIntraDistance(
         IReadOnlyList<float[]> embeddings,
         int[] labels,
         float[] c0,
@@ -185,22 +194,49 @@ public static class SpeakerTurnAssembler
         for (var i = 0; i < embeddings.Count; i++)
         {
             var c = labels[i] == 0 ? c0 : c1;
-            sum += Math.Sqrt(EuclideanSq(embeddings[i], c));
+            sum += 1f - Cosine(embeddings[i], c);
         }
 
         return (float)(sum / embeddings.Count);
     }
 
-    private static float EuclideanSq(float[] a, float[] b)
+    internal static float Cosine(float[] a, float[] b)
     {
-        var sum = 0f;
         var n = Math.Min(a.Length, b.Length);
+        var dot = 0f;
         for (var i = 0; i < n; i++)
         {
-            var d = a[i] - b[i];
-            sum += d * d;
+            dot += a[i] * b[i];
         }
 
-        return sum;
+        return Math.Clamp(dot, -1f, 1f);
+    }
+
+    internal static float[] L2Normalize(float[] vector)
+    {
+        var copy = (float[])vector.Clone();
+        L2NormalizeInPlace(copy);
+        return copy;
+    }
+
+    private static void L2NormalizeInPlace(float[] vector)
+    {
+        var sumSq = 0f;
+        foreach (var v in vector)
+        {
+            sumSq += v * v;
+        }
+
+        var norm = MathF.Sqrt(sumSq);
+        if (norm < 1e-8f)
+        {
+            return;
+        }
+
+        var inv = 1f / norm;
+        for (var i = 0; i < vector.Length; i++)
+        {
+            vector[i] *= inv;
+        }
     }
 }

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "extensionVersion": "0.1.0",
+  "toolkitCompatibility": ">=0.15.2 <0.16.0",
+  "contextPaths": [
+    ".harness/context/architecture.md",
+    ".harness/context/domain.md",
+    ".harness/context/commands.md"
+  ],
+  "commands": {
+    "lint": [
+      "npm",
+      "run",
+      "lint"
+    ],
+    "test": [
+      "npm",
+      "test"
+    ]
+  },
+  "maturityThresholds": {}
+}
