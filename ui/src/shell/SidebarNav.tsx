@@ -14,6 +14,7 @@ import {
   AlertCircleIcon,
   CheckCircleIcon,
   ClockIcon,
+  DownloadIcon,
   FileIcon,
   FolderIcon,
   GridIcon,
@@ -42,6 +43,7 @@ function countBadge(count: number | undefined): React.ReactNode {
 export function SidebarNav({ screen, parameter, isDark, appInfo, onToggleTheme, onNewFolder, onFeedback }: SidebarNavProps) {
   const [sidebar, setSidebar] = useState<SidebarData | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
     void invoke<SidebarData>('sidebar.load')
@@ -53,13 +55,24 @@ export function SidebarNav({ screen, parameter, isDark, appInfo, onToggleTheme, 
     refresh();
     const offNavigation = onEvent('navigation.changed', refresh);
     const offDashboard = onEvent('dashboard.changed', refresh);
+    const offUpdate = onEvent('sidebar.updateChanged', refresh);
     return () => {
       offNavigation();
       offDashboard();
+      offUpdate();
     };
   }, [refresh]);
 
   const counts = sidebar?.counts;
+  const update = sidebar?.update;
+  const requestUpdate = () => {
+    setUpdateError(null);
+    void invoke('sidebar.updateNow', undefined, 30 * 60_000)
+      .catch((error: unknown) => setUpdateError(error instanceof Error
+        ? error.message
+        : 'Não foi possível iniciar a atualização.'))
+      .finally(refresh);
+  };
   const onDashboard = (parameter: Omit<NavigationParam, 'screen'>) =>
     navigateTo('Dashboard', parameter);
 
@@ -116,6 +129,18 @@ export function SidebarNav({ screen, parameter, isDark, appInfo, onToggleTheme, 
       }
       footer={
         <>
+          {appInfo?.hasUpdateChannel && update && (
+            isCollapsed ? (
+              <IconButton label={update.label} icon={<Icon icon={DownloadIcon} />}
+                variant={update.isReady ? 'primary' : 'ghost'} isDisabled={!update.canUpdateNow}
+                onClick={requestUpdate} />
+            ) : (
+              <Button label={update.label} icon={<Icon icon={DownloadIcon} />}
+                variant={update.isReady ? 'primary' : 'ghost'} width="100%"
+                isDisabled={!update.canUpdateNow} onClick={requestUpdate} />
+            )
+          )}
+          {updateError && <span role="alert">{updateError}</span>}
           <SideNavItem
             label="Feedback"
             icon={MessageIcon}

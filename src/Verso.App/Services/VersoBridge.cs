@@ -39,6 +39,7 @@ public sealed class VersoBridge : IDisposable
     private readonly ILogger<VersoBridge> _logger;
     private readonly BridgeConfirmationService _confirmation;
     private readonly TranscriptionQueueService? _queue;
+    private readonly SidebarViewModel _sidebar;
 
     public VersoBridge(IServiceProvider services, NativeBridge bridge, ILogger<VersoBridge> logger)
     {
@@ -47,6 +48,8 @@ public sealed class VersoBridge : IDisposable
         _logger = logger;
         _confirmation = services.GetRequiredService<BridgeConfirmationService>();
         _confirmation.PropertyChanged += OnConfirmationPropertyChanged;
+        _sidebar = services.GetRequiredService<SidebarViewModel>();
+        _sidebar.PropertyChanged += OnSidebarPropertyChanged;
 
         _queue = services.GetService<TranscriptionQueueService>();
         if (_queue is not null)
@@ -69,6 +72,7 @@ public sealed class VersoBridge : IDisposable
     public void Dispose()
     {
         _confirmation.PropertyChanged -= OnConfirmationPropertyChanged;
+        _sidebar.PropertyChanged -= OnSidebarPropertyChanged;
         if (_queue is not null)
         {
             _queue.StatusChanged -= OnQueueStatusChanged;
@@ -101,6 +105,13 @@ public sealed class VersoBridge : IDisposable
         });
 
         _bridge.Register("sidebar.load", async _ => await SnapshotSidebarAsync());
+        _bridge.Register("sidebar.updateNow", async _ =>
+        {
+            if (_sidebar.UpdateNowCommand.CanExecute(null))
+                await _sidebar.UpdateNowCommand.ExecuteAsync(null);
+
+            return null;
+        });
 
         _bridge.Register("navigation.navigate", args =>
         {
@@ -1041,6 +1052,12 @@ public sealed class VersoBridge : IDisposable
     }
 
     // ---------------------------------------------------------------- events
+
+    private void OnSidebarPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SidebarViewModel.UpdateButtonLabel))
+            _bridge.SendEvent("sidebar.updateChanged", null);
+    }
 
     private void OnConfirmationPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
