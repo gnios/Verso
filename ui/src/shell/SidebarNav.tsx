@@ -5,6 +5,7 @@ import { IconButton } from '@astryxdesign/core/IconButton';
 import { Icon } from '@astryxdesign/core/Icon';
 import { SideNav, SideNavCollapseButton, SideNavHeading, SideNavItem, SideNavSection } from '@astryxdesign/core/SideNav';
 import { Text } from '@astryxdesign/core/Text';
+import { VStack } from '@astryxdesign/core/VStack';
 import { invoke, onEvent } from '../lib/bridge';
 import { FOLDERS_ENABLED, RECORDING_ENABLED } from '../lib/features';
 import { navigateTo, type ScreenKey, type NavigationParam } from '../lib/screens';
@@ -65,8 +66,8 @@ export function SidebarNav({ screen, parameter, isDark, appInfo, onToggleTheme, 
   const selectedStatus = parameter.statusFilter ?? 'All';
   const selectedUnassigned = !!parameter.unassignedOnly;
 
-  // No rail colapsado, o botão de expandir fica no footerIcons (o botão do
-  // header some junto com o texto) — assim só existe um botão por estado.
+  // No rail colapsado o header mostra só o logo: expandir e "Nova transcrição"
+  // viram icon-only no topContent — assim só existe um botão por estado.
   return (
     <SideNav
       header={
@@ -87,13 +88,25 @@ export function SidebarNav({ screen, parameter, isDark, appInfo, onToggleTheme, 
         />
       }
       topContent={
-        <Button
-          variant="primary"
-          width="100%"
-          label="Nova transcrição"
-          icon={<Icon icon={PlusIcon} />}
-          onClick={() => void navigateTo('Upload')}
-        />
+        isCollapsed ? (
+          <VStack gap={1} align="center" width="100%">
+            <SideNavCollapseButton />
+            <IconButton
+              icon={<Icon icon={PlusIcon} />}
+              label="Nova transcrição"
+              variant="primary"
+              onClick={() => void navigateTo('Upload')}
+            />
+          </VStack>
+        ) : (
+          <Button
+            variant="primary"
+            width="100%"
+            label="Nova transcrição"
+            icon={<Icon icon={PlusIcon} />}
+            onClick={() => void navigateTo('Upload')}
+          />
+        )
       }
       footer={
         <>
@@ -116,13 +129,14 @@ export function SidebarNav({ screen, parameter, isDark, appInfo, onToggleTheme, 
             isSelected={screen === 'Settings'}
             onClick={() => void navigateTo('Settings')}
           />
-          <Text size="sm" color="secondary" style={{ display: 'block', textAlign: 'right' }}>
-            {sidebar?.versionLabel ?? (appInfo ? `v${appInfo.version}` : '')}
-          </Text>
+          {!isCollapsed && (
+            <Text size="sm" color="secondary" style={{ display: 'block', textAlign: 'right' }}>
+              {sidebar?.versionLabel ?? (appInfo ? `v${appInfo.version}` : '')}
+            </Text>
+          )}
         </>
       }
       collapsible={{ isCollapsed, onCollapsedChange: setIsCollapsed, hasButton: false }}
-      footerIcons={isCollapsed ? <SideNavCollapseButton /> : null}
     >
       {FOLDERS_ENABLED && (
       <SideNavSection
