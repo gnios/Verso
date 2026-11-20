@@ -66,38 +66,42 @@ export function SidebarNav({ screen, parameter, isDark, appInfo, onToggleTheme, 
   const selectedStatus = parameter.statusFilter ?? 'All';
   const selectedUnassigned = !!parameter.unassignedOnly;
 
-  // No rail colapsado o header mostra só o logo: expandir e "Nova transcrição"
-  // viram icon-only no topContent — assim só existe um botão por estado.
+  // O toggle de colapsar fica sempre no topo: expandido, no canto do header;
+  // colapsado, no topo do rail (logo desce uma linha para manter a posição).
   return (
     <SideNav
       header={
-        <SideNavHeading
-          heading="Verso"
-          icon={<img src="/brand/verso-logo.png" alt="" style={{ width: 26, height: 26 }} />}
-          headerEndContent={
-            <>
-              <IconButton
-                icon={<Icon icon={isDark ? SunIcon : MoonIcon} />}
-                label={isDark ? 'Alternar para tema claro' : 'Alternar para tema escuro'}
-                variant="ghost"
-                onClick={onToggleTheme}
-              />
-              <SideNavCollapseButton />
-            </>
-          }
-        />
-      }
-      topContent={
         isCollapsed ? (
           <VStack gap={1} align="center" width="100%">
             <SideNavCollapseButton />
-            <IconButton
-              icon={<Icon icon={PlusIcon} />}
-              label="Nova transcrição"
-              variant="primary"
-              onClick={() => void navigateTo('Upload')}
-            />
+            <img src="/brand/verso-logo.png" alt="" style={{ width: 26, height: 26 }} />
           </VStack>
+        ) : (
+          <SideNavHeading
+            heading="Verso"
+            icon={<img src="/brand/verso-logo.png" alt="" style={{ width: 26, height: 26 }} />}
+            headerEndContent={
+              <>
+                <IconButton
+                  icon={<Icon icon={isDark ? SunIcon : MoonIcon} />}
+                  label={isDark ? 'Alternar para tema claro' : 'Alternar para tema escuro'}
+                  variant="ghost"
+                  onClick={onToggleTheme}
+                />
+                <SideNavCollapseButton />
+              </>
+            }
+          />
+        )
+      }
+      topContent={
+        isCollapsed ? (
+          <IconButton
+            icon={<Icon icon={PlusIcon} />}
+            label="Nova transcrição"
+            variant="primary"
+            onClick={() => void navigateTo('Upload')}
+          />
         ) : (
           <Button
             variant="primary"
