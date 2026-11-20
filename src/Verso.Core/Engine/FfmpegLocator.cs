@@ -44,6 +44,10 @@ public sealed class FfmpegLocator
         if (ffmpeg is not null)
             return ffmpeg;
 
+        if (VersoPaths.IsPackagedWindowsApp)
+            throw new FfmpegNotFoundException(
+                "O FFmpeg é necessário para este formato. Instale-o com winget install Gyan.FFmpeg e reabra o Verso.");
+
         if (_isWindows && _tryInstallFfmpeg())
         {
             ffmpeg = FindFfmpeg();

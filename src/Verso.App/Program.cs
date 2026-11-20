@@ -46,6 +46,11 @@ public class Program
         AttachDebugConsole();
 #endif
 
+        if (VersoPaths.IsPackagedWindowsApp)
+        {
+            Environment.SetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER", Path.Combine(VersoPaths.DataRoot, "WebView2"));
+        }
+
         // Payload em engine/ (release): PATH + whisper LibraryPath antes de Photino/SQLite.
         NativePayloadBootstrap.Apply();
 
@@ -132,9 +137,8 @@ public class Program
     }
 
     // Logging unificado para debug e release: o logger em arquivo (rolling diário em
-    // <appdir>/data/logs) é a única janela persistente do que ocorre por trás —
-    // engine, fila de transcrição, downloads, erros nativos do whisper.cpp. O app é
-    // portátil: logs ao lado do exe, não em %AppData%. O console só é anexado em #if
+    // pasta de dados do usuário) registra a fila de transcrição, downloads e erros
+    // nativos do whisper.cpp. O console só é anexado em #if
     // DEBUG (AttachDebugConsole abre uma janela de console a parte), usando o mesmo
     // formato de linha única do arquivo (AddVersoConsoleLogger) — NÃO o provider padrão
     // Microsoft.Extensions.Logging.Console (formato multi-linha "info: Namespace[0]").
@@ -179,7 +183,7 @@ public class Program
         var logPath = "(não foi possível gravar log — disco cheio ou sem permissão?)";
         try
         {
-            var logDir = Path.Combine(VersoPaths.AppDirectory, "data", "logs");
+            var logDir = VersoPaths.LogsDirectory;
             Directory.CreateDirectory(logDir);
             logPath = Path.Combine(logDir, $"startup-crash-{DateTime.Now:yyyyMMdd-HHmmss}.log");
             File.WriteAllText(logPath, detail);

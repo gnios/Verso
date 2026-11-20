@@ -1,6 +1,16 @@
-# Verso
+<p align="center">
+  <img src="docs/brand/verso-logo.png" width="112" alt="Logo do Verso, com o perfil de uma capivara usando fones">
+</p>
 
-App desktop de transcrição de áudio/vídeo com [whisper.net](https://github.com/sandrohanea/whisper.net), em português. Windows, Linux e macOS (Apple Silicon).
+<h1 align="center">Verso</h1>
+<p align="center">Transcreva, revise e organize suas gravações no próprio computador.</p>
+<p align="center">
+  <a href="https://github.com/gnios/Verso/releases/latest"><strong>Baixar o Verso</strong></a> ·
+  <a href="#primeira-transcrição">Primeira transcrição</a> ·
+  <a href="#como-apoiar-o-verso">Como apoiar</a>
+</p>
+
+O Verso é um aplicativo desktop em português para transformar entrevistas, aulas e outras gravações em texto. Você pode ouvir a gravação enquanto revisa a transcrição, identificar quem está falando e exportar o resultado como texto ou legenda.
 
 **Stack:** .NET 10 · Photino.NET (WebView2 / WebKitGTK / WKWebView) · EF Core 10 + SQLite · whisper.net 1.9.1 · NAudio · **UI em React 19 + Astryx** (design system da Meta, em `ui/`)
 
@@ -43,123 +53,53 @@ Todas as telas estão portadas: **Dashboard, Upload, Gravação, Configurações
 | `./scripts/run-e2e.ps1` | Testes Playwright (`tests/Verso.E2E`) — DOM real, lazy loading de mídia e Range requests |
 | `dotnet test` | Suite completa (xUnit + E2E) |
 
-## O que faz
+## Instalação
 
-- Transcreve áudio e vídeo (fila com progresso por etapa)
-- Biblioteca de transcrições com cards, status e busca
-- Organiza transcrições em **pesquisas** e **tags**
-- Editor com player, waveform e atribuição de **locutores** por segmento
-- Detecção automática de locutores (speaker diarization)
-- Gravação direto do microfone
-- Exporta em **TXT, SRT e VTT**
-- Tema claro/escuro
-- Baixa modelos de reconhecimento de fala sob demanda
-- Recomendação de precisão com base no hardware
+Baixe a versão mais recente nas [releases do Verso](https://github.com/gnios/Verso/releases/latest). Os pacotes já incluem o runtime .NET.
 
-## Precisão da transcrição
+- **Windows 10/11 x64 (`win-x64`)** — execute o `*-setup.exe` para instalar sem administrador ou extraia o ZIP e abra `Verso.App.exe`. O aplicativo usa o Microsoft Edge WebView2.
+- **Linux x64 (`linux-x64`)** — extraia o ZIP e execute `./Verso.App`. Instale o WebKitGTK da sua distribuição, como `libwebkit2gtk-4.1-0` no Ubuntu ou Debian.
+- **macOS Apple Silicon (`osx-arm64`)** — extraia o ZIP e execute `./Verso.App`. O aplicativo usa o WKWebView do sistema.
 
-O Verso oferece **três perfis** pensados para pesquisa acadêmica (sem nomes técnicos de modelo):
+A variante **CPU** funciona sem aceleração gráfica. A variante **GPU** oferece CUDA ou Vulkan no Windows e no Linux, e Core ML no macOS.
 
-| Perfil | Tamanho | Tempo | Quando usar |
-|--------|:-------:|:-----:|-------------|
-| **Rápido** | ~142 MB | Mais rápido | Rascunho, checagem de áudio, primeira passagem |
-| **Equilibrado** | ~466 MB | Tempo médio | Maioria das entrevistas e aulas (padrão) |
-| **Preciso** | ~1,2 GB | Mais lento · maior qualidade | Citação na tese, áudio difícil, análise fina |
+## Primeira transcrição
 
-> A escolha na interface é por **cartões**. O app recomenda um perfil em Configurações com base na memória. Hardware (CPU/GPU) fica em **Avançado**.
+<img align="right" src="docs/brand/verso-mascote.png" width="160" alt="Capivara pesquisadora com fones, caderno e caneta">
 
-### Dispositivos de execução (Avançado)
+1. Importe uma gravação de áudio ou vídeo ou grave pelo microfone.
+2. Aguarde o download do modelo no primeiro uso. Acompanhe a transcrição na fila.
+3. Abra o resultado no editor e use o player e a forma de onda para conferir trechos. Use a detecção automática de locutores e ajuste as atribuições por segmento.
+4. Organize o material em pesquisas e tags. Exporte em **TXT** para trabalhar com o texto ou em **SRT** e **VTT** para usar como legenda.
 
-| Modo | Descrição |
-|------|-----------|
-| **Automático** | Tenta GPU e cai para CPU. Padrão recomendado. |
-| **CPU** | Processa apenas com CPU. Qualquer computador. |
-| **CUDA** | Aceleração por GPU NVIDIA. |
-| **Vulkan** | Aceleração por GPU via Vulkan (AMD, Intel, NVIDIA). |
+<br clear="all">
 
-## Requisitos
+> [!TIP]
+> Para começar, use um arquivo WAV PCM. Para MP3, MP4 e outros formatos, instale o FFmpeg e deixe-o disponível no PATH.
 
-- **Windows 10/11**, **Linux x64** ou **macOS Apple Silicon**
-- Runtime de WebView da plataforma:
-  - Windows: Edge **WebView2** (padrão no Windows 11)
-  - Linux: **WebKitGTK** (ex.: `libwebkit2gtk-4.1-0` no Ubuntu/Debian)
-  - macOS: **WKWebView** (nativo)
-- **FFmpeg** no `PATH` (no Windows o app pode oferecer instalação via winget)
-- Para build: [.NET 10 SDK](https://dotnet.microsoft.com/download)
+### Modelos e dados
 
-## Rodar em desenvolvimento
+Em **Configurações**, você pode escolher entre dois motores de reconhecimento.
 
-```bash
+- **Parakeet** usa o modelo **pt-BR TAGARELA** por padrão. Também oferece o **TDT v3** para português, inglês e espanhol.
+- **Whisper** oferece os perfis **Rápido**, **Equilibrado** e **Preciso** para ajustar o tempo de processamento e a precisão.
+
+O reconhecimento roda localmente. Nos pacotes ZIP e EXE, o banco SQLite, as mídias, os modelos e os logs ficam em `data/`, ao lado do executável. No MSIX, ficam em `%LOCALAPPDATA%\Gnios\Verso\data`. Os pacotes das GitHub Releases atualizam os binários e preservam a biblioteca local.
+
+## Como apoiar o Verso
+
+- **Divulgue.** Compartilhe o Verso com quem trabalha com entrevistas, aulas ou pesquisa. Você também pode dar uma estrela no GitHub.
+- **Conte como foi usar o app.** Abra uma [issue](https://github.com/gnios/Verso/issues) para sugerir melhorias ou relatar problemas. Em um relato de erro, inclua a versão do Verso, o sistema operacional e os passos para reproduzir o problema. Se precisar anexar uma gravação, use uma amostra que possa ser compartilhada publicamente.
+- **Contribua com código ou documentação.** Abra um pull request com uma descrição da mudança e de como você a testou. Para propor uma mudança maior, abra uma issue para conversar sobre a ideia.
+
+### Rodar o projeto para contribuir
+
+Instale o **SDK do .NET 10** e o runtime WebView da sua plataforma. Na raiz do repositório, execute os comandos abaixo.
+
+```sh
 dotnet restore
 dotnet run --project src/Verso.App
-# ou:
-dotnet publish src/Verso.App -c Release -r win-x64 --self-contained true -o ./publish
-# Linux: -r linux-x64 · macOS Apple Silicon: -r osx-arm64
-dotnet test
+dotnet test tests/Verso.Tests
 ```
 
-O banco SQLite, as migrations e a pasta `data/` são criados automaticamente no primeiro boot.
-
-## Estrutura
-
-```
-src/Verso.App     UI Photino.Blazor, ViewModels, serviços de UI
-src/Verso.Worker  Processo isolado de transcrição (spawn automático pelo App)
-src/Verso.Updater Aplica update após o App sair (Windows trava o exe em uso)
-src/Verso.Core    Engine (whisper.net), serviços, dados (EF Core + SQLite), export
-tests/Verso.Tests testes xUnit
-```
-
-## Releases
-
-Pipeline em `.github/workflows/release.yml`. Tag `v*.*.*` ou push na `main` gera um GitHub Release com **6 zips** (cpu/gpu × win-x64 / linux-x64 / osx-arm64) e, no Windows, **instaladores** `*-setup.exe`:
-
-| Arquivo | Aceleração |
-|---------|------------|
-| `*-cpu-win-x64-setup.exe` / `*-gpu-win-x64-setup.exe` | Instalador Windows (sem admin), Menu Iniciar |
-| `*-cpu-win-x64.zip` / `*-gpu-win-x64.zip` | Portátil Windows · CPU · CUDA/Vulkan |
-| `*-cpu-linux-x64.zip` / `*-gpu-linux-x64.zip` | Portátil Linux · CPU · CUDA/Vulkan |
-| `*-cpu-osx-arm64.zip` / `*-gpu-osx-arm64.zip` | Portátil macOS · CPU · Core ML |
-
-O zip **portátil continua first-class**: extraia e execute. O setup só facilita atalho e pasta padrão (`%LOCALAPPDATA%\Programs\Verso`).
-
-Cada pacote tem o app + `Verso.Updater` + Worker (`engine/`) + `wwwroot/` + `runtimes/`. Self-contained (sem .NET instalado). **Dados portáteis** em `data/` ao lado do executável.
-
-**Atualização automática:** nas versões de release (`verso-channel.json` presente), o app consulta a latest GitHub Release, baixa o zip da mesma variante (cpu/gpu e SO) e substitui só os binários. A pasta `data/` (banco, modelos, mídia, logs) e qualquer arquivo extra na pasta do app **não são apagados**. Transcrição em andamento não é interrompida — o update aplica no próximo start. Em `dotnet run` (sem channel) o check não roda.
-
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-> **Aviso do SmartScreen:** por padrão os executáveis **não são assinados**. Ao abrir pela primeira vez, clique em **Mais informações → Executar mesmo assim**. Para eliminar o alerta, configure a assinatura via Azure Trusted Signing (instruções abaixo).
-
-### Assinatura do código (opcional, Azure Trusted Signing)
-
-A etapa de assinatura está no pipeline e ativa **automaticamente** quando as variáveis do Azure estão configuradas.
-
-**Setup (uma vez):**
-
-1. No Azure: crie um **Trusted Signing Account** + **Certificate Profile**
-2. No Entra ID: registre um App, gere um **client secret**, conceda a role **Trusted Signing Certificate Profile Signer**
-3. No GitHub (Settings → Secrets and variables → Actions):
-   - **Secrets:** `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`
-   - **Variables:** `AZURE_SIGNING_ENDPOINT`, `AZURE_SIGNING_ACCOUNT`, `AZURE_CERTIFICATE_PROFILE`
-
-A próxima tag assina os `.exe` da raiz (`Verso.App.exe`, `Verso.Updater.exe` e `Verso.Worker.exe` em `engine/`) automaticamente.
-
-## Roadmap
-
-### Pendente de validação
-
-- **Confirmar estabilidade do crash nativo (`0x80131506`)** — mitigações aplicadas no engine (fábrica fresca por job, sem `WithStringPool`, cancelamento entre chunks, dispose explícito); falta UAT com transcrição longa real (AD-006).
-- **UAT ponta a ponta** — upload → transcrição → editor → exportação, nunca validado manualmente.
-
-### Planejado
-
-- **Drag & drop funcional no upload** — hoje só seleção por clique
-- **Progresso determinado no download de modelos** — barra atual é indeterminada
-
-### Futuro (fora de escopo atual)
-
-- **macOS Intel (osx-x64)** — release atual foca em Apple Silicon (`osx-arm64`).
+Veja a [documentação técnica](DOCS.md) para entender a estrutura do código e o [guia de testes de ponta a ponta](tests/Verso.E2E/README.md) para validar os fluxos da interface.
