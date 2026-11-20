@@ -7,6 +7,7 @@ import { HStack } from '@astryxdesign/core/HStack';
 import { Heading } from '@astryxdesign/core/Heading';
 import { Icon } from '@astryxdesign/core/Icon';
 import { IconButton } from '@astryxdesign/core/IconButton';
+import { Popover } from '@astryxdesign/core/Popover';
 import { Selector } from '@astryxdesign/core/Selector';
 import { Text } from '@astryxdesign/core/Text';
 import { TextInput } from '@astryxdesign/core/TextInput';
@@ -18,6 +19,7 @@ import type { NavigationParam } from '../lib/screens';
 import type {
   CardTag,
   EditorData,
+  SidebarData,
   EditorSegment,
   EditorSpeaker,
   QueueStatusEvent,
@@ -214,7 +216,9 @@ export function EditorPage({ parameter }: EditorPageProps) {
   const [icon, setIcon] = useState<string | null>(null);
   const [tags, setTags] = useState<CardTag[]>([]);
   const [folderId, setFolderId] = useState<number | null>(null);
-  const [newTag, setNewTag] = useState('');
+  const [allTags, setAllTags] = useState<CardTag[]>([]);
+  const [tagPickerOpen, setTagPickerOpen] = useState(false);
+  const [tagQuery, setTagQuery] = useState('');
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -245,6 +249,9 @@ export function EditorPage({ parameter }: EditorPageProps) {
       setFolderId(detail.folder.id);
       setCurrentTime(0);
       setDuration(detail.meta.durationSeconds);
+      void invoke<SidebarData>('sidebar.load')
+        .then((side) => setAllTags(side.tags.map((tag) => ({ name: tag.name, colorName: tag.colorName }))))
+        .catch(() => undefined);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao carregar a transcrição.');
     }
@@ -335,6 +342,27 @@ export function EditorPage({ parameter }: EditorPageProps) {
     setTags(next);
     void invoke('editor.updateMeta', { transcriptionId, tags: next.map((tag) => tag.name) });
   };
+
+  const addTag = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed || tags.some((tag) => tag.name.toLowerCase() === trimmed.toLowerCase())) {
+      return;
+    }
+    const known = allTags.find((tag) => tag.name.toLowerCase() === trimmed.toLowerCase());
+    commitTags([...tags, { name: known?.name ?? trimmed, colorName: known?.colorName ?? 'blue' }]);
+    setTagQuery('');
+    setTagPickerOpen(false);
+  };
+
+  const tagSuggestions = allTags.filter(
+    (tag) =>
+      !tags.some((applied) => applied.name.toLowerCase() === tag.name.toLowerCase()) &&
+      tag.name.toLowerCase().includes(tagQuery.trim().toLowerCase()),
+  );
+  const canCreateTag =
+    tagQuery.trim().length > 0 &&
+    !allTags.some((tag) => tag.name.toLowerCase() === tagQuery.trim().toLowerCase()) &&
+    !tags.some((tag) => tag.name.toLowerCase() === tagQuery.trim().toLowerCase());
 
   const commitFolder = (next: number | null) => {
     setFolderId(next);
@@ -702,22 +730,65 @@ export function EditorPage({ parameter }: EditorPageProps) {
           {tags.map((tag) => (
             <Badge key={tag.name} variant={tag.colorName as never} label={tag.name} />
           ))}
-        </HStack>
-        <HStack gap={2} width="100%">
-          <TextInput
-            label="Nova tag"
-            value={newTag}
-            onChange={setNewTag}
-            placeholder="Adicionar tag…"
-            width={200}
-            onEnter={() => {
-              const name = newTag.trim();
-              if (name && !tags.some((tag) => tag.name.toLowerCase() === name.toLowerCase())) {
-                commitTags([...tags, { name, colorName: 'blue' }]);
-              }
-              setNewTag('');
-            }}
-          />
+          <Popover
+            label="Adicionar tag"
+            isOpen={tagPickerOpen}
+            onOpenChange={setTagPickerOpen}
+            placement="below"
+            alignment="start"
+            width={240}
+            padding={2}
+            content={
+              <VStack gap={2} align="start" width="100%">
+                <TextInput
+                  label="Tag"
+                  isLabelHidden
+                  value={tagQuery}
+                  onChange={setTagQuery}
+                  placeholder="Buscar ou criar tag…"
+                  width="100%"
+                  onEnter={() => {
+                    if (tagSuggestions.length > 0 && !canCreateTag) {
+                      addTag(tagSuggestions[0].name);
+                    } else if (tagQuery.trim()) {
+                      addTag(tagQuery);
+                    }
+                  }}
+                />
+                {tagSuggestions.map((tag) => (
+                  <Button
+                    key={tag.name}
+                    variant="ghost"
+                    width="100%"
+                    label={tag.name}
+                    onClick={() => addTag(tag.name)}
+                  />
+                ))}
+                {canCreateTag ? (
+                  <Button
+                    variant="ghost"
+                    width="100%"
+                    label={`Criar "${tagQuery.trim()}"`}
+                    icon={<Icon icon={PlusIcon} />}
+                    onClick={() => addTag(tagQuery)}
+                  />
+                ) : null}
+                {tagSuggestions.length === 0 && !canCreateTag ? (
+                  <Text size="sm" color="secondary">
+                    {allTags.length === 0 ? 'Digite para criar uma tag.' : 'Nenhuma tag encontrada.'}
+                  </Text>
+                ) : null}
+              </VStack>
+            }
+          >
+            <IconButton
+              icon={<Icon icon={PlusIcon} />}
+              label="Adicionar tag"
+              variant="secondary"
+              size="sm"
+              onClick={() => setTagPickerOpen(true)}
+            />
+          </Popover>
         </HStack>
 
         {error ? <Badge variant="error" label={error} /> : null}
