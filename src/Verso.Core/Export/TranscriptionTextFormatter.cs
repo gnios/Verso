@@ -4,7 +4,7 @@ using System.Text;
 namespace Verso.Core.Export;
 
 /// <summary>
-/// Formatação de saída TXT alinhada a <c>transcrever.cs</c> (FormatarSegmento / FormatarTempo).
+/// Formatação de saída TXT alinhada a <c>scripts/experiments/transcription/transcrever.cs</c> (FormatarSegmento / FormatarTempo).
 /// </summary>
 public static class TranscriptionTextFormatter
 {

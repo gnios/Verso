@@ -62,3 +62,4 @@ dotnet test tests/Verso.Tests
 ```
 
 Veja a [documentação técnica](DOCS.md) para entender a estrutura do código e o [guia de testes de ponta a ponta](tests/Verso.E2E/README.md) para validar os fluxos da interface.
+

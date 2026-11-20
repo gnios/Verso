@@ -22,6 +22,7 @@ __pycache__/
 .venv-whisperx/
 
 # Artefatos de teste/mídia grandes
+TestResults/
 sample-test-23min.mp4
 sample-test-23min_transcricao.txt
 transcricao-output.txt

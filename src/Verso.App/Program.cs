@@ -46,11 +46,23 @@ public class Program
     private static IDisposable? InitializeSentry()
     {
         var dsn = Environment.GetEnvironmentVariable("SENTRY_DSN");
-        if (string.IsNullOrWhiteSpace(dsn)) return null;
+        if (string.IsNullOrWhiteSpace(dsn))
+        {
+            dsn = Verso.Core.SentryConfiguration.DesktopDsn;
+        }
+
+        // The worker is a child process and inherits this value.
+        Environment.SetEnvironmentVariable("SENTRY_DSN", dsn);
 
         return Sentry.SentrySdk.Init(options =>
         {
             options.Dsn = dsn;
+            options.Release = $"verso@{typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "unknown"}";
+#if DEBUG
+            options.Environment = "development";
+#else
+            options.Environment = "production";
+#endif
             options.SendDefaultPii = false;
             options.SetBeforeSend((@event, _) =>
             {

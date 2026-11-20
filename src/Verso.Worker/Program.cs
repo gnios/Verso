@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Verso.Core;
@@ -19,6 +20,56 @@ public static class Program
 {
     public static async Task<int> Main()
     {
+        using var sentry = InitializeSentry();
+        try
+        {
+            return await RunAsync();
+        }
+        catch (Exception ex)
+        {
+            Sentry.SentrySdk.CaptureException(ex);
+            await Sentry.SentrySdk.FlushAsync(TimeSpan.FromSeconds(2));
+            throw;
+        }
+    }
+
+    private static IDisposable? InitializeSentry()
+    {
+        var dsn = Environment.GetEnvironmentVariable("SENTRY_DSN");
+        if (string.IsNullOrWhiteSpace(dsn))
+        {
+            dsn = SentryConfiguration.DesktopDsn;
+        }
+
+        Environment.SetEnvironmentVariable("SENTRY_DSN", dsn);
+
+        return Sentry.SentrySdk.Init(options =>
+        {
+            options.Dsn = dsn;
+            options.Release = $"verso@{typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "unknown"}";
+#if DEBUG
+            options.Environment = "development";
+#else
+            options.Environment = "production";
+#endif
+            options.SendDefaultPii = false;
+            options.SetBeforeSend((@event, _) =>
+            {
+                @event.Message = null!;
+                @event.Request = null!;
+                @event.User = null!;
+                foreach (var exception in @event.SentryExceptions ?? Enumerable.Empty<Sentry.Protocol.SentryException>())
+                {
+                    exception.Value = "[redacted]";
+                }
+                return @event;
+            });
+            options.SetBeforeSendLog(static _ => null);
+        });
+    }
+
+    private static async Task<int> RunAsync()
+    {
         TryLowerProcessPriority();
         WriteStandaloneWarning();
 
@@ -30,6 +81,14 @@ public static class Program
             {
                 options.FileNamePrefix = "verso-worker";
             });
+            if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SENTRY_DSN")))
+            {
+                logging.AddSentry(options =>
+                {
+                    options.MinimumEventLevel = LogLevel.Error;
+                    options.MinimumBreadcrumbLevel = LogLevel.None;
+                });
+            }
             logging.SetMinimumLevel(LogLevel.Information);
         });
         services.AddWhisperEngine();

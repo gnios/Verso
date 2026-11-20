@@ -7,6 +7,10 @@
 @import '@astryxdesign/core/astryx.css';
 @import '@astryxdesign/theme-neutral/theme.css';
 
+[data-astryx-theme='verso'] {
+  --color-on-accent: #fff;
+}
+
 :root {
   font-family: var(--font-family-body);
 }
@@ -118,13 +122,13 @@ body,
   transition: background 0.1s;
 }
 
-.seg.editing {
+.seg.editing,
+.seg.active-seg {
   background: var(--color-background-muted);
 }
 
 .seg.active-seg {
-  background: var(--color-accent-muted);
-  border-left-color: var(--color-accent);
+  border-left-color: var(--color-border-purple);
 }
 
 .seg-time {
@@ -220,15 +224,7 @@ body,
   display: flex;
 }
 
-/* Editor: barra de busca (input range nativo com tokens do tema). */
-.verso-seek {
-  accent-color: var(--color-accent);
-}
-
-/* Editor: player com superfície própria (barra estilo Spotify) — antes o
-   controle flutuava no fundo branco da página e parecia quebra de linha.
-   No tema escuro, --color-background-muted vira #1b1b1b (igual ao fundo) —
-   por isso o dark usa superfície elevada explícita via light-dark(). */
+/* Player do editor: mesma hierarquia compacta da prévia na landing page. */
 .verso-player-wrap {
   width: 100%;
   padding: 0 16px;
@@ -236,10 +232,133 @@ body,
 }
 
 .verso-player {
-  background: light-dark(var(--color-background-muted), #3d3d3d);
-  border: 1px solid light-dark(var(--color-border), #565656);
-  border-radius: var(--radius-container);
-  box-shadow: var(--shadow-low);
+  --player-wave-green: var(--verso-wave-green, light-dark(#70b9ad, #72c7ba));
+  display: grid;
+  grid-template-columns: 42px 44px minmax(0, 1fr) 44px 62px;
+  align-items: center;
+  gap: 12px;
+  color: var(--color-text-primary);
+  background: var(--color-background-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
   padding: 10px 16px;
   box-sizing: border-box;
+}
+
+.verso-player > button {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  box-shadow: none;
+}
+
+.verso-player > button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-accent), black 15%);
+  border-color: color-mix(in srgb, var(--color-accent), black 15%);
+}
+
+.verso-player-time {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.verso-speed {
+  width: 62px;
+  min-height: 30px;
+  padding: 3px 5px;
+  border: 1px solid var(--color-border-purple);
+  border-radius: 8px;
+  color: var(--color-text-purple);
+  background: var(--color-background-purple);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+}
+
+.verso-speed:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.verso-player-timeline {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0;
+}
+
+.verso-waveform {
+  max-height: 32px;
+  color: var(--player-wave-green);
+}
+
+.verso-seek {
+  width: 100%;
+  height: 12px;
+  margin: -1px 0 0;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.verso-seek::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-border-purple);
+}
+
+.verso-seek::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+
+.verso-seek:focus-visible {
+  outline: 2px solid var(--color-icon-purple);
+  outline-offset: 2px;
+}
+
+.verso-seek:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+@media (max-width: 600px) {
+  .verso-player-wrap {
+    padding-inline: 12px;
+  }
+
+  .verso-player {
+    grid-template-columns: 40px 38px minmax(0, 1fr) 38px 56px;
+    gap: 7px;
+    padding: 9px 10px;
+  }
+
+  .verso-player > button {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+  }
+
+  .verso-player-time {
+    font-size: 10px;
+  }
+
+  .verso-speed {
+    width: 56px;
+    font-size: 10px;
+  }
 }
