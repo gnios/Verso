@@ -85,6 +85,15 @@ public class ExportService(IDbContextFactory<VersoDbContext> dbContextFactory)
         await File.WriteAllTextAsync(destPath, builder.ToString(), Encoding.UTF8);
     }
 
+    public async Task ExportRtfAsync(Guid transcriptionId, string destPath)
+    {
+        var transcription = await LoadTranscriptionAsync(transcriptionId);
+        EnsureHasSegments(transcription);
+
+        var content = AcademicRtfFormatter.Build(transcription);
+        await File.WriteAllTextAsync(destPath, content, new UTF8Encoding(false));
+    }
+
     private async Task<Transcription> LoadTranscriptionAsync(Guid transcriptionId)
     {
         await using var context = await dbContextFactory.CreateDbContextAsync();

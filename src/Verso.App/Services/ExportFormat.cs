@@ -5,4 +5,5 @@ public enum ExportFormat
     Txt,
     Srt,
     Vtt,
+    Rtf,
 }

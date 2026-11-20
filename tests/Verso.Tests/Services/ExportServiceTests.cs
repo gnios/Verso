@@ -122,6 +122,61 @@ public class ExportServiceTests
     }
 
     [Fact]
+    public async Task ExportRtfAsync_WritesRtfWithAcademicStructure()
+    {
+        var (provider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();
+        var outputPath = Path.Combine(directory, "export.rtf");
+
+        try
+        {
+            var factory = TestDbHelper.GetFactory(provider);
+            var transcriptionId = await SeedTranscriptionWithSegmentsAsync(factory);
+            var service = new ExportService(factory);
+
+            await service.ExportRtfAsync(transcriptionId, outputPath);
+
+            var content = await File.ReadAllTextAsync(outputPath, Encoding.UTF8);
+            Assert.StartsWith(@"{\rtf1\ansi", content, StringComparison.Ordinal);
+            Assert.Contains(@"\margl1701\margt1701\margr1134\margb1134", content, StringComparison.Ordinal);
+            Assert.Contains(@"TRANSCRI\u199?\u195?O", content, StringComparison.Ordinal); // TRANSCRIÇÃO
+            Assert.Contains("IDENTIFICA", content, StringComparison.Ordinal);
+            Assert.Contains("CONVEN", content, StringComparison.Ordinal);
+            Assert.Contains("[Ana]", content, StringComparison.Ordinal);
+            Assert.Contains("[00:00]", content, StringComparison.Ordinal);
+            Assert.Contains("mundo", content, StringComparison.Ordinal);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
+    public async Task ExportRtfAsync_EscapesAccentedCharacters()
+    {
+        var (provider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();
+        var outputPath = Path.Combine(directory, "export-escape.rtf");
+
+        try
+        {
+            var factory = TestDbHelper.GetFactory(provider);
+            var transcriptionId = await SeedTranscriptionWithSegmentsAsync(factory);
+            var service = new ExportService(factory);
+
+            await service.ExportRtfAsync(transcriptionId, outputPath);
+
+            var content = await File.ReadAllTextAsync(outputPath, Encoding.UTF8);
+            Assert.DoesNotContain("é", content, StringComparison.Ordinal);
+            Assert.DoesNotContain("ç", content, StringComparison.Ordinal);
+            Assert.Contains(@"\u", content, StringComparison.Ordinal);
+        }
+        finally
+        {
+            TestDbHelper.Cleanup(directory);
+        }
+    }
+
+    [Fact]
     public async Task ExportTxtAsync_ThrowsWhenTranscriptionHasNoSegments()
     {
         var (provider, directory) = await TestDbHelper.CreateIsolatedDatabaseAsync();

@@ -7,4 +7,9 @@ public interface ILocalDiarizer
     IReadOnlyList<TranscriptionSegmentResult> Diarize(
         float[] audio,
         IReadOnlyList<TranscriptionSegmentResult> asrSegments);
+
+    IReadOnlyList<TranscriptionSegmentResult> Diarize(
+        float[] audio,
+        IReadOnlyList<TranscriptionSegmentResult> asrSegments,
+        CancellationToken cancellationToken) => Diarize(audio, asrSegments);
 }

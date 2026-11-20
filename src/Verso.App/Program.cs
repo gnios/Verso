@@ -98,7 +98,7 @@ public class Program
         var services = new ServiceCollection();
         services.AddLogging(ConfigureLogging);
         services.AddVersoDatabase();
-        services.AddVersoEngine(enableDiarization: false);
+        services.AddVersoEngine();
         services.AddVersoServices();
         services.AddVersoAppServices();
 

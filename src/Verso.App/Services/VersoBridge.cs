@@ -363,7 +363,7 @@ public sealed class VersoBridge : IDisposable
                 language,
                 quality,
                 settings.Device,
-                SpeakerMode.Off,
+                settings.IdentifySpeakersDefault ? SpeakerMode.Automatic : SpeakerMode.Off,
                 folderId,
                 durationSeconds,
                 icon,
@@ -667,6 +667,7 @@ public sealed class VersoBridge : IDisposable
             {
                 "srt" => ExportFormat.Srt,
                 "vtt" => ExportFormat.Vtt,
+                "rtf" => ExportFormat.Rtf,
                 _ => ExportFormat.Txt,
             };
 
@@ -695,6 +696,9 @@ public sealed class VersoBridge : IDisposable
                         break;
                     case ExportFormat.Vtt:
                         await exportService.ExportVttAsync(transcriptionId, destPath);
+                        break;
+                    case ExportFormat.Rtf:
+                        await exportService.ExportRtfAsync(transcriptionId, destPath);
                         break;
                 }
 
@@ -754,6 +758,12 @@ public sealed class VersoBridge : IDisposable
                     && live.ValueKind is JsonValueKind.True or JsonValueKind.False)
                 {
                     settings.LiveTranscriptionEnabled = live.GetBoolean();
+                }
+
+                if (args?.TryGetProperty("identifySpeakersDefault", out var identifySpeakers) == true
+                    && identifySpeakers.ValueKind is JsonValueKind.True or JsonValueKind.False)
+                {
+                    settings.IdentifySpeakersDefault = identifySpeakers.GetBoolean();
                 }
 
                 if (ParseEnum<ExecutionDevice>(args, "device") is { } device)
@@ -856,6 +866,7 @@ public sealed class VersoBridge : IDisposable
             },
             defaultLanguage = viewModel.SelectedLanguageOption?.Code ?? "pt",
             liveTranscriptionEnabled = viewModel.LiveTranscriptionEnabled,
+            identifySpeakersDefault = viewModel.IdentifySpeakersDefault,
             devices = viewModel.DeviceOptions.Select(d => new { value = d.Value.ToString(), label = d.Label }),
             device = viewModel.SelectedDeviceOption?.Value.ToString() ?? "Auto",
             models = ModelCatalog.All.Select(m => new

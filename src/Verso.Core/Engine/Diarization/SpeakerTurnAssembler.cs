@@ -105,13 +105,18 @@ public static class SpeakerTurnAssembler
         foreach (var piece in named)
         {
             if (merged.Count > 0
-                && merged[^1].SpeakerName == piece.SpeakerName)
+                && merged[^1].SpeakerName == piece.SpeakerName
+                && piece.StartSeconds - merged[^1].EndSeconds < ParakeetSegmentBuilder.DefaultPauseSeconds
+                && piece.EndSeconds - merged[^1].StartSeconds <= ParakeetSegmentBuilder.MaxSegmentSeconds)
             {
                 var prev = merged[^1];
                 merged[^1] = prev with
                 {
                     EndSeconds = piece.EndSeconds,
                     Text = SegmentEditingService.JoinTexts(prev.Text, piece.Text),
+                    Words = prev.Words is not null && piece.Words is not null
+                        ? [.. prev.Words, .. piece.Words]
+                        : null,
                 };
             }
             else

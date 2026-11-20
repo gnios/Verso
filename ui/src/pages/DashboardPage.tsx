@@ -101,6 +101,7 @@ export function DashboardPage({ parameter }: DashboardPageProps) {
       : (parameter.statusFilter ?? 'All');
   const title = activeFilter === 'unassigned' ? 'Sem pasta' : TITLES[activeFilter] ?? 'Biblioteca';
   const isEmpty = data?.isEmpty ?? false;
+  const isProgressEmpty = activeFilter === 'Progress' && !search.trim();
 
   return (
     <VStack gap={4} padding={4} align="start">
@@ -144,9 +145,15 @@ export function DashboardPage({ parameter }: DashboardPageProps) {
       ) : isEmpty ? (
         <HStack justify="center" width="100%">
           <EmptyState
-            title="Nenhuma transcrição aqui"
-            description="Transcreva um áudio ou vídeo para começar, ou ajuste o filtro de busca."
-            icon={<img src="/brand/verso-mascote-biblioteca.png" alt="" style={{ height: 150 }} />}
+            title={isProgressEmpty ? 'Nenhuma transcrição em andamento' : 'Nenhuma transcrição aqui'}
+            description={isProgressEmpty
+              ? 'Acompanhe aqui o progresso das suas transcrições.'
+              : 'Transcreva um áudio ou vídeo para começar, ou ajuste o filtro de busca.'}
+            icon={<img
+              src={isProgressEmpty ? '/brand/verso-mascote-em-andamento.png' : '/brand/verso-mascote-biblioteca.png'}
+              alt=""
+              style={{ height: 150 }}
+            />}
             actions={
               <Button
                 variant="primary"

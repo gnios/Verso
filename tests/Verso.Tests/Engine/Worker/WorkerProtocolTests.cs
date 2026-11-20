@@ -80,7 +80,10 @@ public class WorkerProtocolTests
     {
         var result = new TranscriptionResult(
         [
-            new TranscriptionSegmentResult(0, 1.5, "segmento ok"),
+            new TranscriptionSegmentResult(0, 1.5, "segmento ok")
+            {
+                Words = [new("segmento", 0, 0.6), new(" ok", 1, 1.5)],
+            },
         ]);
         var message = new WorkerResultMessage(result);
 
@@ -93,6 +96,7 @@ public class WorkerProtocolTests
         Assert.Equal(0, typed.Result.Segments[0].StartSeconds);
         Assert.Equal(1.5, typed.Result.Segments[0].EndSeconds);
         Assert.Equal("segmento ok", typed.Result.Segments[0].Text);
+        Assert.Equal(result.Segments[0].Words!.ToArray(), typed.Result.Segments[0].Words!.ToArray());
     }
 
     [Fact]

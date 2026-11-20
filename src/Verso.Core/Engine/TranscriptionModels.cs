@@ -16,7 +16,12 @@ public sealed record TranscriptionSegmentResult(
     double StartSeconds,
     double EndSeconds,
     string Text,
-    string? SpeakerName = null);
+    string? SpeakerName = null)
+{
+    public IReadOnlyList<TranscriptionWordTiming>? Words { get; init; }
+}
+
+public sealed record TranscriptionWordTiming(string Text, double StartSeconds, double EndSeconds);
 
 public sealed record TranscriptionResult(IReadOnlyList<TranscriptionSegmentResult> Segments);
 

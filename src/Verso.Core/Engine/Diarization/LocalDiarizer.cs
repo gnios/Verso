@@ -117,6 +117,7 @@ public sealed class LocalDiarizer : ILocalDiarizer
         overlapping.Sort((a, b) => a.Window.StartSeconds.CompareTo(b.Window.StartSeconds));
         var cursor = segment.StartSeconds;
         var remaining = segment.Text;
+        var words = segment.Words;
         var currentLabel = overlapping[0].Label;
         for (var i = 1; i < overlapping.Count; i++)
         {
@@ -132,18 +133,39 @@ public sealed class LocalDiarizer : ILocalDiarizer
                 continue;
             }
 
-            var (left, right) = WordBoundaryTextSplitter.Split(
-                remaining,
-                cursor,
-                segment.EndSeconds,
-                change);
+            string left;
+            string right;
+            IReadOnlyList<TranscriptionWordTiming>? leftWords = null;
+            if (words is { Count: > 0 })
+            {
+                var split = Enumerable.Range(1, words.Count - 1)
+                    .Where(index => words[index].StartSeconds - cursor >= MinTurnSeconds
+                        && segment.EndSeconds - words[index].StartSeconds >= MinTurnSeconds)
+                    .OrderBy(index => Math.Abs(words[index].StartSeconds - change))
+                    .FirstOrDefault();
+                if (split == 0 || Math.Abs(words[split].StartSeconds - change) > HopSeconds)
+                {
+                    continue;
+                }
+
+                change = words[split].StartSeconds;
+                leftWords = words.Take(split).ToArray();
+                words = words.Skip(split).ToArray();
+                left = string.Concat(leftWords.Select(word => word.Text)).Trim();
+                right = string.Concat(words.Select(word => word.Text)).Trim();
+            }
+            else
+            {
+                (left, right) = WordBoundaryTextSplitter.Split(remaining, cursor, segment.EndSeconds, change);
+            }
+
             if (left.Length > 0)
             {
                 yield return new TranscriptionSegmentResult(
                     cursor,
                     change,
                     left,
-                    NameFor(currentLabel, firstLabel));
+                    NameFor(currentLabel, firstLabel)) { Words = leftWords };
             }
 
             remaining = right;
@@ -157,7 +179,7 @@ public sealed class LocalDiarizer : ILocalDiarizer
                 cursor,
                 segment.EndSeconds,
                 remaining.Length > 0 ? remaining : segment.Text,
-                NameFor(currentLabel, firstLabel));
+                NameFor(currentLabel, firstLabel)) { Words = words };
         }
     }
 

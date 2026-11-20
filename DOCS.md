@@ -199,7 +199,7 @@ Builds **self-contained** / **single-file**. O pacote contém o app, o `Verso.Up
 
 **Atualização automática:** se o pacote tiver `verso-channel.json` (releases), o app baixa sozinho a latest GitHub Release da mesma variante e troca só os binários. `data/` e arquivos extras na pasta **não são apagados**. Uma transcrição em andamento não é cortada; o update aplica na próxima abertura. Status em **Configurações → Sobre**.
 
-> **Segurança no Windows:** confira a assinatura digital e o nome do publicador nas propriedades do instalador. Os pacotes publicados com o novo fluxo exigem assinatura válida da empresa. O SmartScreen ainda pode avisar sobre arquivos com pouca reputação. Veja a seção [Assinatura dos pacotes Windows](#assinatura-dos-pacotes-windows).
+> Os instaladores das GitHub Releases são gerados sem assinatura Authenticode. O Windows pode exibir um aviso do SmartScreen. Baixe o instalador pela página oficial de releases.
 
 ---
 
@@ -227,19 +227,13 @@ O [workflow de release](.github/workflows/release.yml) publica uma versão no Gi
 
 ### Assinatura dos pacotes Windows
 
-O pipeline exige assinatura Authenticode válida e carimbo de tempo para os executáveis e DLLs dos pacotes CPU e GPU, o instalador e o desinstalador. Ele preserva assinaturas incorporadas válidas com carimbo de tempo das dependências. A publicação falha se a configuração estiver incompleta ou se os arquivos não passarem na verificação.
-
-1. Emita um [certificado de assinatura de código OV com eSigner](https://ssl.com/pt/products/software-integrity/code-signing/ov/) em nome da razão social da Gnios. Conclua a validação da empresa com a SSL.com e habilite a assinatura automatizada no eSigner.
-2. No GitHub, em **Settings → Secrets and variables → Actions**, cadastre `ESIGNER_USERNAME`, `ESIGNER_PASSWORD`, `ESIGNER_CREDENTIAL_ID` e `ESIGNER_TOTP_SECRET`. Este último é a chave de configuração do TOTP da credencial de assinatura, obtida ao habilitar a automação no eSigner.
-3. Execute o workflow **release** manualmente para gerar os artefatos de teste. No Windows, confira o publicador, o status `Valid` e o carimbo de tempo do instalador baixado com `Get-AuthenticodeSignature .\Verso-*-setup.exe | Format-List Status,SignerCertificate,TimeStamperCertificate`. Depois de testar a instalação e o desinstalador, publique pelo fluxo normal de tags.
-
-O SmartScreen também considera a reputação do download. Uma versão assinada ainda pode exibir um aviso enquanto ganha reputação. [Documentação da Microsoft](https://learn.microsoft.com/windows/apps/package-and-deploy/code-signing-options)
+O workflow gera os instaladores e os ZIPs Windows sem executar a etapa de assinatura com o eSigner. A instalação e a desinstalação silenciosas continuam sendo testadas antes do upload dos artefatos.
 
 ### Verso Transcrição na Microsoft Store
 
 No fluxo Win32, crie um produto do tipo **Aplicativo EXE ou MSI** no Partner Center. Na primeira submissão, informe:
 
-- **URL do pacote** — link direto e versionado do `Verso-<versão>-cpu-win-x64-setup.exe` assinado na GitHub Release. Cadastre inicialmente a variante CPU, que usa a mesma arquitetura x64 da variante GPU. Use uma nova URL a cada versão.
+- **URL do pacote** — link direto e versionado do `Verso-<versão>-cpu-win-x64-setup.exe` após assinatura em um fluxo separado. Cadastre inicialmente a variante CPU, que usa a mesma arquitetura x64 da variante GPU. Use uma nova URL a cada versão.
 - **Arquitetura e idioma** — `x64` e `pt-BR`.
 - **Parâmetros do instalador** — `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-`.
 - **Documentação dos códigos de saída** — [Setup Exit Codes do Inno Setup](https://jrsoftware.org/inno-setup/documentation/topic_setupexitcodes.htm).

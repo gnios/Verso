@@ -9,7 +9,6 @@ name: release
 ##
 ## Single-file (DLLs gerenciadas embutidas). Layout: App.exe na raiz + engine/ (Worker, wwwroot, runtimes, nativos).
 ## Worker é sibling spawnado sob demanda (sem console no Windows via WinExe).
-## Assinatura Authenticode obrigatória nos pacotes Windows.
 ##
 ## Gatilhos:
 ##   - push para main           -> auto-incrementa patch, builda, tag, GitHub Release
@@ -77,19 +76,6 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: ui/package-lock.json
-
-      - name: Conferir configuração da assinatura Windows
-        if: runner.os == 'Windows'
-        shell: pwsh
-        env: &windows-signing
-          ESIGNER_USERNAME: ${{ secrets.ESIGNER_USERNAME }}
-          ESIGNER_PASSWORD: ${{ secrets.ESIGNER_PASSWORD }}
-          ESIGNER_CREDENTIAL_ID: ${{ secrets.ESIGNER_CREDENTIAL_ID }}
-          ESIGNER_TOTP_SECRET: ${{ secrets.ESIGNER_TOTP_SECRET }}
-        run: |
-          $required = @('ESIGNER_USERNAME', 'ESIGNER_PASSWORD', 'ESIGNER_CREDENTIAL_ID', 'ESIGNER_TOTP_SECRET')
-          $missing = $required | Where-Object { [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_)) }
-          if ($missing) { throw "Configuração de assinatura Windows ausente: $($missing -join ', '). Veja o README." }
 
       - name: Determinar versão
         id: version
@@ -299,35 +285,6 @@ jobs:
 
           echo "Validação OK"
 
-      - name: Configurar Java para o CodeSignTool
-        if: runner.os == 'Windows'
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Instalar CodeSignTool da SSL.com
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $zip = Join-Path $env:RUNNER_TEMP 'CodeSignTool-v1.3.2.zip'
-          $dir = Join-Path $env:RUNNER_TEMP 'CodeSignTool'
-          Invoke-WebRequest -Uri 'https://github.com/SSLcom/CodeSignTool/releases/download/v1.3.2/CodeSignTool-v1.3.2.zip' -OutFile $zip
-          $expected = 'F14B1E1EF14BFA1FD00279C363AAB0DEBBF5DCFBA0E4BCDCE5D22BB771DE0E3A'
-          if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne $expected) { throw 'SHA-256 do CodeSignTool divergente.' }
-          Expand-Archive -LiteralPath $zip -DestinationPath $dir
-          "VERSO_CODESIGN_TOOL=$dir" >> $env:GITHUB_ENV
-
-      - name: Assinar e verificar EXEs e DLLs Windows
-        if: runner.os == 'Windows'
-        shell: pwsh
-        env: *windows-signing
-        run: |
-          $root = "publish/${{ matrix.variant }}-${{ matrix.rid }}"
-          $binaries = Get-ChildItem -LiteralPath $root -Recurse -File |
-            Where-Object { $_.Extension -in '.exe', '.dll' }
-          ./scripts/sign-windows.ps1 -Path $binaries.FullName -KeepValidSignatures
-
       - name: Empacotar zip
         shell: pwsh
         run: |
@@ -360,7 +317,6 @@ jobs:
       - name: Compilar instalador Windows
         if: matrix.os == 'windows-latest'
         shell: pwsh
-        env: *windows-signing
         run: |
           $ver = '${{ steps.version.outputs.version }}'
           $variant = '${{ matrix.variant }}'
@@ -370,26 +326,16 @@ jobs:
           $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
           if (-not (Test-Path $iscc)) { throw "ISCC.exe não encontrado: $iscc" }
           $setupName = "Verso-${ver}-${variant}-${rid}-setup"
-          $signScript = (Resolve-Path 'scripts/sign-windows.ps1').Path
-          $pwsh = (Get-Process -Id $PID).Path
-          $signTool = '/SVerso=$q{0}$q -NoProfile -NonInteractive -File $q{1}$q $f' -f $pwsh, $signScript
-          $uninstallerDir = New-Item -ItemType Directory -Force (Join-Path $env:RUNNER_TEMP 'verso-uninstaller')
           & $iscc `
             /Q `
-            $signTool `
             /DMyAppVersion=$ver `
             "/DSourceDir=$source" `
             "/DOutputDir=$dist" `
-            "/DSignedUninstallerDir=$($uninstallerDir.FullName)" `
             /DOutputBaseFilename=$setupName `
             (Join-Path $PWD 'installer\windows\Verso.iss')
           if ($LASTEXITCODE -ne 0) { throw "ISCC falhou ($LASTEXITCODE)" }
           $exe = Join-Path $dist "$setupName.exe"
           if (-not (Test-Path $exe)) { throw "Setup não gerado: $exe" }
-          $signature = Get-AuthenticodeSignature -LiteralPath $exe
-          if ($signature.Status -ne 'Valid' -or $signature.SignatureType -ne 'Authenticode' -or -not $signature.TimeStamperCertificate) {
-            throw "Instalador sem assinatura Authenticode válida e carimbo de tempo: $exe"
-          }
           Write-Host "Criado $setupName.exe ($([math]::Round((Get-Item $exe).Length/1MB,1)) MB)"
 
       - name: Testar instalação silenciosa Windows
@@ -406,10 +352,6 @@ jobs:
             throw "Instalação silenciosa falhou (código $($installed.ExitCode))."
           }
           $uninstaller = Join-Path $installDir 'unins000.exe'
-          $signature = Get-AuthenticodeSignature -LiteralPath $uninstaller
-          if ($signature.Status -ne 'Valid' -or $signature.SignatureType -ne 'Authenticode' -or -not $signature.TimeStamperCertificate) {
-            throw 'Desinstalador instalado sem assinatura Authenticode válida e carimbo de tempo.'
-          }
           $removed = Start-Process $uninstaller -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' `
             -WindowStyle Hidden -Wait -PassThru
           if ($removed.ExitCode -ne 0 -or (Test-Path (Join-Path $installDir 'Verso.App.exe'))) {

@@ -72,6 +72,30 @@ public class ParakeetSegmentBuilderTests
     }
 
     [Fact]
+    public void Build_DoesNotSplitWordOnPauseBetweenSubwordTokens()
+    {
+        string[] tokens = [" trans", "crição", " depois"];
+        var segments = ParakeetSegmentBuilder.Build(string.Concat(tokens), [0.0, 2.0, 4.0], tokens);
+
+        Assert.Equal(new[] { "transcrição", "depois" }, segments.Select(segment => segment.Text));
+        var word = Assert.Single(segments[0].Words!);
+        Assert.Equal("transcrição", word.Text.Trim());
+        Assert.Equal(2.08, word.EndSeconds, precision: 2);
+        Assert.Equal(4.0, segments[1].StartSeconds);
+    }
+
+    [Fact]
+    public void Build_WaitsForWholeWordAfterDurationLimit()
+    {
+        string[] tokens = [" início", " trans", "cri", "ção", ".", " depois"];
+        var segments = ParakeetSegmentBuilder.Build(
+            string.Concat(tokens), [0.0, 29.8, 30.0, 30.2, 30.3, 30.5], tokens, pauseSeconds: 60);
+
+        Assert.Equal(new[] { "início transcrição.", "depois" }, segments.Select(segment => segment.Text));
+        Assert.Equal(30.5, segments[1].StartSeconds);
+    }
+
+    [Fact]
     public void Build_SplitsWhenSegmentExceedsMaxDuration()
     {
         var timestamps = Enumerable.Range(0, 32).Select(i => (double)i).ToArray();
@@ -173,6 +197,61 @@ public class ParakeetEncoderFramesTests
 
 public class ParakeetAudioChunkerTests
 {
+    [Fact]
+    public void EmptyWindowRetry_StitchesRecoveredWordsAtAbsoluteTimes()
+    {
+        var sampleRate = AudioLoader.SampleRate;
+        var audio = Enumerable.Repeat(0.1f, 20 * sampleRate).ToArray();
+        var windows = new List<ParakeetAudioChunker.WindowTranscript>
+        {
+            new(0, 20, [17], ["antes "]),
+        };
+        var calls = 0;
+        OnnxParakeetRecognizer.AppendWindowWithRetry(
+            new ParakeetAudioChunker.Chunk(18 * sampleRate, audio),
+            samples =>
+            {
+                calls++;
+                if (calls == 1)
+                {
+                    Assert.Same(audio, samples);
+                    return ([], []);
+                }
+
+                Assert.Equal(11 * sampleRate, samples.Length);
+                return calls == 2
+                    ? ([3, 9.8], ["primeira ", "emenda "])
+                    : ([1.1, 5], ["emenda ", "segunda "]);
+            },
+            windows);
+        windows.Add(new(36, 20, [2], ["depois "]));
+
+        Assert.Equal(3, calls);
+        Assert.Equal(new double[] { 0, 18, 27, 36 }, windows.Select(window => window.StartSeconds));
+        var words = ParakeetAudioChunker.StitchWindowTokens(windows).SelectMany(segment => segment.Words!).ToArray();
+        Assert.Equal(new[] { "antes ", "primeira ", "emenda ", "segunda ", "depois " }, words.Select(word => word.Text));
+        Assert.Equal(new double[] { 17, 21, 27.8, 32, 38 }, words.Select(word => word.StartSeconds));
+    }
+
+    [Theory]
+    [InlineData(0f, false, 1)]
+    [InlineData(0.1f, true, 1)]
+    [InlineData(0.1f, false, 3)]
+    public void EmptyWindowRetry_PreservesOriginalWhenRetryIsUnneededOrEmpty(float sample, bool hasTokens, int expectedCalls)
+    {
+        var audio = Enumerable.Repeat(sample, 20 * AudioLoader.SampleRate).ToArray();
+        var windows = new List<ParakeetAudioChunker.WindowTranscript>();
+        var calls = 0;
+        OnnxParakeetRecognizer.AppendWindowWithRetry(new(0, audio), _ =>
+        {
+            calls++;
+            return hasTokens ? ([3], ["fala "]) : ([], []);
+        }, windows);
+
+        Assert.Equal(expectedCalls, calls);
+        Assert.Equal(20, Assert.Single(windows).LengthSeconds);
+    }
+
     [Fact]
     public void Split_ShortAudio_ReturnsSingleChunk()
     {
@@ -346,6 +425,36 @@ public class ParakeetAudioChunkerTests
         Assert.Single(segments);
         Assert.Equal("fala continua aqui", segments[0].Text);
         Assert.Equal(17.5, segments[0].StartSeconds, precision: 2);
+    }
+
+    [Fact]
+    public void StitchWindowTokens_KeepsWholeWordFromOneWindowAtOverlap()
+    {
+        ParakeetAudioChunker.WindowTranscript[] windows =
+        [
+            new(0, 20, [18.4, 18.9, 19.1], [" uma", " trans", "crição"]),
+            new(18, 20, [0.9, 1.1, 1.3], [" trans", "crições", " completa"]),
+        ];
+
+        var segment = Assert.Single(ParakeetAudioChunker.StitchWindowTokens(windows));
+
+        Assert.Equal("uma transcrição completa", segment.Text);
+    }
+
+    [Theory]
+    [InlineData(18.88, 1.12)]
+    [InlineData(19.12, 0.88)]
+    public void StitchWindowTokens_ReconcilesWordOnOppositeSidesOfCut(double leftTime, double rightTime)
+    {
+        ParakeetAudioChunker.WindowTranscript[] windows =
+        [
+            new(0, 20, [18.4, leftTime], [" uma", " palavra"]),
+            new(18, 20, [rightTime, 1.5], [" Palavra,", " inteira"]),
+        ];
+
+        var segment = Assert.Single(ParakeetAudioChunker.StitchWindowTokens(windows));
+
+        Assert.Equal("uma palavra inteira", segment.Text);
     }
 
     private static int CountWord(string text, string word)

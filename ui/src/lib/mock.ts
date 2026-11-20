@@ -225,11 +225,12 @@ const folderData: FolderData = {
   isEmpty: false,
 };
 
-const settingsData: SettingsData = {
+let settingsData: SettingsData = {
   profile: { name: 'Eugen', email: '', institution: 'UFPR' },
   languages: uploadForm.languages,
   defaultLanguage: 'pt',
   liveTranscriptionEnabled: true,
+  identifySpeakersDefault: true,
   devices: [
     { value: 'Auto', label: 'Automático' },
     { value: 'Cpu', label: 'Somente processador' },
@@ -386,7 +387,8 @@ export function mockInvoke(method: string, args?: unknown): Promise<unknown> {
     case 'settings.load':
       return Promise.resolve(settingsData);
     case 'settings.update':
-      return Promise.resolve({ ...settingsData, ...(args as object) });
+      settingsData = { ...settingsData, ...(args as Partial<SettingsData>) };
+      return Promise.resolve(settingsData);
     case 'settings.verifyRuntime':
       return Promise.resolve({ message: 'Runtime já carregado: CUDA (backend cuda). A troca só passa a valer após reiniciar o aplicativo.' });
     case 'settings.openLogs':

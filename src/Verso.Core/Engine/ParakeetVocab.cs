@@ -25,6 +25,11 @@ public sealed class ParakeetVocab
 
     public string this[int id] => _tokens.TryGetValue(id, out var token) ? token : "";
 
+    internal static bool IsWordBoundary(string previousToken, string nextToken) =>
+        !string.IsNullOrWhiteSpace(nextToken)
+        && (char.IsWhiteSpace(nextToken[0])
+            || (previousToken.Length > 0 && char.IsWhiteSpace(previousToken[^1])));
+
     private static int ResolveBlankIndex(IReadOnlyDictionary<int, string> tokens, int size)
     {
         foreach (var name in new[] { "<blk>", "<blank>" })

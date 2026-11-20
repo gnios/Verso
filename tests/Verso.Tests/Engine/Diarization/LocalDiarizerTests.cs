@@ -99,6 +99,25 @@ public class LocalDiarizerTests
     }
 
     [Fact]
+    public void Diarize_UsesWordTimesWhenSpeakerChangesInsideSegment()
+    {
+        var audio = Concat(GenerateTone(3, 120, 0.7f), GenerateTone(3, 220, 0.7f));
+        string[] tokens = [" uma", " pergunta", " bem", " longa?", " sim"];
+        var segments = ParakeetSegmentBuilder.Build(string.Concat(tokens), [0, 0.4, 1.1, 1.9, 2.75], tokens);
+
+        var result = _diarizer.Diarize(audio, [Assert.Single(segments) with { EndSeconds = 6 }]);
+
+        Assert.Collection(result,
+            first => Assert.Equal("uma pergunta bem longa?", first.Text),
+            second =>
+            {
+                Assert.Equal("sim", second.Text);
+                Assert.Equal("Locutor 2", second.SpeakerName);
+                Assert.Equal(2.75, second.StartSeconds);
+            });
+    }
+
+    [Fact]
     public void Diarize_EmptySegments_ReturnsEmpty()
     {
         Assert.Empty(_diarizer.Diarize(GenerateTone(1, 180, 0.5f), []));
