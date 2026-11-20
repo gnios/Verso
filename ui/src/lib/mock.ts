@@ -230,7 +230,7 @@ let settingsData: SettingsData = {
   languages: uploadForm.languages,
   defaultLanguage: 'pt',
   liveTranscriptionEnabled: true,
-  identifySpeakersDefault: true,
+  identifySpeakersDefault: false,
   devices: [
     { value: 'Auto', label: 'Automático' },
     { value: 'Cpu', label: 'Somente processador' },
