@@ -16,7 +16,6 @@ import {
   FileIcon,
   FolderIcon,
   GridIcon,
-  LogoIcon,
   MessageIcon,
   MicIcon,
   MoonIcon,
@@ -70,7 +69,7 @@ export function SidebarNav({ screen, parameter, isDark, appInfo, onToggleTheme, 
       header={
         <SideNavHeading
           heading="Verso"
-          icon={<Icon icon={LogoIcon} size="md" />}
+          icon={<img src="/brand/verso-logo.png" alt="" style={{ width: 26, height: 26 }} />}
           headerEndContent={
             <IconButton
               icon={<Icon icon={isDark ? SunIcon : MoonIcon} />}

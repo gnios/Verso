@@ -13,7 +13,7 @@ import { navigateTo } from '../lib/screens';
 import { useLibraryViewMode } from '../lib/viewMode';
 import type { NavigationParam } from '../lib/screens';
 import type { FolderData } from '../types';
-import { FileIcon, PlusIcon, TrashIcon } from '../icons';
+import { PlusIcon, TrashIcon } from '../icons';
 import { LibraryViewToggle } from '../components/LibraryViewToggle';
 import { TranscriptionCardView } from '../components/TranscriptionCardView';
 import { TranscriptionTableView } from '../components/TranscriptionTableView';
@@ -107,7 +107,7 @@ export function FolderPage({ parameter }: FolderPageProps) {
           <EmptyState
             title="Pasta vazia"
             description="Transcreva um áudio ou vídeo e associe a esta pasta."
-            icon={<Icon icon={FileIcon} size="lg" />}
+            icon={<img src="/brand/verso-mascote.png" alt="" style={{ height: 150 }} />}
             actions={
               <Button
                 variant="primary"
