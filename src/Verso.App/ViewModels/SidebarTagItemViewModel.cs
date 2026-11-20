@@ -1,7 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Verso.App.Services;
-using Verso.Core.Catalogs;
 using Verso.Core.Services;
 
 namespace Verso.App.ViewModels;
@@ -21,7 +20,7 @@ public partial class SidebarTagItemViewModel : ViewModelBase
         Id = tag.Id;
         Name = tag.Name;
         Count = tag.Count;
-        ColorName = TagColorCatalog.GetColor(tag.Name);
+        ColorName = tag.ColorName;
     }
 
     [RelayCommand]

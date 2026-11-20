@@ -28,4 +28,4 @@ public sealed record TranscriptionSummary(
     IReadOnlyList<string> Tags,
     string Preview);
 
-public sealed record TagSummary(int Id, string Name, int Count);
+public sealed record TagSummary(int Id, string Name, int Count, string ColorName = "blue");

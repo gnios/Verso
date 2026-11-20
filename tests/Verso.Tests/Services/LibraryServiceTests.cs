@@ -299,6 +299,10 @@ public class LibraryServiceTests
             Assert.Equal(["descartada", "nova", "reutilizada"], tagNames);
             Assert.Equal("purple", detail.Tags.Single(tag => tag.Name == "nova").ColorName);
             Assert.Equal("green", detail.Tags.Single(tag => tag.Name == "descartada").ColorName);
+            var summaries = await service.GetTagsAsync();
+            var added = Assert.Single(summaries, tag => tag.Name == "nova");
+            Assert.Equal("purple", added.ColorName);
+            Assert.Equal(1, added.Count);
 
             // A tag "antiga" foi removida desta transcrição, mas a linha global de Tag
             // permanece (Tags são globais/únicas por nome — apenas a associação é trocada).
