@@ -101,7 +101,7 @@ public sealed class UpdateSession
 
     public bool TryApplyPendingAndRequestExit()
     {
-        if (!_coordinator.HasPendingApply())
+        if (!_coordinator.CanApplyPending())
             return false;
 
         var launched = _launcher.TryLaunch(

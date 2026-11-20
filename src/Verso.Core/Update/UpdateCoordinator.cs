@@ -56,6 +56,8 @@ public sealed class UpdateCoordinator
         File.Exists(Path.Combine(StagingDirectory, ReadyFileName))
         && OverlayUpdateApplier.HasAppHost(PayloadDirectory);
 
+    public bool CanApplyPending() => !_idle.HasActiveWork && HasPendingApply();
+
     public OverlayApplyResult ApplyPending()
     {
         if (!HasPendingApply())

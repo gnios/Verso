@@ -138,6 +138,9 @@ public partial class SidebarViewModel : ViewModelBase
         if (target is null || !AppVersion.IsNewer(target, AppVersionLabel))
             return;
 
+        if (!_updateCoordinator.CanApplyPending())
+            throw new InvalidOperationException("Aguarde as transcrições em andamento antes de atualizar.");
+
         if (!await _confirmation.ConfirmAsync(
                 UpdateStatusMessages.RestartConfirmTitle,
                 UpdateStatusMessages.RestartConfirm(target),
@@ -146,7 +149,8 @@ public partial class SidebarViewModel : ViewModelBase
             return;
         }
 
-        _updateSession.TryApplyPendingAndRequestExit();
+        if (!_updateSession.TryApplyPendingAndRequestExit())
+            throw new InvalidOperationException("Não foi possível reiniciar para atualizar.");
     }
 
     private bool CanExecuteUpdateNow() => CanUpdateNow;
