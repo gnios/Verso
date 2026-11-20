@@ -173,7 +173,7 @@ export function DashboardPage({ parameter }: DashboardPageProps) {
           <EmptyState
             title="Nenhuma transcrição aqui"
             description="Transcreva um áudio ou vídeo para começar, ou ajuste o filtro de busca."
-            icon={<img src="/brand/verso-mascote.png" alt="" style={{ height: 150 }} />}
+            icon={<img src="/brand/verso-mascote-biblioteca.png" alt="" style={{ height: 150 }} />}
             actions={
               <Button
                 variant="primary"
