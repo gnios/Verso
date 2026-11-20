@@ -16,21 +16,22 @@ public static class AppServiceCollectionExtensions
     public static IServiceCollection AddVersoAppServices(this IServiceCollection services)
     {
         services.AddSingleton<NavigationService>();
-        services.AddSingleton<BlazorThemeApplicator>();
-        services.AddSingleton<IThemeApplicator>(sp => sp.GetRequiredService<BlazorThemeApplicator>());
+        services.AddSingleton<BridgeHost>();
+        services.AddSingleton<NativeThemeApplicator>();
+        services.AddSingleton<IThemeApplicator>(sp => sp.GetRequiredService<NativeThemeApplicator>());
         services.AddSingleton<LocalMediaServer>(sp =>
         {
             var logger = sp.GetService<ILogger<LocalMediaServer>>()
                 ?? NullLogger<LocalMediaServer>.Instance;
-            return new LocalMediaServer(logger);
+            return new LocalMediaServer(logger, sp.GetService<AudioLoader>());
         });
-        services.AddSingleton<Html5AudioPlaybackService>();
-        services.AddSingleton<IMediaPlaybackService>(sp => sp.GetRequiredService<Html5AudioPlaybackService>());
+        services.AddSingleton<BridgeMediaPlaybackService>();
+        services.AddSingleton<IMediaPlaybackService>(sp => sp.GetRequiredService<BridgeMediaPlaybackService>());
         services.AddSingleton<PhotinoWindowAccessor>();
         services.AddSingleton<IFileSaveService, PhotinoFileSaveService>();
         services.AddSingleton<IFileOpenService, PhotinoFileOpenService>();
-        services.AddSingleton<BlazorConfirmationService>();
-        services.AddSingleton<IConfirmationService>(sp => sp.GetRequiredService<BlazorConfirmationService>());
+        services.AddSingleton<BridgeConfirmationService>();
+        services.AddSingleton<IConfirmationService>(sp => sp.GetRequiredService<BridgeConfirmationService>());
         services.AddSingleton<ThemeService>();
         services.AddSingleton<SidebarViewModel>();
         services.AddSingleton<NewPageModalViewModel>();

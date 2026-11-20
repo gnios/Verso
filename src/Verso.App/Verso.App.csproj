@@ -1,4 +1,8 @@
-<Project Sdk="Microsoft.NET.Sdk.Razor">
+<!--
+  UI agora é React (ui/ → wwwroot via Vite). Sem Blazor: SDK plano, Photino.NET puro.
+  Ver ui/README.md e ui/AGENTS.md para o workflow do Astryx.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
@@ -15,19 +19,20 @@
   </ItemGroup>
 
   <!--
-    Photino.Blazor serve a UI via PhysicalFileProvider em
-    <BaseDirectory>/wwwroot (não pelo pipeline de Static Web Assets do ASP.NET).
-    Sem CopyToOutputDirectory a janela abre em branco — index.html/css/js nunca
-    chegam ao output.
+    Photino serve a UI via LocalAppServer em <BaseDirectory>/wwwroot (não pelo pipeline de
+    Static Web Assets do ASP.NET). Sem CopyToOutputDirectory a janela abre em branco —
+    index.html/css/js nunca chegam ao output. O SDK plano não tem o glob de Content do
+    Razor SDK, então o Include é explícito.
   -->
   <ItemGroup>
-    <Content Update="wwwroot\**">
+    <Content Include="wwwroot\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <None Remove="wwwroot\**" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Photino.Blazor" Version="4.0.13" />
+    <PackageReference Include="Photino.NET" Version="4.0.16" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

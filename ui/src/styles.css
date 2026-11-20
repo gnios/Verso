@@ -1,0 +1,212 @@
+/*
+ * Astryx: ordem dos imports importa (cascata de @layer):
+ * fonts (theme) -> reset (@layer reset) -> componentes (@layer astryx-base) -> tokens do tema.
+ */
+@import '@astryxdesign/theme-neutral/fonts.css';
+@import '@astryxdesign/core/reset.css';
+@import '@astryxdesign/core/astryx.css';
+@import '@astryxdesign/theme-neutral/theme.css';
+
+:root {
+  font-family: var(--font-family-body);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* Cards clicáveis da biblioteca (Card não tem prop de cursor). */
+.verso-card {
+  cursor: pointer;
+}
+
+/* Tabela de transcrições: o Table do Astryx não tem onClick por linha,
+   então a célula do título é um botão que ocupa a célula inteira. */
+.verso-table-wrap {
+  width: 100%;
+}
+
+.verso-row-open {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--color-text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.verso-row-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.verso-row-texts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.verso-row-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.verso-row-preview {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Editor: transcrição como documento único (port do .seg do app Blazor).
+   Cada linha = tempo + chip de locutor + textarea transparente auto-expansível;
+   Enter/Backspace/Delete/setas cruzam as bordas dos segmentos (ver onSegmentKeyDown). */
+.seg {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  padding: 4px 12px 4px 8px;
+  margin-bottom: 0;
+  border-left: 3px solid transparent;
+  cursor: text;
+  transition: background 0.1s;
+}
+
+.seg.editing {
+  background: var(--color-background-muted);
+}
+
+.seg.active-seg {
+  background: var(--color-accent-muted);
+  border-left-color: var(--color-accent);
+}
+
+.seg-time {
+  font-family: var(--font-family-code, monospace);
+  font-size: var(--font-size-xs, 11px);
+  color: var(--color-text-secondary);
+  min-width: 48px;
+  padding-top: 5px;
+  flex-shrink: 0;
+  user-select: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.seg-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.seg-speaker-slot {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.seg-speaker-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-full, 99px);
+  font-size: var(--font-size-xs, 12px);
+  font-weight: var(--font-weight-medium, 600);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.seg-speaker-chip:hover {
+  background: var(--color-background-muted);
+  border-color: var(--color-border);
+}
+
+.seg-speaker-chip.empty {
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.seg-speaker-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.seg-text {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: var(--font-size-base, 15px);
+  line-height: 1.7;
+  resize: none;
+  overflow: hidden;
+  padding: 0;
+  outline: none;
+  white-space: pre-wrap;
+  field-sizing: content;
+}
+
+.seg-actions {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  display: none;
+  gap: 2px;
+  align-items: center;
+  background: var(--color-background-popover, var(--color-background-surface));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-element, 6px);
+  box-shadow: var(--shadow-low);
+  padding: 2px;
+  z-index: 20;
+}
+
+.seg.editing .seg-actions,
+.seg:hover .seg-actions {
+  display: flex;
+}
+
+/* Editor: barra de busca (input range nativo com tokens do tema). */
+.verso-seek {
+  accent-color: var(--color-accent);
+}
+
+/* Editor: player com superfície própria (barra estilo Spotify) — antes o
+   controle flutuava no fundo branco da página e parecia quebra de linha.
+   No tema escuro, --color-background-muted vira #1b1b1b (igual ao fundo) —
+   por isso o dark usa superfície elevada explícita via light-dark(). */
+.verso-player-wrap {
+  width: 100%;
+  padding: 0 16px;
+  box-sizing: border-box;
+}
+
+.verso-player {
+  background: light-dark(var(--color-background-muted), #3d3d3d);
+  border: 1px solid light-dark(var(--color-border), #565656);
+  border-radius: var(--radius-container);
+  box-shadow: var(--shadow-low);
+  padding: 10px 16px;
+  box-sizing: border-box;
+}

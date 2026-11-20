@@ -231,7 +231,8 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private async Task LoadAsync()
+    // Public: a bridge (VersoBridge) espera o load concluído para serializar o snapshot.
+    public async Task LoadAsync()
     {
         using var scope = _scopeFactory.CreateScope();
         var libraryService = scope.ServiceProvider.GetRequiredService<LibraryService>();

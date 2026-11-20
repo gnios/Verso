@@ -112,7 +112,7 @@ public static class MediaSchemeHandler
             _ => "application/octet-stream",
         };
 
-    private static string? GetQueryValue(string query, string key)
+    internal static string? GetQueryValue(string query, string key)
     {
         if (string.IsNullOrEmpty(query))
         {

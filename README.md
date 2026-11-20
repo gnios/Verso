@@ -2,7 +2,46 @@
 
 App desktop de transcrição de áudio/vídeo com [whisper.net](https://github.com/sandrohanea/whisper.net), em português. Windows, Linux e macOS (Apple Silicon).
 
-**Stack:** .NET 10 · Photino.Blazor (WebView2 / WebKitGTK / WKWebView) · EF Core 10 + SQLite · whisper.net 1.9.1 · NAudio
+**Stack:** .NET 10 · Photino.NET (WebView2 / WebKitGTK / WKWebView) · EF Core 10 + SQLite · whisper.net 1.9.1 · NAudio · **UI em React 19 + Astryx** (design system da Meta, em `ui/`)
+
+## UI — React + Astryx
+
+A UI Blazor foi substituída por uma SPA **React 19 + [Astryx](https://github.com/meta/astryx)** (`@astryxdesign/core` + tema `neutral`). O shell Photino carrega `http://127.0.0.1:{port}/` (LocalAppServer serve o build em `wwwroot`), e o React fala com o backend .NET por uma **ponte nativa** (`window.external.sendMessage` ⇄ `SendWebMessage`) — sem HTTP para a lógica do app; áudio continua pelo LocalMediaServer (com Range).
+
+```
+ui/                       SPA React + Vite + TypeScript + Astryx
+ui/src/lib/bridge.ts      cliente da ponte (invoke/onEvent; mock no navegador)
+ui/src/astryx-themes.ts   tema (gerado por `astryx theme add`)
+src/Verso.App/Services/NativeBridge.cs   protocolo JSON request/response + eventos
+src/Verso.App/Services/VersoBridge.cs    métodos da aplicação expostos ao React
+src/Verso.App/Services/LocalAppServer.cs servidor HTTP estático do wwwroot
+```
+
+**Build da UI (antes de `dotnet build`/`dotnet run`):**
+
+```bash
+cd ui
+npm install
+npm run build        # tsc --noEmit + vite build → src/Verso.App/wwwroot
+```
+
+**Dev da UI no navegador** (mock embutido, sem o app desktop): `cd ui && npm run dev` → http://localhost:5173. O guia do Astryx para agentes está em `ui/AGENTS.md` (use `npx astryx component <Nome>` para props de qualquer componente).
+
+**Métodos da ponte** (ver `VersoBridge.cs`): `app.info`, `theme.get/toggle`, `sidebar.load`, `navigation.navigate`, `dashboard.load/action/search`, `transcription.action`, `ui.confirm.respond`, `upload.pickFile/selectFile/load/start`, `recording.*`, `editor.load/saveText/split/merge/assignSpeaker/addSpeaker/updateMeta/export`, `settings.load/update/verifyRuntime`, `folder.load/create/update/delete`, `feedback.send`. Eventos push: `navigation.changed`, `theme.changed`, `ui.confirm`, `dashboard.changed`, `dashboard.progress`, `folder.changed`, `queue.status`, `model.download.*`, `media.command`. A verificação E2E da ponte e das telas via CDP do WebView2 está em `scripts/verify-bridge.mjs` — `scripts/run-ui-checks.ps1` executa o fluxo inteiro (build → seed → app com CDP → checks).
+
+Todas as telas estão portadas: **Dashboard, Upload, Gravação, Configurações, Pastas e Editor** (player, segmentos editáveis, locutores, split/merge, tags, export TXT/SRT/VTT). A biblioteca tem visualização em **tabela** (padrão) e **cartões**, alternável no cabeçalho e persistida em `localStorage`.
+
+### Testes de interface e funcionalidade
+
+| Comando | O que valida |
+|---|---|
+| `./scripts/run-ui-checks.ps1` | Fluxo completo: build UI + app, seed, sobe o app com CDP :9223 e roda `verify-bridge.mjs` (ponte JS⇄C# + DOM de todas as telas: tabela/cartões, upload, gravação, settings, pastas, editor). `-SkipBuild` para iterar rápido, `-RestartApp` para reiniciar um app aberto sem CDP |
+| `python scripts/seed-test-transcription.py` | Semeia a transcrição E2E (`E2E — Entrevista de teste` + WAV). **Rode antes do verify** — os checks de editor mutam o banco |
+| `node scripts/verify-bridge.mjs` | 40+ checks da ponte + telas contra um app rodando com `--remote-debugging-port=9223` |
+| `node scripts/screenshot.mjs <saida.png>` | Screenshot da tela atual via CDP |
+| `node scripts/debug-editor.mjs` | Sonda: cards do dashboard + operações do editor com o id semeado |
+| `./scripts/run-e2e.ps1` | Testes Playwright (`tests/Verso.E2E`) — DOM real, lazy loading de mídia e Range requests |
+| `dotnet test` | Suite completa (xUnit + E2E) |
 
 ## O que faz
 
