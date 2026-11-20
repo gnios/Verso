@@ -21,13 +21,6 @@ interface DashboardPageProps {
   parameter: NavigationParam;
 }
 
-const FILTERS: { key: 'All' | 'Progress' | 'Done' | 'Error'; label: string }[] = [
-  { key: 'All', label: 'Todas' },
-  { key: 'Progress', label: 'Em andamento' },
-  { key: 'Done', label: 'Concluídas' },
-  { key: 'Error', label: 'Com erro' },
-];
-
 const TITLES: Record<string, string> = {
   All: 'Biblioteca',
   Progress: 'Em andamento',
@@ -101,14 +94,6 @@ export function DashboardPage({ parameter }: DashboardPageProps) {
     debounceRef.current = setTimeout(() => void load(parameter, value), 400);
   };
 
-  const onFilter = (key: 'All' | 'Progress' | 'Done' | 'Error') => {
-    setSearch('');
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
-    void load({ ...parameter, statusFilter: key, unassignedOnly: false, tagId: undefined }, '');
-  };
-
   const activeFilter = parameter.unassignedOnly
     ? 'unassigned'
     : parameter.tagId !== undefined
@@ -139,18 +124,6 @@ export function DashboardPage({ parameter }: DashboardPageProps) {
           />
           <LibraryViewToggle value={viewMode} onChange={setViewMode} />
         </HStack>
-      </HStack>
-
-      <HStack gap={2}>
-        {FILTERS.map((filter) => (
-          <Button
-            key={filter.key}
-            size="sm"
-            variant={activeFilter === filter.key ? 'primary' : 'secondary'}
-            label={filter.label}
-            onClick={() => onFilter(filter.key)}
-          />
-        ))}
       </HStack>
 
       {error ? (
