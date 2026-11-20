@@ -17,7 +17,7 @@ import { invoke } from '../lib/bridge';
 import { FOLDERS_ENABLED } from '../lib/features';
 import type { NavigationParam } from '../lib/screens';
 import type { FileDescription, UploadFormData } from '../types';
-import { XIcon, FileIcon, UploadIcon } from '../icons';
+import { XIcon, FileIcon } from '../icons';
 
 interface UploadPageProps {
   parameter: NavigationParam;
@@ -180,7 +180,7 @@ export function UploadPage({ parameter }: UploadPageProps) {
                 <EmptyState
                   title="Selecione um arquivo"
                   description="Áudio ou vídeo para transcrever."
-                  icon={<Icon icon={UploadIcon} size="lg" />}
+                  icon={<img src="/brand/verso-mascote.png" alt="" style={{ height: 150 }} />}
                   actions={
                     <Button variant="primary" label="Selecionar arquivo" onClick={() => void pickFile()} />
                   }

@@ -12,7 +12,7 @@ import { navigateTo } from '../lib/screens';
 import { useLibraryViewMode } from '../lib/viewMode';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CardProgress, DashboardData, NavigationParam } from '../types';
-import { AlertCircleIcon, FileIcon, PlusIcon, SearchIcon } from '../icons';
+import { PlusIcon, SearchIcon } from '../icons';
 import { LibraryViewToggle } from '../components/LibraryViewToggle';
 import { TranscriptionCardView } from '../components/TranscriptionCardView';
 import { TranscriptionTableView } from '../components/TranscriptionTableView';
@@ -158,7 +158,7 @@ export function DashboardPage({ parameter }: DashboardPageProps) {
           <EmptyState
             title="Não foi possível carregar"
             description={error}
-            icon={<Icon icon={AlertCircleIcon} size="lg" />}
+            icon={<img src="/brand/verso-mascote-cabeca.png" alt="" style={{ height: 110 }} />}
             actions={
               <Button
                 variant="primary"
@@ -173,7 +173,7 @@ export function DashboardPage({ parameter }: DashboardPageProps) {
           <EmptyState
             title="Nenhuma transcrição aqui"
             description="Transcreva um áudio ou vídeo para começar, ou ajuste o filtro de busca."
-            icon={<Icon icon={FileIcon} size="lg" />}
+            icon={<img src="/brand/verso-mascote.png" alt="" style={{ height: 150 }} />}
             actions={
               <Button
                 variant="primary"
