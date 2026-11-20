@@ -53,7 +53,6 @@ export function UploadPage({ parameter }: UploadPageProps) {
   const [quality, setQuality] = useState('Standard');
   const [engine, setEngine] = useState('Parakeet');
   const [parakeetModel, setParakeetModel] = useState('PtBrTagarela');
-  const [speakerMode, setSpeakerMode] = useState('Automatic');
   const [folderId, setFolderId] = useState<number | null>(null);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +65,6 @@ export function UploadPage({ parameter }: UploadPageProps) {
       setQuality(data.defaults.quality);
       setEngine(data.defaults.engine);
       setParakeetModel(data.defaults.parakeetModel);
-      setSpeakerMode(data.defaults.speakerMode);
       setFolderId(parameter.folderId ?? data.defaults.selectedFolderId ?? null);
       setIcon(data.icons[0] ?? null);
       if (preselectedPath) {
@@ -120,7 +118,6 @@ export function UploadPage({ parameter }: UploadPageProps) {
         quality,
         engine,
         parakeetModel,
-        speakerMode,
         folderId,
       }, 5 * 60_000);
     } catch (err) {

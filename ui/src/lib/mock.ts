@@ -164,10 +164,6 @@ const uploadForm: UploadFormData = {
     { value: 'PtBrTagarela', label: 'pt-BR TAGARELA', sizeLabel: '~80 MB' },
     { value: 'MultilingualV3', label: 'TDT v3 (pt/en/es)', sizeLabel: '~1,2 GB' },
   ],
-  speakerModes: [
-    { value: 'Automatic', label: 'Automático' },
-    { value: 'Off', label: 'Desativado' },
-  ],
   icons: ['🎤', '🎙️', '📝', '📖', '📋', '🗣️', '🔊', '🎧', '💡', '🔬', '💬', '🎥', '📊', '🗂️', '📑', '✍️', '📞', '🔍'],
   folders: [
     { id: null, name: 'Nenhuma pasta', icon: '' },
@@ -179,7 +175,6 @@ const uploadForm: UploadFormData = {
     quality: 'Standard',
     engine: 'Parakeet',
     parakeetModel: 'PtBrTagarela',
-    speakerMode: 'Automatic',
     selectedFolderId: null,
   },
   formats: 'MP3, WAV, M4A, MP4, WEBM, OGG',
@@ -234,7 +229,6 @@ const settingsData: SettingsData = {
   profile: { name: 'Eugen', email: '', institution: 'UFPR' },
   languages: uploadForm.languages,
   defaultLanguage: 'pt',
-  identifySpeakersDefault: true,
   liveTranscriptionEnabled: true,
   devices: [
     { value: 'Auto', label: 'Automático' },

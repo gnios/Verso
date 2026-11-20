@@ -104,7 +104,7 @@ export default function App() {
           {screen === 'Folder' && <FolderPage parameter={parameter} />}
           {screen === 'Upload' && <UploadPage parameter={parameter} />}
           {screen === 'Recording' && <RecordingPage />}
-          {screen === 'Editor' && <EditorPage parameter={parameter} />}
+          {screen === 'Editor' && <EditorPage parameter={parameter} isDark={isDark} />}
           {screen === 'Settings' && <SettingsPage />}
         </ErrorBoundary>
       </AppShell>

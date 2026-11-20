@@ -143,7 +143,8 @@ public class LibraryService(IDbContextFactory<VersoDbContext> dbContextFactory)
         }
     }
 
-    public async Task UpdateTranscriptionTagsAsync(Guid id, IEnumerable<string> tagNames)
+    public async Task UpdateTranscriptionTagsAsync(
+        Guid id, IEnumerable<string> tagNames, IReadOnlyDictionary<string, string>? tagColors = null)
     {
         await using var context = await dbContextFactory.CreateDbContextAsync();
         var transcription = await context.Transcriptions
@@ -156,7 +157,7 @@ public class LibraryService(IDbContextFactory<VersoDbContext> dbContextFactory)
         }
 
         transcription.Tags.Clear();
-        await ApplyTagsAsync(context, transcription, tagNames);
+        await ApplyTagsAsync(context, transcription, tagNames, tagColors);
         await context.SaveChangesAsync();
     }
 
@@ -241,7 +242,7 @@ public class LibraryService(IDbContextFactory<VersoDbContext> dbContextFactory)
         await context.SaveChangesAsync();
     }
 
-    public async Task AssignSpeakerToSegmentAsync(Guid segmentId, Guid speakerId)
+    public async Task AssignSpeakerToSegmentAsync(Guid segmentId, Guid? speakerId)
     {
         await using var context = await dbContextFactory.CreateDbContextAsync();
         var updated = await context.Segments
@@ -311,7 +312,8 @@ public class LibraryService(IDbContextFactory<VersoDbContext> dbContextFactory)
     private static async Task ApplyTagsAsync(
         VersoDbContext context,
         Transcription transcription,
-        IEnumerable<string>? tagNames)
+        IEnumerable<string>? tagNames,
+        IReadOnlyDictionary<string, string>? tagColors = null)
     {
         if (tagNames is null)
         {
@@ -329,7 +331,7 @@ public class LibraryService(IDbContextFactory<VersoDbContext> dbContextFactory)
                 tag = new Tag
                 {
                     Name = tagName,
-                    ColorName = TagColorCatalog.GetColor(tagName),
+                    ColorName = tagColors?.GetValueOrDefault(tagName) ?? TagColorCatalog.GetColor(tagName),
                 };
                 context.Tags.Add(tag);
             }

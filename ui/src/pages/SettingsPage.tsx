@@ -1,23 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Badge } from '@astryxdesign/core/Badge';
 import { Button } from '@astryxdesign/core/Button';
-import { Card } from '@astryxdesign/core/Card';
-import { CheckboxInput } from '@astryxdesign/core/CheckboxInput';
-import { HStack } from '@astryxdesign/core/HStack';
 import { Heading } from '@astryxdesign/core/Heading';
-import { Icon } from '@astryxdesign/core/Icon';
 import { Selector } from '@astryxdesign/core/Selector';
+import { Switch } from '@astryxdesign/core/Switch';
 import { Text } from '@astryxdesign/core/Text';
-import { TextInput } from '@astryxdesign/core/TextInput';
-import { VStack } from '@astryxdesign/core/VStack';
 import { invoke } from '../lib/bridge';
 import type { SettingsData } from '../types';
-import { RefreshIcon } from '../icons';
+
+type SettingsChanges = Partial<Pick<SettingsData,
+  'defaultLanguage' | 'liveTranscriptionEnabled'
+  | 'defaultEngine' | 'defaultParakeetModel' | 'defaultQuality' | 'device'
+>>;
 
 export function SettingsPage() {
   const [data, setData] = useState<SettingsData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [runtimeMessage, setRuntimeMessage] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -33,244 +32,185 @@ export function SettingsPage() {
     void load();
   }, [load]);
 
-  const update = async (changes: Record<string, unknown>) => {
+  const update = async (changes: SettingsChanges) => {
+    if (saving) return;
     setSaving(true);
+    setError(null);
     try {
-      const next = await invoke<SettingsData>('settings.update', changes);
-      setData(next);
+      setData(await invoke<SettingsData>('settings.update', changes));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Falha ao salvar.');
+      setError(err instanceof Error ? err.message : 'Falha ao salvar as configurações.');
     } finally {
       setSaving(false);
     }
   };
 
   const verifyRuntime = async () => {
-    if (!data) {
-      return;
-    }
-    setRuntimeMessage('Verificando…');
+    if (!data || verifying) return;
+    setVerifying(true);
+    setRuntimeMessage(null);
     try {
-      const result = await invoke<{ message: string }>('settings.verifyRuntime', {
+      const { message } = await invoke<{ message: string }>('settings.verifyRuntime', {
         device: data.device,
         quality: data.defaultQuality,
       }, 5 * 60_000);
-      setRuntimeMessage(result.message);
+      setRuntimeMessage(message);
     } catch (err) {
-      setRuntimeMessage(err instanceof Error ? err.message : 'Falha na verificação.');
+      setRuntimeMessage(err instanceof Error ? err.message : 'Falha ao verificar o Whisper.');
+    } finally {
+      setVerifying(false);
     }
-    void load();
   };
 
-  if (!data) {
-    return (
-      <VStack padding={6} align="start" gap={2}>
-        <Heading level={1}>Configurações</Heading>
-        {error ? (
-          <>
-            <Text color="secondary">{error}</Text>
-            <Button variant="primary" label="Tentar de novo" onClick={() => void load()} />
-          </>
-        ) : (
-          <Text color="secondary">Carregando…</Text>
-        )}
-      </VStack>
-    );
-  }
+  const openLogs = async () => {
+    setError(null);
+    try {
+      await invoke('settings.openLogs');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao abrir a pasta de logs.');
+    }
+  };
 
-  const recommended = data.models.find((model) => model.value === data.recommendation.quality);
+  const controlsDisabled = saving || verifying;
 
   return (
-    <VStack gap={4} padding={4} align="start" isScrollable>
-      <VStack gap={1} align="start">
-        <Heading level={1}>Configurações</Heading>
-        <Text color="secondary">Preferências de transcrição e perfil de uso.</Text>
-      </VStack>
+    <div className="settings-scroll">
+      <div className="settings-page">
+        <header className="settings-heading">
+          <Heading level={1}>Configurações</Heading>
+          {saving && <Text size="sm" color="secondary" role="status">Salvando…</Text>}
+        </header>
 
-      <HStack gap={4} align="start" wrap="wrap">
-        {/* Perfil */}
-        <Card padding={4} width={420}>
-          <VStack gap={3} align="start">
-            <Heading level={3}>Perfil</Heading>
-            <TextInput
-              label="Nome"
-              value={data.profile.name}
-              onChange={(name) => setData({ ...data, profile: { ...data.profile, name } })}
-              onBlur={() => void update({ name: data.profile.name })}
-            />
-            <TextInput
-              label="E-mail"
-              value={data.profile.email}
-              onChange={(email) => setData({ ...data, profile: { ...data.profile, email } })}
-              onBlur={() => void update({ email: data.profile.email })}
-            />
-            <TextInput
-              label="Instituição"
-              value={data.profile.institution}
-              onChange={(institution) => setData({ ...data, profile: { ...data.profile, institution } })}
-              onBlur={() => void update({ institution: data.profile.institution })}
-            />
-          </VStack>
-        </Card>
+        {error && <p className="settings-error" role="alert">{error}</p>}
 
-        {/* Preferências */}
-        <Card padding={4} width={420}>
-          <VStack gap={3} align="start">
-            <Heading level={3}>Preferências</Heading>
-            <Selector
-              label="Idioma padrão"
-              options={data.languages.map((language) => ({ value: language.code, label: language.label }))}
-              value={data.defaultLanguage}
-              onChange={(defaultLanguage) => void update({ defaultLanguage })}
-              width="100%"
-            />
-            <CheckboxInput
-              label="Identificar locutores por padrão"
-              value={data.identifySpeakersDefault}
-              onChange={(identifySpeakersDefault) => void update({ identifySpeakersDefault })}
-            />
-            <CheckboxInput
-              label="Transcrição ao vivo durante a gravação"
-              value={data.liveTranscriptionEnabled}
-              onChange={(liveTranscriptionEnabled) => void update({ liveTranscriptionEnabled })}
-            />
-          </VStack>
-        </Card>
-      </HStack>
-
-      {/* Avançado: motor + dispositivo */}
-      <Card padding={4} width="100%">
-        <VStack gap={3} align="start">
-          <Heading level={3}>Avançado</Heading>
-          <HStack gap={4} wrap="wrap">
-            <VStack gap={2} align="start">
-              <Selector
-                label="Motor de transcrição"
-                options={data.engines.map((engine) => ({
-                  value: engine.value,
-                  label: engine.label,
-                  description: engine.hint,
-                }))}
-                value={data.defaultEngine}
-                onChange={(defaultEngine) => void update({ defaultEngine })}
-              />
-              {data.defaultEngine === 'Parakeet' ? (
+        {!data ? (
+          error
+            ? <Button variant="secondary" label="Tentar novamente" onClick={() => void load()} />
+            : <Text color="secondary" role="status">Carregando…</Text>
+        ) : (
+          <>
+            <section className="settings-section" aria-labelledby="settings-transcription">
+              <Heading level={2} id="settings-transcription">Transcrição</Heading>
+              <div className="settings-row settings-select-row">
+                <span aria-hidden="true">Idioma padrão</span>
                 <Selector
-                  label="Modelo Parakeet"
-                  options={data.parakeetModels.map((model) => ({
-                    value: model.value,
-                    label: model.label,
-                    description: model.sizeLabel,
-                  }))}
-                  value={data.defaultParakeetModel}
-                  onChange={(defaultParakeetModel) => void update({ defaultParakeetModel })}
+                  label="Idioma padrão"
+                  isLabelHidden
+                  options={data.languages.map(({ code, label }) => ({ value: code, label }))}
+                  value={data.defaultLanguage}
+                  onChange={(defaultLanguage) => void update({ defaultLanguage })}
+                  isDisabled={saving}
+                  width="100%"
                 />
-              ) : null}
-            </VStack>
-            <VStack gap={2} align="start">
-              <Selector
-                label="Dispositivo de execução"
-                options={data.devices.map((device) => ({ value: device.value, label: device.label }))}
-                value={data.device}
-                onChange={(device) => void update({ device })}
-              />
-              <Text size="sm" color="secondary">{data.developer.runtimePreference}</Text>
-            </VStack>
-          </HStack>
-          {/* Perfil de precisão só se aplica ao Whisper — o Parakeet ignora
-              ModelQuality (a escolha é o modelo TAGARELA/TDT v3 acima). */}
-          {data.defaultEngine === 'Whisper' ? (
-            <VStack gap={2} align="start" width="100%">
-              <HStack gap={2} align="center">
-                <Text size="sm" color="secondary">Perfil de precisão (Whisper)</Text>
-                {recommended ? (
-                  <Badge variant="success" label={`Recomendado: ${recommended.label}`} />
-                ) : null}
-              </HStack>
-              {data.recommendation.detectedRamGb > 0 ? (
-                <Text size="sm" color="secondary">
-                  {data.recommendation.reason} · RAM detectada: {data.recommendation.detectedRamGb} GB
-                </Text>
-              ) : null}
-              <HStack gap={3} align="start" wrap="wrap">
-                {data.models.map((model) => (
-                  <Card
-                    key={model.value}
-                    variant={data.defaultQuality === model.value ? 'blue' : 'default'}
-                    padding={3}
-                    width={260}
-                    className="verso-card"
-                    onClick={() => void update({ defaultQuality: model.value })}
-                  >
-                    <VStack gap={1} align="start">
-                      <HStack justify="between" width="100%">
-                        <Heading level={4}>{model.label}</Heading>
-                        <Badge label={model.sizeLabel} />
-                      </HStack>
-                      <Text size="sm" color="secondary">{model.speedHint}</Text>
-                      <Text size="sm">{model.whenToUse}</Text>
-                    </VStack>
-                  </Card>
-                ))}
-              </HStack>
-            </VStack>
-          ) : null}
-        </VStack>
-      </Card>
+              </div>
+            </section>
 
-      {/* Desenvolvedor */}
-      <Card padding={4} width="100%">
-        <VStack gap={3} align="start">
-          <HStack justify="between" width="100%">
-            <Heading level={3}>Desenvolvedor</Heading>
-            <Button
-              size="sm"
-              variant="ghost"
-              label="Atualizar"
-              icon={<Icon icon={RefreshIcon} size="sm" />}
-              onClick={() => void load()}
-            />
-          </HStack>
-          <HStack gap={2} wrap="wrap">
-            <Badge label={`Versão ${data.developer.appVersion}`} />
-            <Badge label={data.developer.isRuntimeLoaded ? `Runtime: ${data.developer.loadedRuntime}` : 'Runtime não carregado'} />
-            <Badge label={`Backend ${data.developer.loadedBackend}`} />
-            <Badge label={`GPU ativa: ${data.developer.activeGpu}`} />
-          </HStack>
-          {data.developer.gpus.length > 0 ? (
-            <VStack gap={1} align="start">
-              {data.developer.gpus.map((gpu) => (
-                <Text key={gpu.name} size="sm" color="secondary">
-                  {gpu.name} · {gpu.kindLabel} · {gpu.ramLabel}
-                </Text>
-              ))}
-            </VStack>
-          ) : (
-            <Text size="sm" color="secondary">Nenhuma GPU detectada.</Text>
-          )}
-          <HStack gap={2}>
-            <Button
-              size="sm"
-              variant="secondary"
-              label="Verificar runtime"
-              onClick={() => void verifyRuntime()}
-            />
-            <Button
-              size="sm"
-              variant="secondary"
-              label="Abrir pasta de logs"
-              onClick={() => void invoke('settings.openLogs')}
-            />
-          </HStack>
-          {runtimeMessage ? <Text size="sm">{runtimeMessage}</Text> : null}
-          <Text size="sm" color="secondary">
-            {data.developer.updateStatus} · Logs: {data.developer.logDirectory}
-          </Text>
-        </VStack>
-      </Card>
+            <section className="settings-section" aria-labelledby="settings-recording">
+              <Heading level={2} id="settings-recording">Gravação</Heading>
+              <div className="settings-row">
+                <Switch
+                  label="Transcrição ao vivo"
+                  value={data.liveTranscriptionEnabled}
+                  onChange={(liveTranscriptionEnabled) => void update({ liveTranscriptionEnabled })}
+                  isDisabled={saving}
+                  labelPosition="start"
+                  labelSpacing="spread"
+                  width="100%"
+                />
+              </div>
+            </section>
 
-      {saving ? <Text size="sm" color="secondary">Salvando…</Text> : null}
-      {error ? <Text size="sm" color="secondary">{error}</Text> : null}
-    </VStack>
+            <details className="settings-details">
+              <summary>Modelos e desempenho</summary>
+              <div className="settings-advanced">
+                <div className="settings-row settings-select-row">
+                  <span aria-hidden="true">Motor de transcrição</span>
+                  <Selector
+                    label="Motor de transcrição"
+                    isLabelHidden
+                    options={data.engines.map(({ value, label, hint }) => ({ value, label, description: hint }))}
+                    value={data.defaultEngine}
+                    onChange={(defaultEngine) => void update({ defaultEngine })}
+                    isDisabled={controlsDisabled}
+                    width="100%"
+                  />
+                </div>
+                {data.defaultEngine === 'Parakeet' ? (
+                  <div className="settings-row settings-select-row">
+                    <span aria-hidden="true">Modelo Parakeet</span>
+                    <Selector
+                      label="Modelo Parakeet"
+                      isLabelHidden
+                      options={data.parakeetModels.map(({ value, label, sizeLabel }) => ({
+                        value, label, description: sizeLabel,
+                      }))}
+                      value={data.defaultParakeetModel}
+                      onChange={(defaultParakeetModel) => void update({ defaultParakeetModel })}
+                      isDisabled={controlsDisabled}
+                      width="100%"
+                    />
+                  </div>
+                ) : (
+                  <div className="settings-row settings-select-row">
+                    <span aria-hidden="true">Perfil do Whisper</span>
+                    <Selector
+                      label="Perfil do Whisper"
+                      isLabelHidden
+                      options={data.models.map(({ value, label, sizeLabel, speedHint }) => ({
+                        value,
+                        label,
+                        description: [sizeLabel, speedHint, value === data.recommendation.quality && 'Recomendado']
+                          .filter(Boolean).join(' · '),
+                      }))}
+                      value={data.defaultQuality}
+                      onChange={(defaultQuality) => void update({ defaultQuality })}
+                      isDisabled={controlsDisabled}
+                      width="100%"
+                    />
+                  </div>
+                )}
+                <div className="settings-row settings-select-row">
+                  <span aria-hidden="true">Dispositivo de execução</span>
+                  <Selector
+                    label="Dispositivo de execução"
+                    isLabelHidden
+                    options={data.devices}
+                    value={data.device}
+                    onChange={(device) => void update({ device })}
+                    isDisabled={controlsDisabled}
+                    width="100%"
+                  />
+                </div>
+              </div>
+            </details>
+
+            <details className="settings-details">
+              <summary>Diagnóstico</summary>
+              <div className="settings-diagnostics">
+                <dl>
+                  <div><dt>Versão do Verso</dt><dd>{data.developer.appVersion}</dd></div>
+                  {data.developer.gpus.map((gpu) => (
+                    <div key={gpu.name}><dt>GPU</dt><dd>{gpu.name} · {gpu.ramLabel}</dd></div>
+                  ))}
+                  {data.developer.isRuntimeLoaded && (
+                    <div><dt>Runtime do Whisper</dt><dd>{data.developer.loadedRuntime} · {data.developer.loadedBackend}</dd></div>
+                  )}
+                </dl>
+                <div className="settings-actions">
+                  <Button size="sm" variant="secondary" label="Abrir pasta de logs" onClick={() => void openLogs()} />
+                  <Button size="sm" variant="secondary" label="Verificar Whisper"
+                    isDisabled={controlsDisabled} onClick={() => void verifyRuntime()} />
+                </div>
+                {(verifying || runtimeMessage) && (
+                  <p className="settings-runtime-message" role="status">
+                    {verifying ? 'Verificando o Whisper…' : runtimeMessage}
+                  </p>
+                )}
+              </div>
+            </details>
+          </>
+        )}
+      </div>
+    </div>
   );
 }

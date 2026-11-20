@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -304,11 +305,6 @@ public sealed class VersoBridge : IDisposable
                     label = p.Label,
                     sizeLabel = p.SizeLabel,
                 }),
-                speakerModes = new[]
-                {
-                    new { value = "Automatic", label = "Automático" },
-                    new { value = "Off", label = "Desativado" },
-                },
                 icons = IconCatalog.TransIcons,
                 folders = folders.Select(f => new { id = (int?)f.Id, name = f.Title, icon = f.Icon })
                     .Prepend(new { id = (int?)null, name = "Nenhuma pasta", icon = "" }),
@@ -318,7 +314,6 @@ public sealed class VersoBridge : IDisposable
                     quality = ModelCatalog.ResolveProfile(settings.DefaultQuality).ToString(),
                     engine = settings.DefaultEngine.ToString(),
                     parakeetModel = settings.DefaultParakeetModel.ToString(),
-                    speakerMode = settings.IdentifySpeakersDefault ? "Automatic" : "Off",
                     selectedFolderId = preselectedFolderId is int folderId ? (int?)folderId : null,
                 },
                 formats = UploadMediaFormats.DisplayList,
@@ -350,8 +345,6 @@ public sealed class VersoBridge : IDisposable
             var quality = ParseEnum<ModelQuality>(args, "quality") ?? ModelQuality.Standard;
             var engine = ParseEnum<TranscriptionEngineKind>(args, "engine") ?? settings.DefaultEngine;
             var parakeetModel = ParseEnum<ParakeetModel>(args, "parakeetModel") ?? settings.DefaultParakeetModel;
-            var speakerMode = ParseEnum<SpeakerMode>(args, "speakerMode")
-                ?? (settings.IdentifySpeakersDefault ? SpeakerMode.Automatic : SpeakerMode.Off);
             var folderId = GetNullableInt(args, "folderId");
             var icon = GetNullableString(args, "icon");
             var tags = args?.TryGetProperty("tags", out var tagsElement) == true
@@ -370,7 +363,7 @@ public sealed class VersoBridge : IDisposable
                 language,
                 quality,
                 settings.Device,
-                speakerMode,
+                SpeakerMode.Off,
                 folderId,
                 durationSeconds,
                 icon,
@@ -574,7 +567,8 @@ public sealed class VersoBridge : IDisposable
         _bridge.Register("editor.assignSpeaker", async args =>
         {
             var segmentId = GetGuid(args, "segmentId");
-            var speakerId = GetGuid(args, "speakerId");
+            Guid? speakerId = args?.TryGetProperty("speakerId", out var speaker) == true
+                && speaker.ValueKind == JsonValueKind.Null ? null : GetGuid(args, "speakerId");
             using var scope = _services.CreateScope();
             var library = scope.ServiceProvider.GetRequiredService<LibraryService>();
             await library.AssignSpeakerToSegmentAsync(segmentId, speakerId);
@@ -635,7 +629,22 @@ public sealed class VersoBridge : IDisposable
                     .Select(t => t.GetString() ?? "")
                     .Where(t => t.Length > 0)
                     .ToArray();
-                await library.UpdateTranscriptionTagsAsync(transcriptionId, tags);
+                var colors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                if (args?.TryGetProperty("tagColors", out var colorElement) == true
+                    && colorElement.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (var entry in colorElement.EnumerateObject())
+                    {
+                        if (entry.Value.ValueKind == JsonValueKind.String
+                            && entry.Value.GetString() is "blue" or "cyan" or "green" or "orange"
+                                or "pink" or "purple" or "teal" or "yellow" or "red")
+                        {
+                            colors[entry.Name] = entry.Value.GetString()!;
+                        }
+                    }
+                }
+
+                await library.UpdateTranscriptionTagsAsync(transcriptionId, tags, colors);
             }
 
             if (args?.TryGetProperty("folderId", out var folderElement) == true)
@@ -739,12 +748,6 @@ public sealed class VersoBridge : IDisposable
                 if (args?.TryGetProperty("defaultLanguage", out var language) == true)
                 {
                     settings.DefaultLanguage = language.GetString() ?? "pt";
-                }
-
-                if (args?.TryGetProperty("identifySpeakersDefault", out var identify) == true
-                    && identify.ValueKind is JsonValueKind.True or JsonValueKind.False)
-                {
-                    settings.IdentifySpeakersDefault = identify.GetBoolean();
                 }
 
                 if (args?.TryGetProperty("liveTranscriptionEnabled", out var live) == true
@@ -852,7 +855,6 @@ public sealed class VersoBridge : IDisposable
                 new { code = "en", label = "English" },
             },
             defaultLanguage = viewModel.SelectedLanguageOption?.Code ?? "pt",
-            identifySpeakersDefault = viewModel.IdentifySpeakersDefault,
             liveTranscriptionEnabled = viewModel.LiveTranscriptionEnabled,
             devices = viewModel.DeviceOptions.Select(d => new { value = d.Value.ToString(), label = d.Label }),
             device = viewModel.SelectedDeviceOption?.Value.ToString() ?? "Auto",

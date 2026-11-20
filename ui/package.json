@@ -16,6 +16,7 @@
     "@astryxdesign/theme-neutral": "0.7.16",
     "@sentry/react": "^11.15.0",
     "@stylexjs/stylex": "^0.19.0",
+    "emoji-picker-react": "^4.22.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

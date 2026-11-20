@@ -155,7 +155,6 @@ export interface UploadFormData {
   models: ModelOption[];
   engines: EngineOption[];
   parakeetModels: ParakeetModelOption[];
-  speakerModes: { value: string; label: string }[];
   icons: string[];
   folders: UploadFolderOption[];
   defaults: {
@@ -163,7 +162,6 @@ export interface UploadFormData {
     quality: string;
     engine: string;
     parakeetModel: string;
-    speakerMode: string;
     selectedFolderId: number | null;
   };
   formats: string;
@@ -242,7 +240,6 @@ export interface SettingsData {
   profile: { name: string; email: string; institution: string };
   languages: { code: string; label: string }[];
   defaultLanguage: string;
-  identifySpeakersDefault: boolean;
   liveTranscriptionEnabled: boolean;
   devices: { value: string; label: string }[];
   device: string;

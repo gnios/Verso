@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from '@astryxdesign/core/Badge';
 import { Button } from '@astryxdesign/core/Button';
 import { Card } from '@astryxdesign/core/Card';
-import { Collapsible } from '@astryxdesign/core/Collapsible';
 import { DropdownMenu } from '@astryxdesign/core/DropdownMenu';
 import { HStack } from '@astryxdesign/core/HStack';
 import { Heading } from '@astryxdesign/core/Heading';
@@ -15,7 +14,6 @@ import { TextInput } from '@astryxdesign/core/TextInput';
 import { VStack } from '@astryxdesign/core/VStack';
 import { invoke, onEvent } from '../lib/bridge';
 import { FOLDERS_ENABLED } from '../lib/features';
-import { navigateTo } from '../lib/screens';
 import type { NavigationParam } from '../lib/screens';
 import type {
   CardTag,
@@ -28,7 +26,6 @@ import type {
   SegmentSplitResult,
 } from '../types';
 import {
-  ChevronLeftIcon,
   DownloadIcon,
   MergeIcon,
   PauseIcon,
@@ -36,22 +33,38 @@ import {
   PlusIcon,
   ScissorsIcon,
   UserIcon,
+  CheckCircleIcon,
 } from '../icons';
 
 interface EditorPageProps {
   parameter: NavigationParam;
+  isDark: boolean;
 }
 
-const TAG_VARIANTS = ['blue', 'cyan', 'green', 'orange', 'pink', 'purple', 'teal', 'yellow', 'red'] as const;
+const TranscriptionEmojiPicker = lazy(() => import('../components/TranscriptionEmojiPicker'));
 
-// Cor estável por nome de tag: o mesmo nome sempre rende a mesma variante do
-// Badge, sem depender do catálogo limitado do backend.
-function tagVariant(name: string): (typeof TAG_VARIANTS)[number] {
-  let hash = 2166136261;
-  for (let i = 0; i < name.length; i++) {
-    hash = Math.imul(hash ^ name.charCodeAt(i), 16777619);
-  }
-  return TAG_VARIANTS[(hash >>> 0) % TAG_VARIANTS.length];
+const TAG_COLORS = {
+  blue: 'Azul', cyan: 'Ciano', green: 'Verde', orange: 'Laranja', pink: 'Rosa',
+  purple: 'Roxo', teal: 'Verde-azulado', yellow: 'Amarelo', red: 'Vermelho',
+} as const;
+
+function tagVariant(color: string): keyof typeof TAG_COLORS {
+  return Object.hasOwn(TAG_COLORS, color) ? color as keyof typeof TAG_COLORS : 'blue';
+}
+
+function PickerOption({ label, color, selected, onClick }: {
+  label: string;
+  color?: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button className="editor-picker-option" type="button" aria-pressed={selected} onClick={onClick}>
+      <span className="seg-speaker-dot" style={{ background: color }} aria-hidden="true" />
+      <span>{label}</span>
+      {selected && <Icon icon={CheckCircleIcon} size="sm" />}
+    </button>
+  );
 }
 
 function formatTime(seconds: number): string {
@@ -242,17 +255,21 @@ function WaveformCanvas({
   );
 }
 
-export function EditorPage({ parameter }: EditorPageProps) {
+export function EditorPage({ parameter, isDark }: EditorPageProps) {
   const [data, setData] = useState<EditorData | null>(null);
   const [segments, setSegments] = useState<EditorSegment[]>([]);
   const [speakers, setSpeakers] = useState<EditorSpeaker[]>([]);
   const [title, setTitle] = useState('');
   const [icon, setIcon] = useState<string | null>(null);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [savingIcon, setSavingIcon] = useState(false);
   const [tags, setTags] = useState<CardTag[]>([]);
   const [folderId, setFolderId] = useState<number | null>(null);
   const [allTags, setAllTags] = useState<CardTag[]>([]);
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
   const [tagQuery, setTagQuery] = useState('');
+  const [tagColor, setTagColor] = useState<string | null>(null);
+  const [savingTags, setSavingTags] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -374,41 +391,67 @@ export function EditorPage({ parameter }: EditorPageProps) {
     }
   };
 
-  const commitTitle = () => {
-    if (title.trim() && title !== data?.title) {
-      void invoke('editor.updateMeta', { transcriptionId, title: title.trim() });
+  const commitTitle = async () => {
+    const next = title.trim() || data?.title || '';
+    setTitle(next);
+    if (next === data?.title) return;
+    try {
+      await invoke('editor.updateMeta', { transcriptionId, title: next });
+      setData((previous) => previous && { ...previous, title: next });
+    } catch (err) {
+      setTitle(data?.title ?? '');
+      setError(err instanceof Error ? err.message : 'Falha ao salvar o título.');
     }
   };
 
-  const commitTags = (next: CardTag[]) => {
-    setTags(next);
-    void invoke('editor.updateMeta', { transcriptionId, tags: next.map((tag) => tag.name) });
+  const commitIcon = async (nextIcon: string) => {
+    setEmojiPickerOpen(false);
+    if (savingIcon || nextIcon === icon) return;
+    setSavingIcon(true);
+    try {
+      await invoke('editor.updateMeta', { transcriptionId, icon: nextIcon });
+      setIcon(nextIcon);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao salvar o emoji.');
+    } finally {
+      setSavingIcon(false);
+    }
   };
 
-  const addTag = (name: string) => {
-    const trimmed = name.trim();
-    if (!trimmed || tags.some((tag) => tag.name.toLowerCase() === trimmed.toLowerCase())) {
-      return;
-    }
-    const known = allTags.find((tag) => tag.name.toLowerCase() === trimmed.toLowerCase());
-    commitTags([...tags, { name: known?.name ?? trimmed, colorName: known?.colorName ?? 'blue' }]);
+  const changeTagPicker = (open: boolean) => {
+    setTagPickerOpen(open);
     setTagQuery('');
-    setTagPickerOpen(false);
+    setTagColor(null);
   };
 
-  const removeTag = (name: string) => {
-    commitTags(tags.filter((tag) => tag.name.toLowerCase() !== name.toLowerCase()));
+  const commitTags = async (next: CardTag[], created?: CardTag) => {
+    if (savingTags) return;
+    setSavingTags(true);
+    try {
+      await invoke('editor.updateMeta', {
+        transcriptionId,
+        tags: next.map((tag) => tag.name),
+        tagColors: created ? { [created.name]: created.colorName } : undefined,
+      });
+      setTags(next);
+      if (created) setAllTags((previous) => [...previous, created]);
+      changeTagPicker(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao salvar as tags.');
+    } finally {
+      setSavingTags(false);
+    }
   };
 
-  const tagSuggestions = allTags.filter(
-    (tag) =>
-      !tags.some((applied) => applied.name.toLowerCase() === tag.name.toLowerCase()) &&
-      tag.name.toLowerCase().includes(tagQuery.trim().toLowerCase()),
-  );
-  const canCreateTag =
-    tagQuery.trim().length > 0 &&
-    !allTags.some((tag) => tag.name.toLowerCase() === tagQuery.trim().toLowerCase()) &&
-    !tags.some((tag) => tag.name.toLowerCase() === tagQuery.trim().toLowerCase());
+  const query = tagQuery.trim().toLowerCase();
+  const knownTags = new Map([...allTags, ...tags].map((tag) => [tag.name.toLowerCase(), tag]));
+  const tagMatches = [...knownTags.values()].filter((tag) => tag.name.toLowerCase().includes(query));
+  const canCreateTag = query.length > 0 && !knownTags.has(query);
+  const createTag = () => {
+    if (!canCreateTag || !tagColor) return;
+    const created = { name: tagQuery.trim(), colorName: tagColor };
+    void commitTags([...tags, created], created);
+  };
 
   const commitFolder = (next: number | null) => {
     setFolderId(next);
@@ -586,27 +629,67 @@ export function EditorPage({ parameter }: EditorPageProps) {
     }
   };
 
-  const assignSpeaker = (segmentId: string, speakerId: string | null) => {
-    setSegments((previous) =>
-      previous.map((segment) => (segment.id === segmentId ? { ...segment, speakerId } : segment)),
-    );
-    setActiveSpeakerFor(null);
-    if (speakerId) {
-      void invoke('editor.assignSpeaker', { segmentId, speakerId });
+  const saveSpeaker = async (segmentId: string, speakerId: string | null, name?: string) => {
+    try {
+      if (name) {
+        const speaker = await invoke<EditorSpeaker>('editor.addSpeaker', { transcriptionId, name });
+        setSpeakers((previous) => previous.some((option) => option.id === speaker.id)
+          ? previous
+          : [...previous, speaker]);
+        speakerId = speaker.id;
+      }
+      await invoke('editor.assignSpeaker', { segmentId, speakerId });
+      setSegments((previous) =>
+        previous.map((segment) => (segment.id === segmentId ? { ...segment, speakerId } : segment)),
+      );
+      setActiveSpeakerFor(null);
+      setNewSpeakerName('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao atribuir o locutor.');
     }
   };
 
-  const addSpeaker = async (segmentId: string) => {
-    const name = newSpeakerName.trim();
-    if (!name) {
-      return;
-    }
-
-    const speaker = await invoke<EditorSpeaker>('editor.addSpeaker', { transcriptionId, name });
-    setSpeakers((previous) => [...previous, speaker]);
-    setNewSpeakerName('');
-    assignSpeaker(segmentId, speaker.id);
-  };
+  const speakerPicker = (segment: EditorSegment, trigger: React.ReactNode) => (
+    <span onClick={(event) => event.stopPropagation()}>
+      <Popover
+        label="Selecionar locutor"
+        placement="below"
+        alignment="start"
+        width={274}
+        padding={0}
+        isOpen={activeSpeakerFor === segment.id}
+        onOpenChange={(open) => {
+          setActiveSpeakerFor(open ? segment.id : null);
+          setNewSpeakerName('');
+        }}
+        content={(
+          <div className="editor-picker">
+            <div className="editor-picker-title">Selecionar locutor</div>
+            <div className="editor-picker-list">
+              {speakers.map((speaker) => (
+                <PickerOption key={speaker.id} label={speaker.name} color={speaker.colorHex}
+                  selected={segment.speakerId === speaker.id}
+                  onClick={() => void saveSpeaker(segment.id, speaker.id)} />
+              ))}
+              <PickerOption label="Sem locutor" selected={!segment.speakerId}
+                onClick={() => void saveSpeaker(segment.id, null)} />
+            </div>
+            <div className="editor-picker-create">
+              <TextInput label="Novo locutor" isLabelHidden value={newSpeakerName} width="100%"
+                onChange={setNewSpeakerName} placeholder="Novo locutor…"
+                onEnter={() => {
+                  if (newSpeakerName.trim()) void saveSpeaker(segment.id, null, newSpeakerName.trim());
+                }} />
+              <Button size="sm" variant="primary" label="Adicionar" isDisabled={!newSpeakerName.trim()}
+                onClick={() => void saveSpeaker(segment.id, null, newSpeakerName.trim())} />
+            </div>
+          </div>
+        )}
+      >
+        {trigger}
+      </Popover>
+    </span>
+  );
 
   const exportAs = async (format: 'txt' | 'srt' | 'vtt') => {
     try {
@@ -668,57 +751,228 @@ export function EditorPage({ parameter }: EditorPageProps) {
         />
       ) : null}
 
-      {/* Título + exportação no topo (pedido do usuário: título editável
-          primeiro, junto dos botões de baixar; player vem em seguida). */}
-      <HStack gap={2} align="center" padding={4} paddingBlockEnd={2} width="100%">
-        <IconButton
-          icon={<Icon icon={ChevronLeftIcon} />}
-          label="Voltar para a biblioteca"
-          variant="ghost"
-          onClick={() => void navigateTo('Dashboard')}
-        />
-        <Text size="lg">{icon ?? '📝'}</Text>
-        <TextInput
-          label="Título da transcrição"
-          isLabelHidden
-          value={title}
-          onChange={setTitle}
-          onBlur={commitTitle}
-          width="100%"
-          data-testid="editor-title"
-        />
-        {FOLDERS_ENABLED && (
-        <Selector
-          label="Pasta"
-          options={data.folders.map((folder) => ({
-            value: folder.id === null ? 'none' : String(folder.id),
-            label: folder.name,
-          }))}
-          value={folderId === null ? 'none' : String(folderId)}
-          onChange={(value) => commitFolder(value === 'none' ? null : Number(value))}
-        />
-        )}
-        {/* flex-shrink 0: sem isso o título (width 100%) espremia o botão
-            até o rótulo virar "B…". */}
-        <div style={{ flexShrink: 0 }}>
-        <DropdownMenu
-          button={{
-            variant: 'secondary',
-            size: 'lg',
-            label: 'Baixar',
-            icon: <Icon icon={DownloadIcon} size="sm" />,
-            isDisabled: !data.hasSegments,
-          }}
-          menuWidth={200}
-          items={[
-            { label: 'Texto (TXT)', onClick: () => void exportAs('txt') },
-            { label: 'Legendas (SRT)', onClick: () => void exportAs('srt') },
-            { label: 'Legendas (VTT)', onClick: () => void exportAs('vtt') },
-          ]}
-        />
-        </div>
-      </HStack>
+      <div className="editor-scroll">
+        <div className="editor-document">
+          <div className="editor-title-row">
+            <Popover
+              label="Escolher emoji da transcrição"
+              isOpen={emojiPickerOpen}
+              onOpenChange={setEmojiPickerOpen}
+              placement="below"
+              alignment="start"
+              width={340}
+              padding={0}
+              content={emojiPickerOpen && (
+                <Suspense fallback={<div className="editor-emoji-loading" role="status">Carregando emojis…</div>}>
+                  <TranscriptionEmojiPicker isDark={isDark} onSelect={(emoji) => void commitIcon(emoji)} />
+                </Suspense>
+              )}
+            >
+              <button type="button" className="editor-emoji-trigger" aria-label="Alterar emoji da transcrição"
+                title="Alterar emoji da transcrição" disabled={savingIcon}>
+                <span aria-hidden="true">{icon ?? '📝'}</span>
+              </button>
+            </Popover>
+            <h1>
+              <input className="editor-title" aria-label="Título da transcrição"
+                value={title} onChange={(event) => setTitle(event.target.value)}
+                onBlur={() => void commitTitle()}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') event.currentTarget.blur();
+                }}
+                data-testid="editor-title" />
+            </h1>
+          </div>
+          <div className="editor-meta">
+            <span>{data.meta.duration}</span>
+            <span>{data.meta.model}</span>
+            {data.meta.processingTime && <span>Processado em {data.meta.processingTime}</span>}
+            {data.meta.speakerCount > 0 && <span>{data.meta.speakerCount} locutores</span>}
+            {data.isInProgress && <Badge variant="info" label="Em andamento" />}
+            {data.isError && <Badge variant="error" label={data.errorMessage ?? 'Erro'} />}
+            <div className="editor-export">
+              <DropdownMenu
+                button={{
+                  variant: 'ghost',
+                  size: 'sm',
+                  label: 'Baixar',
+                  icon: <Icon icon={DownloadIcon} size="sm" />,
+                  isDisabled: !data.hasSegments,
+                }}
+                menuWidth={200}
+                items={[
+                  { label: 'Texto (TXT)', onClick: () => void exportAs('txt') },
+                  { label: 'Legendas (SRT)', onClick: () => void exportAs('srt') },
+                  { label: 'Legendas (VTT)', onClick: () => void exportAs('vtt') },
+                ]}
+              />
+            </div>
+          </div>
+          <HStack className="editor-tags" gap={2} wrap="wrap" align="center">
+            {tags.map((tag) => (
+              <Badge key={tag.name} variant={tagVariant(tag.colorName)} label={tag.name} />
+            ))}
+            <Popover label="Selecionar tags" isOpen={tagPickerOpen}
+              onOpenChange={changeTagPicker} placement="below" alignment="start" width={290} padding={0}
+              content={
+                <fieldset className="editor-picker" disabled={savingTags}>
+                  <div className="editor-picker-title">Selecionar tags</div>
+                  <div className="editor-picker-list">
+                    {tagMatches.map((tag) => {
+                      const selected = tags.some((item) => item.name.toLowerCase() === tag.name.toLowerCase());
+                      return (
+                        <PickerOption key={tag.name} label={tag.name} selected={selected}
+                          color={`var(--color-text-${tagVariant(tag.colorName)})`}
+                          onClick={() => void commitTags(selected
+                            ? tags.filter((item) => item.name.toLowerCase() !== tag.name.toLowerCase())
+                            : [...tags, tag])} />
+                      );
+                    })}
+                  </div>
+                  <div className="editor-picker-create">
+                    <TextInput label="Buscar ou criar tag" isLabelHidden value={tagQuery}
+                      onChange={setTagQuery} placeholder="Buscar ou criar tag…"
+                      onEnter={createTag} width="100%" />
+                    <Button size="sm" variant="primary" label="Criar"
+                      isDisabled={!canCreateTag || !tagColor} onClick={createTag} />
+                  </div>
+                  {canCreateTag && (
+                    <div className="editor-tag-colors" role="group" aria-label="Cor da nova tag">
+                      {Object.entries(TAG_COLORS).map(([color, label]) => (
+                        <button key={color} className="editor-tag-color" type="button" aria-label={label}
+                          title={label} aria-pressed={tagColor === color} onClick={() => setTagColor(color)}>
+                          <span style={{ background: `var(--color-text-${color})` }} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </fieldset>
+              }
+            >
+              <Button label="Tags" variant="ghost" size="sm" icon={<Icon icon={PlusIcon} />} />
+            </Popover>
+          </HStack>
+            {FOLDERS_ENABLED && (
+              <Selector
+                label="Pasta"
+                options={data.folders.map((folder) => ({
+                  value: folder.id === null ? 'none' : String(folder.id),
+                  label: folder.name,
+                }))}
+                value={folderId === null ? 'none' : String(folderId)}
+                onChange={(value) => commitFolder(value === 'none' ? null : Number(value))}
+              />
+            )}
+          {error ? <Badge variant="error" label={error} /> : null}
 
+          {/* Segmentos */}
+          <VStack gap={2} align="start" width="100%" paddingBlockEnd={6} data-testid="transcript-segments">
+            {data.isInProgress ? (
+              <Card padding={4} width="100%">
+                <VStack gap={2} align="start">
+                  <Heading level={3}>Transcrição em andamento</Heading>
+                  <Text color="secondary">
+                    Os segmentos aparecem aqui assim que a transcrição terminar.
+                  </Text>
+                </VStack>
+              </Card>
+            ) : segments.length === 0 ? (
+              <Card padding={4} width="100%">
+                <Text color="secondary">
+                  {data.isError ? 'A transcrição falhou — tente novamente pela biblioteca.' : 'Nenhum segmento.'}
+                </Text>
+              </Card>
+            ) : (
+              segments.map((segment, index) => {
+                const speaker = segment.speakerId ? speakerById.get(segment.speakerId) : undefined;
+                const isActive = segment.id === activeSegmentId;
+                return (
+                  <div
+                    key={segment.id}
+                    data-segment-id={segment.id}
+                    className={`seg${isActive ? ' active-seg' : ''}${focusedSegmentId === segment.id ? ' editing' : ''}`}
+                    onClick={() => seek(segment.start)}
+                  >
+                    <button
+                      type="button"
+                      className="seg-time"
+                      title="Ir para este ponto"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        seek(segment.start);
+                      }}
+                    >
+                      {formatTime(segment.start)}
+                    </button>
+
+                    <div className="seg-body">
+                      <div className="seg-speaker-slot">
+                        {speakerPicker(segment, (
+                          <button type="button" className={`seg-speaker-chip${speaker ? '' : ' empty'}`}
+                            style={speaker ? { color: speaker.colorHex } : undefined}
+                            title={speaker ? 'Mudar locutor' : 'Atribuir locutor'}>
+                            {speaker ? <span>{speaker.name}</span> : (
+                              <>
+                                <Icon icon={UserIcon} size="sm" />
+                                <span>Locutor</span>
+                              </>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+
+                      <textarea
+                        ref={(element) => {
+                          if (element) {
+                            textareaRefs.current.set(segment.id, element);
+                          } else {
+                            textareaRefs.current.delete(segment.id);
+                          }
+                        }}
+                        className="seg-text"
+                        rows={1}
+                        value={segment.text}
+                        onChange={(event) =>
+                          setSegments((previous) =>
+                            previous.map((item) =>
+                              item.id === segment.id ? { ...item, text: event.target.value } : item,
+                            ),
+                          )
+                        }
+                        onFocus={() => setFocusedSegmentId(segment.id)}
+                        onBlur={(event) => {
+                          setFocusedSegmentId(null);
+                          saveSegmentText(segment.id, event.target.value);
+                        }}
+                        onKeyDown={(event) => onSegmentKeyDown(segment, index, event)}
+                        onClick={(event) => event.stopPropagation()}
+                      />
+                    </div>
+
+                    <div className="seg-actions" onClick={(event) => event.stopPropagation()}>
+                      <IconButton
+                        icon={<Icon icon={ScissorsIcon} size="sm" />}
+                        label="Dividir no cursor"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void splitSegment(segment, textareaCaret(segment.id))}
+                      />
+                      <IconButton
+                        icon={<Icon icon={MergeIcon} size="sm" />}
+                        label="Mesclar com o anterior"
+                        variant="ghost"
+                        size="sm"
+                        isDisabled={index === 0}
+                        onClick={() => void mergeSegment(segment)}
+                      />
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </VStack>
+        </div>
+      </div>
       {/* Player compacto: botão, tempo e waveform seguem a prévia da landing page. */}
       <div className="verso-player-wrap">
         <div className="verso-player">
@@ -775,249 +1029,6 @@ export function EditorPage({ parameter }: EditorPageProps) {
           </select>
         </div>
       </div>
-
-      {/* Conteúdo rolável: meta, tags e segmentos */}
-      <VStack gap={3} align="start" padding={4} width="100%" isScrollable>
-        {/* Meta + tags */}
-        <Collapsible
-          defaultIsOpen
-          trigger={<Text size="sm" color="secondary">Tags</Text>}
-          style={{ width: '100%' }}
-        >
-        <HStack gap={2} wrap="wrap" style={{ marginTop: 8 }}>
-          <Badge label={data.meta.model} />
-          <Badge label={data.meta.duration} />
-          {data.meta.processingTime ? <Badge label={`Processado em ${data.meta.processingTime}`} /> : null}
-          {data.meta.speakerCount > 0 ? <Badge label={`${data.meta.speakerCount} locutores`} /> : null}
-          {data.isInProgress ? <Badge variant="info" label="Em andamento" /> : null}
-          {data.isError ? <Badge variant="error" label={data.errorMessage ?? 'Erro'} /> : null}
-          {tags.map((tag) => (
-            <span key={tag.name} className="verso-tag-chip">
-              <Badge variant={tagVariant(tag.name)} label={tag.name} />
-              <button
-                type="button"
-                className="verso-tag-chip-remove"
-                aria-label={`Remover tag ${tag.name}`}
-                onClick={() => removeTag(tag.name)}
-              >
-                ×
-              </button>
-            </span>
-          ))}
-          <Popover
-            label="Adicionar tag"
-            isOpen={tagPickerOpen}
-            onOpenChange={setTagPickerOpen}
-            placement="below"
-            alignment="start"
-            width={240}
-            padding={2}
-            content={
-              <VStack gap={2} align="start" width="100%">
-                <TextInput
-                  label="Tag"
-                  isLabelHidden
-                  value={tagQuery}
-                  onChange={setTagQuery}
-                  placeholder="Buscar ou criar tag…"
-                  width="100%"
-                  onEnter={() => {
-                    if (tagSuggestions.length > 0 && !canCreateTag) {
-                      addTag(tagSuggestions[0].name);
-                    } else if (tagQuery.trim()) {
-                      addTag(tagQuery);
-                    }
-                  }}
-                />
-                {tagSuggestions.map((tag) => (
-                  <Button
-                    key={tag.name}
-                    variant="ghost"
-                    width="100%"
-                    label={tag.name}
-                    onClick={() => addTag(tag.name)}
-                  />
-                ))}
-                {canCreateTag ? (
-                  <Button
-                    variant="ghost"
-                    width="100%"
-                    label={`Criar "${tagQuery.trim()}"`}
-                    icon={<Icon icon={PlusIcon} />}
-                    onClick={() => addTag(tagQuery)}
-                  />
-                ) : null}
-                {tagSuggestions.length === 0 && !canCreateTag ? (
-                  <Text size="sm" color="secondary">
-                    {allTags.length === 0 ? 'Digite para criar uma tag.' : 'Nenhuma tag encontrada.'}
-                  </Text>
-                ) : null}
-              </VStack>
-            }
-          >
-            <IconButton
-              icon={<Icon icon={PlusIcon} />}
-              label="Adicionar tag"
-              variant="secondary"
-              size="sm"
-              onClick={() => setTagPickerOpen(true)}
-            />
-          </Popover>
-        </HStack>
-        </Collapsible>
-
-        {error ? <Badge variant="error" label={error} /> : null}
-
-        {/* Segmentos */}
-        <VStack gap={2} align="start" width="100%" paddingBlockEnd={6} data-testid="transcript-segments">
-          {data.isInProgress ? (
-            <Card padding={4} width="100%">
-              <VStack gap={2} align="start">
-                <Heading level={3}>Transcrição em andamento</Heading>
-                <Text color="secondary">
-                  Os segmentos aparecem aqui assim que a transcrição terminar.
-                </Text>
-              </VStack>
-            </Card>
-          ) : segments.length === 0 ? (
-            <Card padding={4} width="100%">
-              <Text color="secondary">
-                {data.isError ? 'A transcrição falhou — tente novamente pela biblioteca.' : 'Nenhum segmento.'}
-              </Text>
-            </Card>
-          ) : (
-            segments.map((segment, index) => {
-              const speaker = segment.speakerId ? speakerById.get(segment.speakerId) : undefined;
-              const isActive = segment.id === activeSegmentId;
-              return (
-                <div
-                  key={segment.id}
-                  data-segment-id={segment.id}
-                  className={`seg${isActive ? ' active-seg' : ''}${focusedSegmentId === segment.id ? ' editing' : ''}`}
-                  onClick={() => seek(segment.start)}
-                >
-                  <button
-                    type="button"
-                    className="seg-time"
-                    title="Ir para este ponto"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      seek(segment.start);
-                    }}
-                  >
-                    {formatTime(segment.start)}
-                  </button>
-
-                  <div className="seg-body">
-                    <div className="seg-speaker-slot">
-                      <button
-                        type="button"
-                        className={`seg-speaker-chip${speaker ? '' : ' empty'}`}
-                        style={speaker ? { color: speaker.colorHex } : undefined}
-                        title={speaker ? 'Mudar locutor' : 'Atribuir locutor'}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setActiveSpeakerFor(activeSpeakerFor === segment.id ? null : segment.id);
-                        }}
-                      >
-                        {speaker ? (
-                          <>
-                            <span className="seg-speaker-dot" style={{ background: speaker.colorHex }} />
-                            <span>{speaker.name}</span>
-                          </>
-                        ) : (
-                          <>
-                            <Icon icon={UserIcon} size="sm" />
-                            <span>Locutor</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-
-                    {activeSpeakerFor === segment.id ? (
-                      <Card variant="muted" padding={2} width="100%">
-                        <VStack gap={2} align="start">
-                          <Selector
-                            label="Locutor"
-                            options={[
-                              { value: 'none', label: 'Sem locutor' },
-                              ...speakers.map((option) => ({ value: option.id, label: option.name })),
-                            ]}
-                            value={segment.speakerId ?? 'none'}
-                            onChange={(value) => assignSpeaker(segment.id, value === 'none' ? null : value)}
-                            width="100%"
-                          />
-                          <HStack gap={2} width="100%">
-                            <TextInput
-                              label="Novo locutor"
-                              value={newSpeakerName}
-                              onChange={setNewSpeakerName}
-                              placeholder="Nome do locutor"
-                              onEnter={() => void addSpeaker(segment.id)}
-                            />
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              label="Adicionar"
-                              icon={<Icon icon={PlusIcon} size="sm" />}
-                              onClick={() => void addSpeaker(segment.id)}
-                            />
-                          </HStack>
-                        </VStack>
-                      </Card>
-                    ) : null}
-
-                    <textarea
-                      ref={(element) => {
-                        if (element) {
-                          textareaRefs.current.set(segment.id, element);
-                        } else {
-                          textareaRefs.current.delete(segment.id);
-                        }
-                      }}
-                      className="seg-text"
-                      rows={1}
-                      value={segment.text}
-                      onChange={(event) =>
-                        setSegments((previous) =>
-                          previous.map((item) =>
-                            item.id === segment.id ? { ...item, text: event.target.value } : item,
-                          ),
-                        )
-                      }
-                      onFocus={() => setFocusedSegmentId(segment.id)}
-                      onBlur={(event) => {
-                        setFocusedSegmentId(null);
-                        saveSegmentText(segment.id, event.target.value);
-                      }}
-                      onKeyDown={(event) => onSegmentKeyDown(segment, index, event)}
-                      onClick={(event) => event.stopPropagation()}
-                    />
-                  </div>
-
-                  <div className="seg-actions" onClick={(event) => event.stopPropagation()}>
-                    <IconButton
-                      icon={<Icon icon={ScissorsIcon} size="sm" />}
-                      label="Dividir no cursor"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => void splitSegment(segment, textareaCaret(segment.id))}
-                    />
-                    <IconButton
-                      icon={<Icon icon={MergeIcon} size="sm" />}
-                      label="Mesclar com o anterior"
-                      variant="ghost"
-                      size="sm"
-                      isDisabled={index === 0}
-                      onClick={() => void mergeSegment(segment)}
-                    />
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </VStack>
-      </VStack>
     </VStack>
   );
 
