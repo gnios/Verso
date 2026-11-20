@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from '@astryxdesign/core/Badge';
 import { Button } from '@astryxdesign/core/Button';
 import { Card } from '@astryxdesign/core/Card';
+import { Collapsible } from '@astryxdesign/core/Collapsible';
 import { DropdownMenu } from '@astryxdesign/core/DropdownMenu';
 import { HStack } from '@astryxdesign/core/HStack';
 import { Heading } from '@astryxdesign/core/Heading';
@@ -39,6 +40,18 @@ import {
 
 interface EditorPageProps {
   parameter: NavigationParam;
+}
+
+const TAG_VARIANTS = ['blue', 'cyan', 'green', 'orange', 'pink', 'purple', 'teal', 'yellow', 'red'] as const;
+
+// Cor estável por nome de tag: o mesmo nome sempre rende a mesma variante do
+// Badge, sem depender do catálogo limitado do backend.
+function tagVariant(name: string): (typeof TAG_VARIANTS)[number] {
+  let hash = 2166136261;
+  for (let i = 0; i < name.length; i++) {
+    hash = Math.imul(hash ^ name.charCodeAt(i), 16777619);
+  }
+  return TAG_VARIANTS[(hash >>> 0) % TAG_VARIANTS.length];
 }
 
 function formatTime(seconds: number): string {
@@ -720,7 +733,12 @@ export function EditorPage({ parameter }: EditorPageProps) {
       {/* Conteúdo rolável: meta, tags e segmentos */}
       <VStack gap={3} align="start" padding={4} width="100%" isScrollable>
         {/* Meta + tags */}
-        <HStack gap={2} wrap="wrap">
+        <Collapsible
+          defaultIsOpen
+          trigger={<Text size="sm" color="secondary">Tags</Text>}
+          style={{ width: '100%' }}
+        >
+        <HStack gap={2} wrap="wrap" style={{ marginTop: 8 }}>
           <Badge label={data.meta.model} />
           <Badge label={data.meta.duration} />
           {data.meta.processingTime ? <Badge label={`Processado em ${data.meta.processingTime}`} /> : null}
@@ -728,7 +746,7 @@ export function EditorPage({ parameter }: EditorPageProps) {
           {data.isInProgress ? <Badge variant="info" label="Em andamento" /> : null}
           {data.isError ? <Badge variant="error" label={data.errorMessage ?? 'Erro'} /> : null}
           {tags.map((tag) => (
-            <Badge key={tag.name} variant={tag.colorName as never} label={tag.name} />
+            <Badge key={tag.name} variant={tagVariant(tag.name)} label={tag.name} />
           ))}
           <Popover
             label="Adicionar tag"
@@ -790,6 +808,7 @@ export function EditorPage({ parameter }: EditorPageProps) {
             />
           </Popover>
         </HStack>
+        </Collapsible>
 
         {error ? <Badge variant="error" label={error} /> : null}
 
