@@ -28,16 +28,43 @@ public class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        using var sentry = InitializeSentry();
         try
         {
             MainAsync(args).GetAwaiter().GetResult();
         }
         catch (Exception ex)
         {
+            Sentry.SentrySdk.CaptureException(ex);
+            Sentry.SentrySdk.FlushAsync(TimeSpan.FromSeconds(2)).GetAwaiter().GetResult();
             // WinExe não tem console — sem isto o app abre e fecha sem feedback.
             ShowStartupFailure(ex);
             Environment.Exit(1);
         }
+    }
+
+    private static IDisposable? InitializeSentry()
+    {
+        var dsn = Environment.GetEnvironmentVariable("SENTRY_DSN");
+        if (string.IsNullOrWhiteSpace(dsn)) return null;
+
+        return Sentry.SentrySdk.Init(options =>
+        {
+            options.Dsn = dsn;
+            options.SendDefaultPii = false;
+            options.SetBeforeSend((@event, _) =>
+            {
+                @event.Message = null!;
+                @event.Request = null!;
+                @event.User = null!;
+                foreach (var exception in @event.SentryExceptions ?? Enumerable.Empty<Sentry.Protocol.SentryException>())
+                {
+                    exception.Value = "[redacted]";
+                }
+                return @event;
+            });
+            options.SetBeforeSendLog(static _ => null);
+        });
     }
 
     private static async Task MainAsync(string[] args)
@@ -92,6 +119,16 @@ public class Program
             .SetMinSize(1024, 640)
             .SetMaxSize(1600, 1000)
             .Center();
+
+        // Ícone da janela (barra de título + taskbar): SetIconFile exige o HWND
+        // nativo — chamar antes de WindowCreated crasha. O .ico vai pro output
+        // via CopyToOutputDirectory no csproj.
+        var windowIconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "verso.ico");
+        if (OperatingSystem.IsWindows() && File.Exists(windowIconPath))
+        {
+            window.RegisterWindowCreatedHandler((_, _) => window.SetIconFile(windowIconPath));
+        }
+
 #if DEBUG
         window.SetDevToolsEnabled(true);
 #endif
@@ -146,6 +183,14 @@ public class Program
     {
         logging.ClearProviders();
         logging.AddVersoFileLogger();
+        if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SENTRY_DSN")))
+        {
+            logging.AddSentry(options =>
+            {
+                options.MinimumEventLevel = LogLevel.Error;
+                options.MinimumBreadcrumbLevel = LogLevel.None;
+            });
+        }
         logging.SetMinimumLevel(LogLevel.Information);
         logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
         logging.AddFilter("Verso", LogLevel.Information);

@@ -29,6 +29,8 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <None Remove="wwwroot\**" />
+    <!-- Copiado para o output: Photino.SetIconFile lê o .ico em runtime. -->
+    <None Include="Assets\verso.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
@@ -40,6 +42,7 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.9" />
+    <PackageReference Include="Sentry.Extensions.Logging" Version="7.0.1" />
     <PackageReference Include="System.Management" Version="10.0.0" />
   </ItemGroup>
 
@@ -79,11 +82,7 @@
       <_VersoWorkerOutputFiles Include="$(_WorkerOutDir)Verso.Worker.runtimeconfig.json" />
       <_VersoWorkerOutputFiles Include="$(_WorkerOutDir)Verso.Worker.pdb" />
     </ItemGroup>
-    <Copy
-      SourceFiles="@(_VersoWorkerOutputFiles)"
-      DestinationFolder="$(OutDir)"
-      SkipUnchangedFiles="true"
-      Condition="Exists('%(Identity)')" />
+    <Copy SourceFiles="@(_VersoWorkerOutputFiles)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('%(Identity)')" />
   </Target>
 
   <!--
@@ -114,12 +113,8 @@
       <_LayoutScript>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\scripts\layout-payload.ps1'))</_LayoutScript>
     </PropertyGroup>
     <!-- Windows: Windows PowerShell (nem sempre há pwsh). Unix: pwsh do runner. -->
-    <Exec
-      Condition="'$(OS)' == 'Windows_NT'"
-      Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(_LayoutScript)&quot; -PublishDir &quot;$(_PubDir)&quot;" />
-    <Exec
-      Condition="'$(OS)' != 'Windows_NT'"
-      Command="pwsh -NoProfile -File &quot;$(_LayoutScript)&quot; -PublishDir &quot;$(_PubDir)&quot;" />
+    <Exec Condition="'$(OS)' == 'Windows_NT'" Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(_LayoutScript)&quot; -PublishDir &quot;$(_PubDir)&quot;" />
+    <Exec Condition="'$(OS)' != 'Windows_NT'" Command="pwsh -NoProfile -File &quot;$(_LayoutScript)&quot; -PublishDir &quot;$(_PubDir)&quot;" />
   </Target>
 
   <!-- Updater na raiz (ao lado do App): o exe em execução não pode aplicar overlay no Windows. -->
@@ -142,10 +137,6 @@
       <_ChannelVariant Condition="'$(_ChannelVariant)' == ''">gpu</_ChannelVariant>
       <_ChannelJson>{"variant":"$(_ChannelVariant)","rid":"$(RuntimeIdentifier)"}</_ChannelJson>
     </PropertyGroup>
-    <WriteLinesToFile
-      File="$(_ChannelDir)/verso-channel.json"
-      Lines="$(_ChannelJson)"
-      Overwrite="true"
-      Encoding="UTF-8" />
+    <WriteLinesToFile File="$(_ChannelDir)/verso-channel.json" Lines="$(_ChannelJson)" Overwrite="true" Encoding="UTF-8" />
   </Target>
 </Project>
