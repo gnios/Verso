@@ -107,7 +107,7 @@ export function FolderPage({ parameter }: FolderPageProps) {
           <EmptyState
             title="Pasta vazia"
             description="Transcreva um áudio ou vídeo e associe a esta pasta."
-            icon={<img src="/brand/verso-mascote.png" alt="" style={{ height: 150 }} />}
+            icon={<img src="/brand/verso-mascote-pasta-vazia.png" alt="" style={{ height: 150 }} />}
             actions={
               <Button
                 variant="primary"
