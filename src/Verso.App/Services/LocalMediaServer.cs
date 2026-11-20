@@ -1,11 +1,14 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Verso.Core.Engine;
 
 namespace Verso.App.Services;
 
@@ -17,6 +20,7 @@ namespace Verso.App.Services;
 public sealed class LocalMediaServer : IAsyncDisposable
 {
     private readonly ILogger<LocalMediaServer> _logger;
+    private readonly AudioLoader? _audioLoader;
     private readonly object _sync = new();
     private HttpListener? _listener;
     private CancellationTokenSource? _cts;
@@ -25,10 +29,15 @@ public sealed class LocalMediaServer : IAsyncDisposable
     private long _bytesServed;
     private int _requestCount;
     private int _rangeRequestCount;
+    // Picos: cache por arquivo+mtime e semáforo global — cada compute roda um ffmpeg;
+    // uma rajada de requests não pode criar dezenas de processos e afogar o servidor.
+    private readonly SemaphoreSlim _peaksGate = new(1);
+    private readonly Dictionary<string, (long WriteTimeUtcTicks, int Buckets, float[] Peaks)> _peaksCache = new();
 
-    public LocalMediaServer(ILogger<LocalMediaServer> logger)
+    public LocalMediaServer(ILogger<LocalMediaServer> logger, AudioLoader? audioLoader = null)
     {
         _logger = logger;
+        _audioLoader = audioLoader;
     }
 
     /// <summary>Total de bytes escritos nas respostas (útil para asserts E2E de streaming).</summary>
@@ -197,17 +206,95 @@ public sealed class LocalMediaServer : IAsyncDisposable
             {
                 break;
             }
-            catch (HttpListenerException)
+            catch (ObjectDisposedException)
             {
                 break;
             }
-            catch (ObjectDisposedException)
+            catch (Exception ex)
             {
+                // Erro transitório do listener: se ainda estiver escutando, continua —
+                // sair do loop matava o servidor de mídia e o player parava de funcionar.
+                if (listener.IsListening)
+                {
+                    _logger.LogWarning(ex, "Falha transitória no LocalMediaServer; continuando");
+                    continue;
+                }
+
                 break;
             }
 
             _ = Task.Run(() => HandleRequest(context), CancellationToken.None);
         }
+    }
+
+    private void HandlePeaksRequest(HttpListenerContext context, string filePath, int buckets, string query)
+    {
+        var response = context.Response;
+        response.ContentType = "application/json; charset=utf-8";
+        response.AddHeader("Cache-Control", "no-store");
+
+        try
+        {
+            if (_audioLoader is null)
+            {
+                response.StatusCode = (int)HttpStatusCode.NotImplemented;
+                WriteJson(response, """{"error":"peaks indisponível"}""");
+                return;
+            }
+
+            var durationSeconds = MediaSchemeHandler.GetQueryValue(query, "duration") is { } durationValue
+                                  && double.TryParse(durationValue, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed)
+                ? parsed
+                : 0;
+
+            var stamp = new FileInfo(filePath).LastWriteTimeUtc.Ticks;
+            lock (_peaksCache)
+            {
+                if (_peaksCache.TryGetValue(filePath, out var cached)
+                    && cached.WriteTimeUtcTicks == stamp
+                    && cached.Buckets == buckets)
+                {
+                    WriteJson(response, JsonSerializer.Serialize(new { peaks = cached.Peaks }));
+                    return;
+                }
+            }
+
+            _peaksGate.Wait();
+            try
+            {
+                var peaks = _audioLoader.ComputePeaks(filePath, Math.Min(buckets, 4096), durationSeconds);
+                lock (_peaksCache)
+                {
+                    if (_peaksCache.Count >= 32)
+                    {
+                        _peaksCache.Clear();
+                    }
+
+                    _peaksCache[filePath] = (stamp, buckets, peaks);
+                }
+
+                WriteJson(response, JsonSerializer.Serialize(new { peaks }));
+            }
+            finally
+            {
+                _peaksGate.Release();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Falha ao gerar picos de {FilePath}", filePath);
+            response.StatusCode = (int)HttpStatusCode.InternalServerError;
+            WriteJson(response, JsonSerializer.Serialize(new { error = ex.Message }));
+        }
+    }
+
+    private static void WriteJson(HttpListenerResponse response, string json)
+    {
+        var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+        response.ContentLength64 = bytes.Length;
+        response.OutputStream.Write(bytes, 0, bytes.Length);
+        response.OutputStream.Flush();
+        response.Close();
     }
 
     private void HandleRequest(HttpListenerContext context)
@@ -249,6 +336,18 @@ public sealed class LocalMediaServer : IAsyncDisposable
             }
 
             Interlocked.Increment(ref _requestCount);
+
+            // ?peaks=N&duration=S — picos do waveform calculados no servidor via
+            // ffmpeg (streaming s16 8kHz, memória constante). Decodificar no renderer
+            // estourava a memória do WebView2 em mídias longas (OOM → tela branca).
+            var query = request.Url?.Query ?? "";
+            if (MediaSchemeHandler.GetQueryValue(query, "peaks") is { } peaksValue
+                && int.TryParse(peaksValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var buckets)
+                && buckets > 0)
+            {
+                HandlePeaksRequest(context, filePath, buckets, query);
+                return;
+            }
 
             var contentType = MediaSchemeHandler.GetContentType(filePath);
             var fileInfo = new FileInfo(filePath);

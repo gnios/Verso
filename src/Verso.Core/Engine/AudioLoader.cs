@@ -163,6 +163,95 @@ public sealed class AudioLoader
     }
 
     /// <summary>
+    /// Picos de waveform em O(1) de memória: ffmpeg decodifica para s16le 8kHz mono
+    /// via pipe e cada amostra alimenta o máximo do seu bucket — sem materializar o
+    /// áudio (um m4a de 1h virava ~1GB de PCM no WebView e derrubava o renderer).
+    /// <paramref name="durationSeconds"/> vem do cadastro da transcrição; se zerado,
+    /// tenta <see cref="GetDuration"/> (ffprobe).
+    /// </summary>
+    public float[] ComputePeaks(
+        string inputPath,
+        int buckets,
+        double durationSeconds = 0,
+        CancellationToken cancellationToken = default)
+    {
+        const int peaksRate = 8000;
+        if (buckets <= 0 || buckets > 4096)
+        {
+            throw new ArgumentOutOfRangeException(nameof(buckets));
+        }
+
+        var seconds = durationSeconds > 0 ? durationSeconds : GetDuration(inputPath);
+        if (seconds <= 0)
+        {
+            throw new InvalidOperationException("Duração desconhecida — não foi possível gerar picos.");
+        }
+
+        var ffmpeg = _ffmpegLocator.EnsureFfmpeg();
+        var psi = new ProcessStartInfo
+        {
+            FileName = ffmpeg,
+            Arguments = $"-nostdin -hide_banner -loglevel error -i \"{inputPath}\" -ar {peaksRate} -ac 1 -f s16le pipe:1",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+
+        using var process = Process.Start(psi)
+            ?? throw new InvalidOperationException("Não foi possível iniciar o ffmpeg.");
+        var stderrTask = process.StandardError.ReadToEndAsync();
+
+        var peaks = new float[buckets];
+        var samplesPerBucket = Math.Max(1.0, seconds * peaksRate / buckets);
+        long sampleIndex = 0;
+        var carry = -1; // byte baixo pendente quando o chunk corta um sample s16 no meio
+
+        using (var stdout = process.StandardOutput.BaseStream)
+        {
+            var buffer = new byte[64 * 1024];
+            int read;
+            while ((read = stdout.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                for (var i = 0; i < read; i++)
+                {
+                    if (carry < 0)
+                    {
+                        carry = buffer[i];
+                        continue;
+                    }
+
+                    var sample = (short)(carry | (buffer[i] << 8));
+                    carry = -1;
+                    var bucket = (int)(sampleIndex / samplesPerBucket);
+                    if (bucket >= buckets)
+                    {
+                        bucket = buckets - 1;
+                    }
+
+                    var abs = Math.Abs(sample / 32768f);
+                    if (abs > peaks[bucket])
+                    {
+                        peaks[bucket] = abs;
+                    }
+
+                    sampleIndex++;
+                }
+            }
+        }
+
+        var stderr = stderrTask.GetAwaiter().GetResult();
+        process.WaitForExit();
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"ffmpeg falhou:\n{stderr}");
+        }
+
+        return peaks;
+    }
+
+    /// <summary>
     /// Lê só a duração (segundos), sem decodificar o PCM. WAV usa o header;
     /// demais formatos tentam ffprobe e, se faltar, o banner do ffmpeg (<c>-i</c> sem decode).
     /// </summary>

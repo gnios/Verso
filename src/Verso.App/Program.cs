@@ -4,11 +4,9 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Photino.Blazor;
-using Verso.App.Components.Layout;
+using Photino.NET;
 using Verso.App.Services;
 using Verso.Core;
 using Verso.Core.Data;
@@ -52,48 +50,66 @@ public class Program
         NativePayloadBootstrap.Apply();
 
         var wwwroot = Path.Combine(VersoPaths.PayloadDirectory, "wwwroot");
-        var appBuilder = PhotinoBlazorAppBuilder.CreateDefault(
-            new PhysicalFileProvider(wwwroot),
-            args);
-        appBuilder.RootComponents.Add<MainLayout>("#app");
 
-        appBuilder.Services.AddLogging(ConfigureLogging);
-        appBuilder.Services.AddVersoDatabase();
-        appBuilder.Services.AddVersoEngine();
-        appBuilder.Services.AddVersoServices();
-        appBuilder.Services.AddVersoAppServices();
+        var services = new ServiceCollection();
+        services.AddLogging(ConfigureLogging);
+        services.AddVersoDatabase();
+        services.AddVersoEngine();
+        services.AddVersoServices();
+        services.AddVersoAppServices();
 
-        var app = appBuilder.Build();
-        _services = app.Services;
-        app.Services.GetRequiredService<PhotinoWindowAccessor>().Attach(app.MainWindow);
+        var provider = services.BuildServiceProvider();
+        _services = provider;
+
+        UiThread.Attach();
+        UiThread.AttachLogger(provider.GetRequiredService<ILoggerFactory>().CreateLogger("UiThread"));
+
+        RouteWhisperNativeLogs(provider);
+        await DbBootstrapper.MigrateAsync(provider);
 
         // HTTP local com Range — NÃO usar RegisterCustomSchemeHandler para áudio:
         // o Photino materializa o Stream inteiro em memória (IntPtr + numBytes).
-        var mediaServer = app.Services.GetRequiredService<LocalMediaServer>();
+        var mediaServer = provider.GetRequiredService<LocalMediaServer>();
         mediaServer.Start();
 
-        app.MainWindow
+        // Serve o build React (wwwroot) para a janela Photino.
+        var appServer = new LocalAppServer(
+            provider.GetRequiredService<ILogger<LocalAppServer>>(),
+            wwwroot);
+        appServer.Start();
+
+        // Limites da janela: abaixo de 1024x640 a tabela de transcrições +
+        // sidebar ficam ilegíveis; acima de 1600x1000 a janela fica "esticada"
+        // demais em monitores largos/HiDPI.
+        var window = new PhotinoWindow()
             .SetTitle("Verso")
             .SetSize(1280, 800)
+            .SetMinSize(1024, 640)
+            .SetMaxSize(1600, 1000)
             .Center();
 #if DEBUG
-        app.MainWindow.SetDevToolsEnabled(true);
+        window.SetDevToolsEnabled(true);
 #endif
 
-        // NÃO usar Photino ShowMessage aqui: se a janela nativa ainda não está pronta
-        // (ou já morreu), Photino_ShowMessage causa AV (0xc0000005) e mascara o erro real.
-        AppDomain.CurrentDomain.UnhandledException += (_, error) =>
-        {
-            var ex = error.ExceptionObject as Exception
-                     ?? new Exception(error.ExceptionObject?.ToString() ?? "erro desconhecido");
-            ShowStartupFailure(ex);
-        };
+        provider.GetRequiredService<PhotinoWindowAccessor>().Attach(window);
 
-        RouteWhisperNativeLogs(app.Services);
-        UiThread.AttachLogger(app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("UiThread"));
-        await DbBootstrapper.MigrateAsync(app.Services);
+        var bridge = new NativeBridge(window, provider.GetRequiredService<ILogger<NativeBridge>>());
+        provider.GetRequiredService<BridgeHost>().Attach(bridge);
+        using var versoBridge = new VersoBridge(provider, bridge, provider.GetRequiredService<ILogger<VersoBridge>>());
+        versoBridge.Attach();
 
-        var hostedServices = app.Services.GetServices<IHostedService>().ToList();
+        window.RegisterWebMessageReceivedHandler((sender, message) => bridge.HandleMessage(message));
+        window.Load($"{appServer.BaseUrl}index.html");
+
+        // Recupera de renderer morto (página em branco): o React envia app.ping;
+        // silêncio prolongado recarrega a UI sem reiniciar o processo.
+        using var watchdog = new WebViewWatchdog(
+            window,
+            bridge,
+            $"{appServer.BaseUrl}index.html",
+            provider.GetRequiredService<ILogger<WebViewWatchdog>>());
+
+        var hostedServices = provider.GetServices<IHostedService>().ToList();
         foreach (var hostedService in hostedServices)
         {
             await hostedService.StartAsync(CancellationToken.None);
@@ -101,7 +117,7 @@ public class Program
 
         try
         {
-            app.Run();
+            window.WaitForClose();
         }
         finally
         {
@@ -111,6 +127,7 @@ public class Program
             }
 
             await mediaServer.DisposeAsync();
+            await appServer.DisposeAsync();
         }
     }
 
@@ -121,14 +138,6 @@ public class Program
     // DEBUG (AttachDebugConsole abre uma janela de console a parte), usando o mesmo
     // formato de linha única do arquivo (AddVersoConsoleLogger) — NÃO o provider padrão
     // Microsoft.Extensions.Logging.Console (formato multi-linha "info: Namespace[0]").
-    //
-    // IMPORTANTE: não adicionar Trace.Listeners.Add(new ConsoleTraceListener(...)) aqui.
-    // Isso já foi feito antes e capturou, além dos nossos logs, todo o tracing INTERNO do
-    // Photino/Blazor (System.Diagnostics.Trace.WriteLine de coisas como
-    // `Photino.NET: "Verso".SendWebMessage(__bwv:[...blob base64...])` a cada render do
-    // WebView) — ruído irrelevante e ininteligível que afoga qualquer log real da
-    // aplicação. Trace/Debug.WriteLine da nossa própria base (ver UiThread.cs) devem ir
-    // para o ILogger normal, não para Trace.Listeners.
     private static void ConfigureLogging(ILoggingBuilder logging)
     {
         logging.ClearProviders();

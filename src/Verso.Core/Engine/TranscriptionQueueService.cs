@@ -434,6 +434,8 @@ public static class EngineServiceCollectionExtensions
             sp.GetService<IModelDownloadNotifier>()));
         services.AddSingleton<ISpeakerEmbedder, EcapaSpeakerEmbedder>();
         services.AddSingleton<ILocalDiarizer, LocalDiarizer>();
+        services.AddSingleton<FfmpegLocator>();
+        services.AddSingleton<AudioLoader>();
         services.AddSingleton<TranscriptionQueueService>();
         services.AddSingleton<IUpdateIdleSignal>(sp => sp.GetRequiredService<TranscriptionQueueService>());
         services.AddHostedService(sp => sp.GetRequiredService<TranscriptionQueueService>());

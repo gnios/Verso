@@ -37,3 +37,6 @@ app_pid.csv
 
 # Estado interno do tlc-spec-driven (decisões/specs — não vai ao repo público)
 .specs/
+
+# Screenshots gerados pelas verificações CDP (scripts/verify-bridge.mjs, screenshot.mjs)
+scripts/*.png
