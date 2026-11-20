@@ -135,7 +135,7 @@ public class Program
         // Ícone da janela (barra de título + taskbar): SetIconFile exige o HWND
         // nativo — chamar antes de WindowCreated crasha. O .ico vai pro output
         // via CopyToOutputDirectory no csproj.
-        var windowIconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "verso.ico");
+        var windowIconPath = Path.Combine(VersoPaths.PayloadDirectory, "Assets", "verso.ico");
         if (OperatingSystem.IsWindows() && File.Exists(windowIconPath))
         {
             window.RegisterWindowCreatedHandler((_, _) => window.SetIconFile(windowIconPath));

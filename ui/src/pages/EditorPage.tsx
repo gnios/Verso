@@ -278,6 +278,9 @@ export function EditorPage({ parameter, isDark }: EditorPageProps) {
   const [focusedSegmentId, setFocusedSegmentId] = useState<string | null>(null);
   const [activeSpeakerFor, setActiveSpeakerFor] = useState<string | null>(null);
   const [newSpeakerName, setNewSpeakerName] = useState('');
+  const [speakerRenameDraft, setSpeakerRenameDraft] = useState<string | null>(null);
+  const [renamingSpeaker, setRenamingSpeaker] = useState(false);
+  const [speakerRenameError, setSpeakerRenameError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const textareaRefs = useRef(new Map<string, HTMLTextAreaElement>());
@@ -649,47 +652,99 @@ export function EditorPage({ parameter, isDark }: EditorPageProps) {
     }
   };
 
-  const speakerPicker = (segment: EditorSegment, trigger: React.ReactNode) => (
-    <span onClick={(event) => event.stopPropagation()}>
-      <Popover
-        label="Selecionar locutor"
-        placement="below"
-        alignment="start"
-        width={274}
-        padding={0}
-        isOpen={activeSpeakerFor === segment.id}
-        onOpenChange={(open) => {
-          setActiveSpeakerFor(open ? segment.id : null);
-          setNewSpeakerName('');
-        }}
-        content={(
-          <div className="editor-picker">
-            <div className="editor-picker-title">Selecionar locutor</div>
-            <div className="editor-picker-list">
-              {speakers.map((speaker) => (
-                <PickerOption key={speaker.id} label={speaker.name} color={speaker.colorHex}
-                  selected={segment.speakerId === speaker.id}
-                  onClick={() => void saveSpeaker(segment.id, speaker.id)} />
-              ))}
-              <PickerOption label="Sem locutor" selected={!segment.speakerId}
-                onClick={() => void saveSpeaker(segment.id, null)} />
+  const renameSpeaker = async (speaker: EditorSpeaker, draft: string) => {
+    const name = draft.trim();
+    if (renamingSpeaker || !name || name === speaker.name) return;
+
+    setRenamingSpeaker(true);
+    setSpeakerRenameError(null);
+    try {
+      await invoke('editor.renameSpeaker', { speakerId: speaker.id, name });
+      setSpeakers((previous) => previous.map((option) =>
+        option.id === speaker.id ? { ...option, name } : option));
+      setSpeakerRenameDraft(null);
+    } catch (err) {
+      setSpeakerRenameError(err instanceof Error ? err.message : 'Falha ao renomear o locutor.');
+    } finally {
+      setRenamingSpeaker(false);
+    }
+  };
+
+  const speakerPicker = (segment: EditorSegment, trigger: React.ReactNode) => {
+    const currentSpeaker = speakerById.get(segment.speakerId ?? '');
+    const canRename = speakerRenameDraft !== null && activeSpeakerFor === segment.id && currentSpeaker;
+
+    return (
+      <span onClick={(event) => event.stopPropagation()}>
+        <Popover
+          label="Selecionar locutor"
+          placement="below"
+          alignment="start"
+          width={274}
+          padding={0}
+          isOpen={activeSpeakerFor === segment.id}
+          onOpenChange={(open) => {
+            setActiveSpeakerFor(open ? segment.id : null);
+            setNewSpeakerName('');
+            setSpeakerRenameDraft(null);
+            setSpeakerRenameError(null);
+          }}
+          content={(
+            <div className="editor-picker">
+              {canRename ? (
+                <>
+                  <div className="editor-picker-title">Renomear locutor</div>
+                  <p className="editor-speaker-rename-note">O nome muda em todos os trechos deste locutor.</p>
+                  <div className="editor-picker-create">
+                    <TextInput label="Nome do locutor" isLabelHidden value={speakerRenameDraft}
+                      width="100%" isDisabled={renamingSpeaker} onChange={setSpeakerRenameDraft}
+                      onEnter={() => void renameSpeaker(currentSpeaker, speakerRenameDraft)} />
+                    <Button size="sm" variant="primary" label="Salvar" isLoading={renamingSpeaker}
+                      isDisabled={!speakerRenameDraft.trim() || speakerRenameDraft.trim() === currentSpeaker.name}
+                      onClick={() => void renameSpeaker(currentSpeaker, speakerRenameDraft)} />
+                  </div>
+                  {speakerRenameError && <p className="editor-speaker-rename-note" role="alert">{speakerRenameError}</p>}
+                  <button type="button" className="editor-picker-option" disabled={renamingSpeaker}
+                    onClick={() => setSpeakerRenameDraft(null)}>Cancelar</button>
+                </>
+              ) : (
+                <>
+                  <div className="editor-picker-title">Selecionar locutor</div>
+                  <div className="editor-picker-list">
+                    {speakers.map((speaker) => (
+                      <PickerOption key={speaker.id} label={speaker.name} color={speaker.colorHex}
+                        selected={segment.speakerId === speaker.id}
+                        onClick={() => void saveSpeaker(segment.id, speaker.id)} />
+                    ))}
+                    <PickerOption label="Sem locutor" selected={!segment.speakerId}
+                      onClick={() => void saveSpeaker(segment.id, null)} />
+                  </div>
+                  {currentSpeaker && (
+                    <button type="button" className="editor-picker-option" disabled={renamingSpeaker}
+                      onClick={() => {
+                        setSpeakerRenameError(null);
+                        setSpeakerRenameDraft(currentSpeaker.name);
+                      }}>Renomear locutor</button>
+                  )}
+                  <div className="editor-picker-create">
+                    <TextInput label="Novo locutor" isLabelHidden value={newSpeakerName} width="100%"
+                      onChange={setNewSpeakerName} placeholder="Novo locutor…"
+                      onEnter={() => {
+                        if (newSpeakerName.trim()) void saveSpeaker(segment.id, null, newSpeakerName.trim());
+                      }} />
+                    <Button size="sm" variant="primary" label="Adicionar" isDisabled={!newSpeakerName.trim()}
+                      onClick={() => void saveSpeaker(segment.id, null, newSpeakerName.trim())} />
+                  </div>
+                </>
+              )}
             </div>
-            <div className="editor-picker-create">
-              <TextInput label="Novo locutor" isLabelHidden value={newSpeakerName} width="100%"
-                onChange={setNewSpeakerName} placeholder="Novo locutor…"
-                onEnter={() => {
-                  if (newSpeakerName.trim()) void saveSpeaker(segment.id, null, newSpeakerName.trim());
-                }} />
-              <Button size="sm" variant="primary" label="Adicionar" isDisabled={!newSpeakerName.trim()}
-                onClick={() => void saveSpeaker(segment.id, null, newSpeakerName.trim())} />
-            </div>
-          </div>
-        )}
-      >
-        {trigger}
-      </Popover>
-    </span>
-  );
+          )}
+        >
+          {trigger}
+        </Popover>
+      </span>
+    );
+  };
 
   const exportAs = async (format: 'txt' | 'srt' | 'vtt' | 'rtf') => {
     try {

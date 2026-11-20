@@ -46,8 +46,8 @@ Name: "desktopicon"; Description: "Criar atalho na área de trabalho"; GroupDesc
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "data\*"
 
 [Icons]
-Name: "{group}\Verso"; Filename: "{app}\Verso.App.exe"
-Name: "{autodesktop}\Verso"; Filename: "{app}\Verso.App.exe"; Tasks: desktopicon
+Name: "{group}\Verso"; Filename: "{app}\Verso.App.exe"; IconFilename: "{app}\engine\Assets\verso.ico"
+Name: "{autodesktop}\Verso"; Filename: "{app}\Verso.App.exe"; IconFilename: "{app}\engine\Assets\verso.ico"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\Verso.App.exe"; Description: "Abrir o Verso"; Flags: nowait postinstall skipifsilent

@@ -7,7 +7,7 @@ public class UserSettings
     public string Email { get; set; } = "";
     public string Institution { get; set; } = "";
     public string DefaultLanguage { get; set; } = "pt";
-    public bool IdentifySpeakersDefault { get; set; } = true;
+    public bool IdentifySpeakersDefault { get; set; }
     public bool LiveTranscriptionEnabled { get; set; } = true; // inerte no MVP
     public ExecutionDevice Device { get; set; } = ExecutionDevice.Auto;
     public ModelQuality DefaultQuality { get; set; } = ModelQuality.Standard;

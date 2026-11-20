@@ -64,7 +64,7 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
     private LanguageOptionViewModel? _selectedLanguageOption;
 
     [ObservableProperty]
-    private bool _identifySpeakersDefault = true;
+    private bool _identifySpeakersDefault;
 
     [ObservableProperty]
     private bool _liveTranscriptionEnabled = true;

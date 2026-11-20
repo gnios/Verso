@@ -139,14 +139,14 @@ public class SettingsViewModelTests
             var settings = CreateSettings(provider);
             await settings.LoadAsync();
 
-            settings.IdentifySpeakersDefault = false;
+            settings.IdentifySpeakersDefault = true;
             await Task.Delay(50);
 
             using var scope = provider.CreateScope();
             var service = scope.ServiceProvider.GetRequiredService<SettingsService>();
             var saved = await service.GetAsync();
 
-            Assert.False(saved.IdentifySpeakersDefault);
+            Assert.True(saved.IdentifySpeakersDefault);
         }
         finally
         {

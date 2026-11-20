@@ -105,7 +105,7 @@ export function SettingsPage() {
               </div>
               <Switch
                 label="Identificar locutores (Beta)"
-                description="Separa a fala em até três grupos de voz em novas transcrições de arquivos. Na primeira vez, baixa cerca de 46 MB em modelos para rodar no seu computador."
+                description="Ao ativar, o tempo de transcrição pode aumentar. Separa a fala em até três grupos de voz. Na primeira vez, baixa cerca de 46 MB em modelos para rodar no seu computador."
                 className="settings-row"
                 value={data.identifySpeakersDefault}
                 onChange={(identifySpeakersDefault) => void update({ identifySpeakersDefault })}

@@ -18,7 +18,7 @@ public class SettingsServiceTests
 
             Assert.Equal(1, settings.Id);
             Assert.Equal("pt", settings.DefaultLanguage);
-            Assert.True(settings.IdentifySpeakersDefault);
+            Assert.False(settings.IdentifySpeakersDefault);
             Assert.Equal(ExecutionDevice.Auto, settings.Device);
             Assert.Equal(TranscriptionEngineKind.Parakeet, settings.DefaultEngine);
             Assert.Equal(ParakeetModel.PtBrTagarela, settings.DefaultParakeetModel);
@@ -44,6 +44,7 @@ public class SettingsServiceTests
             {
                 s.Name = "Eugenia";
                 s.DefaultLanguage = "en";
+                s.IdentifySpeakersDefault = true;
             });
 
             await service.UpdateAsync(s => s.DarkTheme = true);
