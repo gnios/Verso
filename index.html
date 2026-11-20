@@ -3,35 +3,125 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Como o Verso Transcrição trata dados no Windows e como entrar em contato com a Gnios.">
-  <title>Política de Privacidade | Verso Transcrição</title>
+  <meta name="description" content="Verso é um aplicativo desktop em português para transcrever, revisar e organizar gravações no próprio computador.">
+  <title>Verso — Transcrição local de áudio e vídeo</title>
+  <link rel="icon" href="assets/verso-logo.png" type="image/png">
   <style>
-    html { color-scheme: light; background: #fff; color: #222; }
-    body { margin: 0; font: 1rem/1.65 system-ui, sans-serif; }
-    main { max-width: 45rem; margin: auto; padding: 2.5rem 1.25rem; }
-    h1, h2 { line-height: 1.25; }
-    h2 { margin-top: 1.8rem; font-size: 1.25rem; }
-    a { color: #075aa7; }
+    :root {
+      color-scheme: light;
+      --ink: #201331;
+      --paper: #fff5e2;
+      --cream: #f6e5c8;
+      --mint: #b3e1c8;
+      --green: #1f604e;
+      --serif: Georgia, "Times New Roman", serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font: 1.05rem/1.65 system-ui, sans-serif; }
+    img { display: block; max-width: 100%; height: auto; }
+    a { color: inherit; text-underline-offset: .23em; }
+    a:hover { text-decoration-thickness: .15em; }
+    a:focus-visible { outline: .2rem solid currentColor; outline-offset: .3rem; }
+    .wrap { width: min(72rem, calc(100% - 3rem)); margin-inline: auto; }
+    .skip { position: absolute; top: .5rem; left: .75rem; padding: .5rem 1rem; background: var(--paper); color: var(--ink); transform: translateY(-160%); }
+    .skip:focus { transform: none; }
+    .masthead { background: var(--ink); color: var(--paper); }
+    header { border-bottom: 1px solid #fff5e242; }
+    .top, .nav, .wordmark { display: flex; align-items: center; gap: 1rem; }
+    .top { justify-content: space-between; padding-block: .85rem; flex-wrap: wrap; }
+    .nav { flex-wrap: wrap; gap: .4rem 1.4rem; font-size: .9rem; }
+    .wordmark { font: 1.6rem var(--serif); text-decoration: none; gap: .55rem; }
+    .hero { display: grid; grid-template-columns: 1.35fr 1fr; align-items: center; gap: clamp(1rem, 4vw, 4rem); padding-block: clamp(3rem, 8vw, 7rem); }
+    h1, h2, h3 { font-family: var(--serif); font-weight: 400; line-height: 1.08; margin: 0; }
+    h1 { font-size: clamp(3rem, 7.5vw, 7rem); letter-spacing: -.065em; max-width: 9ch; }
+    h2 { font-size: clamp(2.15rem, 4vw, 3.75rem); letter-spacing: -.04em; }
+    h3 { font-size: 1.6rem; }
+    p { margin: 1rem 0; max-width: 65ch; }
+    .hero p { max-width: 44ch; }
+    .portrait { width: min(100%, 23rem); margin-inline: auto; }
+    .button { display: inline-block; border-radius: .3rem; background: var(--mint); color: var(--ink); text-decoration: none; padding: .75rem 1.15rem; font-weight: 700; }
+    .button:hover { background: #d5f4df; }
+    .button:focus-visible { outline-color: var(--paper); }
+    .platforms { display: block; margin-top: .7rem; font-size: .84rem; }
+    section { padding-block: clamp(2.5rem, 6vw, 5.5rem); }
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); padding: 0; margin: 2rem 0 0; list-style-position: inside; }
+    .steps li { border-top: 2px solid var(--green); padding: 1rem 1.25rem 0 0; }
+    .steps li + li { border-left: 1px solid #20133133; padding-left: 1.25rem; }
+    .steps li::marker { color: var(--green); font: 1.4rem var(--serif); }
+    .steps h3 { display: inline; }
+    .steps p { margin-bottom: 0; }
+    .download { background: var(--cream); }
+    .download h2 { max-width: 16ch; }
+    .download ul { padding-left: 1.3em; }
+    .download a, .support a, footer a { color: var(--green); font-weight: 650; }
+    footer .wrap { border-top: 1px solid #20133133; padding-block: 1.15rem; }
+    @media (max-width: 46rem) {
+      .hero, .steps { grid-template-columns: 1fr; }
+      .portrait { width: min(70%, 17rem); }
+      .steps li, .steps li + li { border-left: 0; padding: 1rem 0; }
+    }
+    @media (max-width: 24rem) {
+      .wrap { width: calc(100% - 2rem); }
+      .nav { gap: .3rem .95rem; }
+    }
   </style>
 </head>
 <body>
-<main>
-  <h1>Política de Privacidade do Verso Transcrição</h1>
-  <p>Versão para Windows publicada pela Gnios. Atualizada em 19 de novembro de 2026.</p>
+  <a class="skip" href="#conteudo">Ir para o conteúdo</a>
+  <div class="masthead">
+    <header>
+      <div class="wrap top">
+        <a class="wordmark" href="./"><img src="assets/verso-logo.png" alt="" width="40" height="40">Verso</a>
+        <nav class="nav" aria-label="Navegação principal">
+          <a href="#como-usar">Como usar</a>
+          <a href="#apoiar">Apoiar</a>
+          <a href="privacidade.html">Privacidade</a>
+        </nav>
+      </div>
+    </header>
+    <div class="wrap hero" id="conteudo">
+      <div>
+        <h1>Da voz ao texto.</h1>
+        <p>O Verso transcreve entrevistas, aulas e outras gravações no seu computador. Ouça, revise e organize o texto em um app desktop em português.</p>
+        <a class="button" href="#baixar">Baixar o Verso</a>
+        <small class="platforms">Windows x64, Linux x64 e macOS Apple Silicon</small>
+      </div>
+      <img class="portrait" src="assets/verso-mascote.png" alt="Capivara pesquisadora com fones, caneta e um caderno aberto" width="1219" height="1290">
+    </div>
+  </div>
 
-  <h2>Transcrição e armazenamento no seu dispositivo</h2>
-  <p>O Verso importa os arquivos de áudio ou vídeo que você seleciona e os processa no seu computador. A transcrição não exige conta no Verso. O app não envia as gravações nem o texto das transcrições para a Gnios para realizar esse processamento.</p>
-  <p>As cópias de mídia importada, as transcrições, as marcações de tempo, as configurações e os registros técnicos ficam na pasta de dados do app. Se você preencher nome, e-mail ou instituição nas configurações, esses dados ficam no perfil local. O acesso a esses arquivos depende das permissões da sua conta no Windows. Você pode excluir transcrições pela biblioteca e remover cópias exportadas pela pasta em que as salvou. Os demais arquivos locais permanecem no dispositivo até serem removidos.</p>
+  <main>
+    <section class="wrap" id="como-usar">
+      <h2>Da gravação à revisão</h2>
+      <ol class="steps">
+        <li><h3>Importe ou grave</h3><p>Abra um arquivo de áudio ou vídeo, ou grave pelo microfone. O app baixa o modelo no primeiro uso e processa a gravação localmente.</p></li>
+        <li><h3>Confira o texto</h3><p>Ouça a gravação no editor enquanto revisa os trechos e ajusta quem está falando.</p></li>
+        <li><h3>Organize e exporte</h3><p>Reúna transcrições por pesquisa e tags. Exporte em TXT para usar o texto ou em SRT e VTT para legendas.</p></li>
+      </ol>
+    </section>
 
-  <h2>Download de modelos</h2>
-  <p>O app acessa a internet para baixar os modelos necessários à transcrição e, quando selecionado, à identificação de locutores. Os provedores de download, como o Hugging Face, podem receber dados técnicos da conexão, como o endereço IP. O download não envia suas gravações ou transcrições ao provedor.</p>
+    <section class="download" id="baixar">
+      <div class="wrap">
+        <h2>Instale no seu computador</h2>
+        <ul>
+          <li><strong>Windows x64.</strong> Execute o instalador ou extraia o ZIP portátil.</li>
+          <li><strong>Linux x64.</strong> Instale o WebKitGTK, extraia o ZIP e abra o app.</li>
+          <li><strong>macOS Apple Silicon.</strong> Extraia o ZIP e abra o app.</li>
+        </ul>
+        <p>Para MP3, MP4 e outros formatos, instale o FFmpeg. Um WAV PCM pode ser transcrito sem ele.</p>
+        <p><a href="https://github.com/gnios/Verso/releases/latest">Ver downloads no GitHub</a></p>
+      </div>
+    </section>
 
-  <h2>Feedback opcional</h2>
-  <p>Se você escolher enviar feedback, a Gnios recebe o tipo de solicitação, o título e a mensagem que você escreveu. O app também envia informações de diagnóstico, como versão do app e do Windows, processador, memória, GPU e estatísticas de até cinco transcrições recentes, como data, modelo e tempos de áudio e de processamento. O app não anexa o áudio nem o texto das transcrições. Evite incluir dados pessoais, gravações ou trechos de transcrições na mensagem.</p>
-  <p>O feedback é transmitido via HTTPS e armazenado em uma planilha do Google usada pela Gnios para investigar problemas e avaliar melhorias. A Gnios usa essas informações para esses fins e as conserva enquanto forem necessárias para esse atendimento, salvo quando houver obrigação de conservar os dados por mais tempo. Você pode usar o Verso sem enviar feedback.</p>
+    <section class="wrap support" id="apoiar">
+      <h2>Como apoiar o Verso</h2>
+      <p>Compartilhe o app com quem pode usá-lo, envie sugestões ou contribua com código e documentação no GitHub.</p>
+      <p><a href="https://github.com/gnios/Verso/issues">Enviar feedback</a> · <a href="https://github.com/gnios/Verso#como-apoiar-o-verso">Ver como contribuir</a></p>
+    </section>
+  </main>
 
-  <h2>Seus direitos e contato</h2>
-  <p>Para falar com a Gnios, responsável pelo tratamento do feedback, escreva para <a href="mailto:eugenio00@gmail.com">eugenio00@gmail.com</a>. Você pode solicitar confirmação de tratamento, acesso, correção, eliminação e o exercício dos demais direitos previstos no art. 18 da LGPD, conforme aplicável ao seu caso.</p>
-</main>
+  <footer>
+    <div class="wrap">Verso, pela Gnios · <a href="privacidade.html">Política de privacidade</a></div>
+  </footer>
 </body>
 </html>
