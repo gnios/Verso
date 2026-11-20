@@ -218,6 +218,7 @@ public sealed class TranscriptionQueueService : BackgroundService, IUpdateIdleSi
         CancellationToken cancellationToken)
     {
         await using var context = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
         var transcription = await context.Transcriptions
             .SingleOrDefaultAsync(t => t.Id == request.TranscriptionId, cancellationToken);
@@ -269,22 +270,14 @@ public sealed class TranscriptionQueueService : BackgroundService, IUpdateIdleSi
         }
 
         var duration = result.Segments.Count > 0 ? result.Segments.Max(s => s.EndSeconds) : 0d;
-        // A reader can observe Done as soon as ExecuteUpdateAsync commits.
-        _latestProgress.TryRemove(request.TranscriptionId, out _);
-        var updated = await context.Transcriptions
-            .Where(t => t.Id == request.TranscriptionId)
-            .ExecuteUpdateAsync(
-                setters => setters
-                    .SetProperty(t => t.Status, TranscriptionStatus.Done)
-                    .SetProperty(t => t.ErrorMessage, (string?)null)
-                    .SetProperty(t => t.DurationSeconds, duration)
-                    .SetProperty(t => t.ProcessingDurationSeconds, (double?)processingSeconds),
-                cancellationToken);
-
-        if (updated == 0)
-            throw new InvalidOperationException($"Transcrição {request.TranscriptionId} não encontrada.");
+        transcription.Status = TranscriptionStatus.Done;
+        transcription.ErrorMessage = null;
+        transcription.DurationSeconds = duration;
+        transcription.ProcessingDurationSeconds = processingSeconds;
 
         await context.SaveChangesAsync(cancellationToken);
+        _latestProgress.TryRemove(request.TranscriptionId, out _);
+        await transaction.CommitAsync(cancellationToken);
 
         // Atualiza o cache de RTF para refinar estimativas futuras deste modelo+dispositivo
         if (duration > 0 && processingSeconds > 0)
