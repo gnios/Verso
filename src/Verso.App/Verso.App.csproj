@@ -83,6 +83,12 @@
       <_VersoWorkerOutputFiles Include="$(_WorkerOutDir)Verso.Worker.pdb" />
     </ItemGroup>
     <Copy SourceFiles="@(_VersoWorkerOutputFiles)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('%(Identity)')" />
+    <ItemGroup>
+      <_ParakeetOrtFiles Include="$(_WorkerOutDir)parakeet-onnx\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_ParakeetOrtFiles)"
+      DestinationFiles="@(_ParakeetOrtFiles->'$(OutDir)parakeet-onnx\%(RecursiveDir)%(Filename)%(Extension)')"
+      SkipUnchangedFiles="true" />
   </Target>
 
   <!--

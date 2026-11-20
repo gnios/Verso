@@ -25,6 +25,19 @@ public sealed class AudioLoader
     public float[] LoadSamples16kHz(string inputPath) =>
         LoadSamples16kHz(inputPath, startSeconds: null, durationSeconds: null);
 
+    internal float[] LoadDiarizationSamples16kHz(string inputPath)
+    {
+        if (Path.GetExtension(inputPath).Equals(".wav", StringComparison.OrdinalIgnoreCase))
+        {
+            using var stream = OpenSharedRead(inputPath);
+            using var reader = new WaveFileReader(stream);
+            if (reader.WaveFormat.Channels <= 2)
+                return ReadWavSamples(reader, startSeconds: null, durationSeconds: null, mono: true);
+        }
+
+        return LoadSamplesWithFfmpeg(inputPath, floatPcm: true);
+    }
+
     public float[] LoadSamples16kHz(string inputPath, double startSeconds, double durationSeconds) =>
         LoadSamples16kHz(inputPath, (double?)startSeconds, (double?)durationSeconds);
 
@@ -44,7 +57,16 @@ public sealed class AudioLoader
     {
         using var stream = OpenSharedRead(inputPath);
         using var reader = new WaveFileReader(stream);
+        return ReadWavSamples(reader, startSeconds, durationSeconds, mono: false);
+    }
+
+    private static float[] ReadWavSamples(
+        WaveFileReader reader, double? startSeconds, double? durationSeconds, bool mono)
+    {
         ISampleProvider provider = reader.ToSampleProvider();
+        if (mono && reader.WaveFormat.Channels == 2)
+            provider = new StereoToMonoSampleProvider(provider);
+
         if (startSeconds is >= 0 || durationSeconds is > 0)
         {
             var offset = new OffsetSampleProvider(provider);
@@ -82,13 +104,14 @@ public sealed class AudioLoader
     private float[] LoadSamplesWithFfmpeg(
         string inputPath,
         double? startSeconds = null,
-        double? durationSeconds = null)
+        double? durationSeconds = null,
+        bool floatPcm = false)
     {
         var ffmpeg = _ffmpegLocator.EnsureFfmpeg();
         var psi = new ProcessStartInfo
         {
             FileName = ffmpeg,
-            Arguments = BuildFfmpegPcmArguments(inputPath, startSeconds, durationSeconds),
+            Arguments = BuildFfmpegPcmArguments(inputPath, startSeconds, durationSeconds, floatPcm),
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -108,10 +131,15 @@ public sealed class AudioLoader
         if (process.ExitCode != 0)
             throw new InvalidOperationException($"ffmpeg falhou:\n{stderr}");
 
-        if (pcmStream.TryGetBuffer(out var segment))
-            return ConvertPcm16ToFloat(segment.AsSpan());
+        if (!pcmStream.TryGetBuffer(out var segment))
+            segment = new ArraySegment<byte>(pcmStream.ToArray());
 
-        return ConvertPcm16ToFloat(pcmStream.ToArray());
+        if (!floatPcm)
+            return ConvertPcm16ToFloat(segment.AsSpan());
+        if (segment.Count < sizeof(float) || segment.Count % sizeof(float) != 0)
+            throw new InvalidOperationException("ffmpeg não retornou PCM de 32 bits válido.");
+
+        return MemoryMarshal.Cast<byte, float>(segment.AsSpan()).ToArray();
     }
 
     /// <summary>
@@ -121,12 +149,15 @@ public sealed class AudioLoader
     internal static string BuildFfmpegPcmArguments(
         string inputPath,
         double? startSeconds,
-        double? durationSeconds)
+        double? durationSeconds,
+        bool floatPcm = false)
     {
         var inv = CultureInfo.InvariantCulture;
         var quoted = $"\"{inputPath}\"";
         var prefix = "-nostdin -hide_banner -loglevel error -threads 0";
-        var suffix = $"-ar {SampleRate} -ac 1 -f s16le pipe:1";
+        var suffix = floatPcm
+            ? $"-vn -ac 1 -ar {SampleRate} -f f32le pipe:1"
+            : $"-ar {SampleRate} -ac 1 -f s16le pipe:1";
 
         if (startSeconds is >= 0)
         {

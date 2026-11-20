@@ -14,6 +14,7 @@ public sealed class PhotinoFileSaveService : IFileSaveService
         {
             ExportFormat.Txt => "txt",
             ExportFormat.Srt => "srt",
+            ExportFormat.Rtf => "rtf",
             _ => "vtt",
         };
 

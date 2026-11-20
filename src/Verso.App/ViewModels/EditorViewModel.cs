@@ -214,6 +214,9 @@ public partial class EditorViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private Task ExportAsVttAsync() => ExportWithFormatAsync(ExportFormat.Vtt);
 
+    [RelayCommand]
+    private Task ExportAsRtfAsync() => ExportWithFormatAsync(ExportFormat.Rtf);
+
     internal async Task ExportWithFormatAsync(ExportFormat format)
     {
         if (!HasSegments || _transcriptionId == Guid.Empty)
@@ -247,6 +250,9 @@ public partial class EditorViewModel : ViewModelBase, IDisposable
                     break;
                 case ExportFormat.Vtt:
                     await exportService.ExportVttAsync(_transcriptionId, destPath);
+                    break;
+                case ExportFormat.Rtf:
+                    await exportService.ExportRtfAsync(_transcriptionId, destPath);
                     break;
             }
 

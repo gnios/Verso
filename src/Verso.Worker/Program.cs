@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.InteropServices;
+using Microsoft.ML.OnnxRuntime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Verso.Core;
@@ -20,6 +22,7 @@ public static class Program
 {
     public static async Task<int> Main()
     {
+        UseParakeetOnnxRuntime();
         using var sentry = InitializeSentry();
         try
         {
@@ -31,6 +34,23 @@ public static class Program
             await Sentry.SentrySdk.FlushAsync(TimeSpan.FromSeconds(2));
             throw;
         }
+    }
+
+    private static void UseParakeetOnnxRuntime()
+    {
+        // Sherpa uses its own ONNX Runtime in the app. Keep the worker on the
+        // Parakeet runtime used to validate its decoding and timestamps.
+        NativeLibrary.SetDllImportResolver(typeof(InferenceSession).Assembly, (name, _, _) =>
+        {
+            if (name != "onnxruntime")
+                return IntPtr.Zero;
+
+            var file = OperatingSystem.IsWindows() ? "onnxruntime.dll"
+                : OperatingSystem.IsMacOS() ? "libonnxruntime.dylib" : "libonnxruntime.so";
+            var path = Path.Combine(AppContext.BaseDirectory, "parakeet-onnx",
+                RuntimeInformation.RuntimeIdentifier, "native", file);
+            return NativeLibrary.Load(path);
+        });
     }
 
     private static IDisposable? InitializeSentry()

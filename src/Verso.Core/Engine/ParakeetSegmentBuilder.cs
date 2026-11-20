@@ -39,7 +39,7 @@ public static class ParakeetSegmentBuilder
             var gap = !isLast && tokenTimestamps[i] - tokenTimestamps[i - 1] >= pauseSeconds;
             var tooLong = !isLast
                 && tokenTimestamps[i - 1] - tokenTimestamps[start] >= MaxSegmentSeconds;
-            if (!isLast && !gap && !tooLong)
+            if (!isLast && (!(gap || tooLong) || !ParakeetVocab.IsWordBoundary(tokens[i - 1], tokens[i])))
             {
                 continue;
             }
@@ -54,12 +54,46 @@ public static class ParakeetSegmentBuilder
                     segEnd = segStart + TokenEndPaddingSeconds;
                 }
 
-                segments.Add(new TranscriptionSegmentResult(segStart, segEnd, piece));
+                segments.Add(new TranscriptionSegmentResult(segStart, segEnd, piece)
+                {
+                    Words = BuildWords(tokens, tokenTimestamps, start, i),
+                });
             }
 
             start = i;
         }
 
         return segments;
+    }
+
+    private static List<TranscriptionWordTiming> BuildWords(
+        IReadOnlyList<string> tokens, IReadOnlyList<double> timestamps, int start, int end)
+    {
+        var words = new List<TranscriptionWordTiming>();
+        var wordStart = start;
+        for (var i = start + 1; i <= end; i++)
+        {
+            if (i < end && !ParakeetVocab.IsWordBoundary(tokens[i - 1], tokens[i]))
+            {
+                continue;
+            }
+
+            var text = string.Concat(tokens.Skip(wordStart).Take(i - wordStart));
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                var wordEnd = timestamps[i - 1] + TokenEndPaddingSeconds;
+                if (i < end)
+                {
+                    wordEnd = Math.Min(wordEnd, timestamps[i]);
+                }
+
+                words.Add(new TranscriptionWordTiming(text, timestamps[wordStart],
+                    Math.Max(timestamps[wordStart], wordEnd)));
+            }
+
+            wordStart = i;
+        }
+
+        return words;
     }
 }

@@ -8,7 +8,7 @@ import { invoke } from '../lib/bridge';
 import type { SettingsData } from '../types';
 
 type SettingsChanges = Partial<Pick<SettingsData,
-  'defaultLanguage' | 'liveTranscriptionEnabled'
+  'defaultLanguage' | 'liveTranscriptionEnabled' | 'identifySpeakersDefault'
   | 'defaultEngine' | 'defaultParakeetModel' | 'defaultQuality' | 'device'
 >>;
 
@@ -103,6 +103,17 @@ export function SettingsPage() {
                   width="100%"
                 />
               </div>
+              <Switch
+                label="Identificar locutores (Beta)"
+                description="Separa a fala em até três grupos de voz em novas transcrições de arquivos. Na primeira vez, baixa cerca de 46 MB em modelos para rodar no seu computador."
+                className="settings-row"
+                value={data.identifySpeakersDefault}
+                onChange={(identifySpeakersDefault) => void update({ identifySpeakersDefault })}
+                isDisabled={saving}
+                labelPosition="start"
+                labelSpacing="spread"
+                width="100%"
+              />
             </section>
 
             <section className="settings-section" aria-labelledby="settings-recording">

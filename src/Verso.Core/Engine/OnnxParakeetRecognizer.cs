@@ -85,17 +85,49 @@ public sealed class OnnxParakeetRecognizer : IParakeetRecognizer, IDisposable
         for (var i = 0; i < chunks.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var chunk = chunks[i];
-            var (timestamps, tokens) = RecognizeWindowTokens(chunk.Samples, cancellationToken);
-            windows.Add(new ParakeetAudioChunker.WindowTranscript(
-                chunk.OffsetSamples / (double)AudioLoader.SampleRate,
-                chunk.Samples.Length / (double)AudioLoader.SampleRate,
-                timestamps,
-                tokens));
+            AppendWindowWithRetry(
+                chunks[i], samples => RecognizeWindowTokens(samples, cancellationToken), windows);
             progress?.Report(new EngineProgress("transcribing", i + 1, chunks.Count));
         }
 
         return ParakeetAudioChunker.StitchWindowTokens(windows);
+    }
+
+    internal static void AppendWindowWithRetry(
+        ParakeetAudioChunker.Chunk chunk,
+        Func<float[], (IReadOnlyList<double> Timestamps, IReadOnlyList<string> Tokens)> decode,
+        List<ParakeetAudioChunker.WindowTranscript> windows)
+    {
+        ParakeetAudioChunker.WindowTranscript DecodeWindow(float[] samples, int offset)
+        {
+            var (timestamps, tokens) = decode(samples);
+            return new ParakeetAudioChunker.WindowTranscript(
+                offset / (double)AudioLoader.SampleRate,
+                samples.Length / (double)AudioLoader.SampleRate,
+                timestamps,
+                tokens);
+        }
+
+        var original = DecodeWindow(chunk.Samples, chunk.OffsetSamples);
+        var overlap = ParakeetAudioChunker.OverlapSamples();
+        if (original.Tokens.Count == 0 &&
+            chunk.Samples.Length > 3 * overlap &&
+            Array.Exists(chunk.Samples, sample => sample != 0))
+        {
+            // TDT can emit only blanks in a long window with speech. Decode two
+            // shorter windows with the same outer bounds and normal stitch overlap.
+            var rightStart = (chunk.Samples.Length - overlap) / 2;
+            var left = DecodeWindow(chunk.Samples[..(rightStart + overlap)], chunk.OffsetSamples);
+            var right = DecodeWindow(chunk.Samples[rightStart..], chunk.OffsetSamples + rightStart);
+            if (left.Tokens.Count > 0 || right.Tokens.Count > 0)
+            {
+                windows.Add(left);
+                windows.Add(right);
+                return;
+            }
+        }
+
+        windows.Add(original);
     }
 
     private (IReadOnlyList<double> Timestamps, IReadOnlyList<string> Tokens) RecognizeWindowTokens(

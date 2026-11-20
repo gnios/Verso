@@ -89,7 +89,6 @@ public partial class UploadViewModel : ViewModelBase
     [ObservableProperty]
     private ParakeetModelOptionViewModel? _selectedParakeetModelOption;
 
-    public SpeakerMode SpeakerMode => SpeakerMode.Off;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SelectedFolderId))]
@@ -289,7 +288,7 @@ public partial class UploadViewModel : ViewModelBase
                 language,
                 Quality,
                 settings.Device,
-                SpeakerMode,
+                settings.IdentifySpeakersDefault ? SpeakerMode.Automatic : SpeakerMode.Off,
                 SelectedFolder?.Id,
                 durationSeconds,
                 IconPicker.SelectedIcon,

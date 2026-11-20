@@ -122,7 +122,7 @@ public static class ParakeetAudioChunker
     /// <summary>
     /// Mantém só os tokens da região confiável da janela: depois de overlap/2 no
     /// começo (exceto a primeira) e antes de overlap/2 no fim (exceto a última).
-    /// Recorte por token evita descartar a frase inteira quando ela começa no overlap.
+    /// A janela é escolhida pelo primeiro token da palavra, preservando suas continuações.
     /// </summary>
     public static IReadOnlyList<TimedToken> TrimOwnedRegion(
         IReadOnlyList<double> timestamps,
@@ -147,20 +147,12 @@ public static class ParakeetAudioChunker
             keepUntil = keepAfter;
         }
 
-        var count = Math.Min(timestamps.Count, tokens.Count);
-        var trimmed = new List<TimedToken>(count);
-        for (var i = 0; i < count; i++)
-        {
-            var t = timestamps[i];
-            if (t < keepAfter || t >= keepUntil)
-            {
-                continue;
-            }
-
-            trimmed.Add(new TimedToken(t + chunkStartSeconds, tokens[i]));
-        }
-
-        return trimmed;
+        var window = new WindowTranscript(chunkStartSeconds, windowLengthSeconds, timestamps, tokens);
+        var start = FindCut(window, keepAfter);
+        var end = FindCut(window, keepUntil);
+        return Enumerable.Range(start, end - start)
+            .Select(i => new TimedToken(timestamps[i] + chunkStartSeconds, tokens[i]))
+            .ToArray();
     }
 
     /// <summary>
@@ -176,16 +168,60 @@ public static class ParakeetAudioChunker
         }
 
         var all = new List<TimedToken>();
+        var starts = new int[windows.Count];
+        var ends = new int[windows.Count];
         for (var i = 0; i < windows.Count; i++)
         {
             var window = windows[i];
-            all.AddRange(TrimOwnedRegion(
-                window.Timestamps,
-                window.Tokens,
-                window.StartSeconds,
-                isFirstChunk: i == 0,
-                isLastChunk: i == windows.Count - 1,
-                window.LengthSeconds));
+            var count = Math.Min(window.Tokens.Count, window.Timestamps.Count);
+            starts[i] = i == 0 ? 0 : FindCut(window, OverlapSeconds / 2.0);
+            ends[i] = i == windows.Count - 1 ? count : FindCut(window, window.LengthSeconds - OverlapSeconds / 2.0);
+        }
+
+        for (var i = 1; i < windows.Count; i++)
+        {
+            var previous = windows[i - 1];
+            var current = windows[i];
+            var overlapEnd = previous.StartSeconds + previous.LengthSeconds;
+            var rightWords = OverlapWords(current, current.StartSeconds, overlapEnd).ToLookup(word => word.Text);
+            var leftWords = OverlapWords(previous, current.StartSeconds, overlapEnd).ToLookup(word => word.Text);
+            foreach (var group in leftWords)
+            {
+                var matching = rightWords[group.Key];
+                if (group.Count() != 1 || matching.Count() != 1)
+                {
+                    continue;
+                }
+
+                var left = group.Single();
+                var right = matching.Single();
+                if (Math.Abs(left.Time - right.Time) > 0.4)
+                {
+                    continue;
+                }
+
+                // Corrige a emenda apenas quando a mesma palavra seria repetida ou omitida.
+                if (left.End == ends[i - 1] && right.Start == starts[i])
+                {
+                    starts[i] = right.End;
+                    break;
+                }
+
+                if (left.Start == ends[i - 1] && right.End == starts[i])
+                {
+                    ends[i - 1] = left.End;
+                    break;
+                }
+            }
+        }
+
+        for (var i = 0; i < windows.Count; i++)
+        {
+            var window = windows[i];
+            for (var token = starts[i]; token < ends[i]; token++)
+            {
+                all.Add(new TimedToken(window.StartSeconds + window.Timestamps[token], window.Tokens[token]));
+            }
         }
 
         if (all.Count == 0)
@@ -203,4 +239,50 @@ public static class ParakeetAudioChunker
 
         return ParakeetSegmentBuilder.Build(string.Concat(toks), times, toks);
     }
+
+    private static int FindCut(WindowTranscript window, double time)
+    {
+        var count = Math.Min(window.Tokens.Count, window.Timestamps.Count);
+        for (var i = 0; i < count; i++)
+        {
+            if (window.Timestamps[i] >= time && IsWordStart(window, i))
+            {
+                return i;
+            }
+        }
+
+        return count;
+    }
+
+    private static IEnumerable<(string Text, int Start, int End, double Time)> OverlapWords(
+        WindowTranscript window, double overlapStart, double overlapEnd)
+    {
+        var count = Math.Min(window.Tokens.Count, window.Timestamps.Count);
+        var start = FindCut(window, overlapStart - window.StartSeconds);
+        for (var i = start + 1; i <= count; i++)
+        {
+            if (i < count && !IsWordStart(window, i))
+            {
+                continue;
+            }
+
+            var time = window.StartSeconds + window.Timestamps[start];
+            if (time >= overlapEnd)
+            {
+                yield break;
+            }
+
+            var text = string.Concat(window.Tokens.Skip(start).Take(i - start));
+            var normalized = string.Concat(text.Where(char.IsLetterOrDigit)).ToUpperInvariant();
+            if (normalized.Length > 0)
+            {
+                yield return (normalized, start, i, time);
+            }
+
+            start = i;
+        }
+    }
+
+    private static bool IsWordStart(WindowTranscript window, int index) =>
+        index == 0 || ParakeetVocab.IsWordBoundary(window.Tokens[index - 1], window.Tokens[index]);
 }

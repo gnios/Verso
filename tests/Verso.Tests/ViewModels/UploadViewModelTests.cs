@@ -129,7 +129,6 @@ public class UploadViewModelTests
             Assert.Equal("pt", upload.Language);
             Assert.Equal(TranscriptionEngineKind.Parakeet, upload.Engine);
             Assert.Equal(ParakeetModel.PtBrTagarela, upload.ParakeetModel);
-            Assert.Equal(SpeakerMode.Off, upload.SpeakerMode);
         }
         finally
         {
@@ -154,12 +153,18 @@ public class UploadViewModelTests
         }
     }
 
-    [Fact]
-    public async Task StartTranscription_CreatesRecordEnqueuesAndNavigatesToDashboard()
+    [Theory]
+    [InlineData(false, SpeakerMode.Off)]
+    [InlineData(true, SpeakerMode.Automatic)]
+    public async Task StartTranscription_CreatesRecordEnqueuesAndNavigatesToDashboard(
+        bool identifySpeakers, SpeakerMode expectedSpeakerMode)
     {
         var (provider, directory, mediaPath, folderId) = await CreateUploadProviderAsync();
         try
         {
+            using var scope = provider.CreateScope();
+            await scope.ServiceProvider.GetRequiredService<SettingsService>()
+                .UpdateAsync(settings => settings.IdentifySpeakersDefault = identifySpeakers);
             var upload = await CreateUploadAsync(provider, folderId);
             upload.TrySelectFile(mediaPath);
             upload.SelectedFolder = upload.FolderOptions.First(option => option.Id == folderId);
@@ -178,7 +183,7 @@ public class UploadViewModelTests
             Assert.Equal("pt", transcription.Language);
             Assert.Equal(TranscriptionEngineKind.Parakeet, transcription.Engine);
             Assert.Equal(ParakeetModel.PtBrTagarela, transcription.ParakeetModel);
-            Assert.Equal(SpeakerMode.Off, transcription.SpeakerMode);
+            Assert.Equal(expectedSpeakerMode, transcription.SpeakerMode);
             Assert.False(string.IsNullOrWhiteSpace(transcription.MediaFilePath));
             Assert.True(File.Exists(transcription.MediaFilePath));
         }

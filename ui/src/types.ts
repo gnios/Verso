@@ -241,6 +241,7 @@ export interface SettingsData {
   languages: { code: string; label: string }[];
   defaultLanguage: string;
   liveTranscriptionEnabled: boolean;
+  identifySpeakersDefault: boolean;
   devices: { value: string; label: string }[];
   device: string;
   models: ModelOption[];

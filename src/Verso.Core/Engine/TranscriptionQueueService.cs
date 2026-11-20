@@ -269,6 +269,8 @@ public sealed class TranscriptionQueueService : BackgroundService, IUpdateIdleSi
         }
 
         var duration = result.Segments.Count > 0 ? result.Segments.Max(s => s.EndSeconds) : 0d;
+        // A reader can observe Done as soon as ExecuteUpdateAsync commits.
+        _latestProgress.TryRemove(request.TranscriptionId, out _);
         var updated = await context.Transcriptions
             .Where(t => t.Id == request.TranscriptionId)
             .ExecuteUpdateAsync(
@@ -314,8 +316,12 @@ public sealed class TranscriptionQueueService : BackgroundService, IUpdateIdleSi
             }
 
             await _diarizer.EnsureReadyAsync(cancellationToken).ConfigureAwait(false);
-            var samples = _audioLoader.LoadSamples16kHz(request.MediaFilePath);
-            return _diarizer.Diarize(samples, segments);
+            var samples = _audioLoader.LoadDiarizationSamples16kHz(request.MediaFilePath);
+            return _diarizer.Diarize(samples, segments, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -431,11 +437,8 @@ public static class EngineServiceCollectionExtensions
         services.AddSingleton<ITranscriptionEngine, WorkerProcessTranscriptionEngine>();
         if (enableDiarization)
         {
-            services.AddSingleton(sp => new EcapaSpeakerModelManager(
-                sp.GetService<ILogger<EcapaSpeakerModelManager>>(),
-                sp.GetService<IModelDownloadNotifier>()));
-            services.AddSingleton<ISpeakerEmbedder, EcapaSpeakerEmbedder>();
-            services.AddSingleton<ILocalDiarizer, LocalDiarizer>();
+            services.AddSingleton<SherpaSpeakerModels>();
+            services.AddSingleton<ILocalDiarizer, SherpaDiarizer>();
         }
         services.AddSingleton<FfmpegLocator>();
         services.AddSingleton<AudioLoader>();

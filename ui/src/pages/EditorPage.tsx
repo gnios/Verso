@@ -691,7 +691,7 @@ export function EditorPage({ parameter, isDark }: EditorPageProps) {
     </span>
   );
 
-  const exportAs = async (format: 'txt' | 'srt' | 'vtt') => {
+  const exportAs = async (format: 'txt' | 'srt' | 'vtt' | 'rtf') => {
     try {
       const result = await invoke<{ path: string | null; error: string | null }>('editor.export', {
         transcriptionId,
@@ -799,9 +799,10 @@ export function EditorPage({ parameter, isDark }: EditorPageProps) {
                   icon: <Icon icon={DownloadIcon} size="sm" />,
                   isDisabled: !data.hasSegments,
                 }}
-                menuWidth={200}
+                menuWidth={240}
                 items={[
                   { label: 'Texto (TXT)', onClick: () => void exportAs('txt') },
+                  { label: 'Documento acadêmico (RTF)', onClick: () => void exportAs('rtf') },
                   { label: 'Legendas (SRT)', onClick: () => void exportAs('srt') },
                   { label: 'Legendas (VTT)', onClick: () => void exportAs('vtt') },
                 ]}
