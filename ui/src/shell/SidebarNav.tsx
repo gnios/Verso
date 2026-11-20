@@ -100,6 +100,8 @@ export function SidebarNav({ screen, parameter, isDark, appInfo, onToggleTheme, 
             icon={<Icon icon={PlusIcon} />}
             label="Nova transcrição"
             variant="primary"
+            size="lg"
+            style={{ borderRadius: '50%' }}
             onClick={() => void navigateTo('Upload')}
           />
         ) : (
