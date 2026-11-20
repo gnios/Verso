@@ -123,7 +123,7 @@
   </Target>
 
   <!-- Updater na raiz (ao lado do App): o exe em execução não pode aplicar overlay no Windows. -->
-  <Target Name="PublishVersoUpdater" AfterTargets="LayoutPayloadDirectory" Condition="'$(RuntimeIdentifier)' != ''">
+  <Target Name="PublishVersoUpdater" AfterTargets="LayoutPayloadDirectory" Condition="'$(RuntimeIdentifier)' != '' and '$(VersoStorePackage)' != 'true'">
     <PropertyGroup>
       <_UpdaterProject>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\Verso.Updater\Verso.Updater.csproj'))</_UpdaterProject>
       <_UpdaterPublishDir>$([System.IO.Path]::GetFullPath('$(PublishDir)'))</_UpdaterPublishDir>
@@ -135,7 +135,7 @@
     <Exec Command="dotnet publish &quot;$(_UpdaterProject)&quot; -c $(Configuration) -r $(RuntimeIdentifier) --self-contained $(_UpdaterSelfContained) -p:PublishSingleFile=$(_UpdaterPublishSingleFile) -p:IncludeNativeLibrariesForSelfExtract=false -p:Version=$(Version) -o &quot;$(_UpdaterPublishDir)&quot;" />
   </Target>
 
-  <Target Name="WriteVersoChannel" AfterTargets="PublishVersoUpdater" Condition="'$(RuntimeIdentifier)' != ''">
+  <Target Name="WriteVersoChannel" AfterTargets="PublishVersoUpdater" Condition="'$(RuntimeIdentifier)' != '' and '$(VersoStorePackage)' != 'true'">
     <PropertyGroup>
       <_ChannelDir>$([System.IO.Path]::GetFullPath('$(PublishDir)'))</_ChannelDir>
       <_ChannelVariant Condition="'$(VersoIncludeGpuRuntimes)' == 'false'">cpu</_ChannelVariant>
