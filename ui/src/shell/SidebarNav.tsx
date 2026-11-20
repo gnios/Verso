@@ -3,7 +3,7 @@ import { Badge } from '@astryxdesign/core/Badge';
 import { Button } from '@astryxdesign/core/Button';
 import { IconButton } from '@astryxdesign/core/IconButton';
 import { Icon } from '@astryxdesign/core/Icon';
-import { SideNav, SideNavHeading, SideNavItem, SideNavSection } from '@astryxdesign/core/SideNav';
+import { SideNav, SideNavCollapseButton, SideNavHeading, SideNavItem, SideNavSection } from '@astryxdesign/core/SideNav';
 import { Text } from '@astryxdesign/core/Text';
 import { invoke, onEvent } from '../lib/bridge';
 import { FOLDERS_ENABLED, RECORDING_ENABLED } from '../lib/features';
@@ -40,6 +40,7 @@ function countBadge(count: number | undefined): React.ReactNode {
 
 export function SidebarNav({ screen, parameter, isDark, appInfo, onToggleTheme, onNewFolder, onFeedback }: SidebarNavProps) {
   const [sidebar, setSidebar] = useState<SidebarData | null>(null);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const refresh = useCallback(() => {
     void invoke<SidebarData>('sidebar.load')
@@ -64,6 +65,8 @@ export function SidebarNav({ screen, parameter, isDark, appInfo, onToggleTheme, 
   const selectedStatus = parameter.statusFilter ?? 'All';
   const selectedUnassigned = !!parameter.unassignedOnly;
 
+  // No rail colapsado, o botão de expandir fica no footerIcons (o botão do
+  // header some junto com o texto) — assim só existe um botão por estado.
   return (
     <SideNav
       header={
@@ -71,12 +74,15 @@ export function SidebarNav({ screen, parameter, isDark, appInfo, onToggleTheme, 
           heading="Verso"
           icon={<img src="/brand/verso-logo.png" alt="" style={{ width: 26, height: 26 }} />}
           headerEndContent={
-            <IconButton
-              icon={<Icon icon={isDark ? SunIcon : MoonIcon} />}
-              label={isDark ? 'Alternar para tema claro' : 'Alternar para tema escuro'}
-              variant="ghost"
-              onClick={onToggleTheme}
-            />
+            <>
+              <IconButton
+                icon={<Icon icon={isDark ? SunIcon : MoonIcon} />}
+                label={isDark ? 'Alternar para tema claro' : 'Alternar para tema escuro'}
+                variant="ghost"
+                onClick={onToggleTheme}
+              />
+              <SideNavCollapseButton />
+            </>
           }
         />
       }
@@ -92,12 +98,6 @@ export function SidebarNav({ screen, parameter, isDark, appInfo, onToggleTheme, 
       footer={
         <>
           <SideNavItem
-            label="Configurações"
-            icon={SettingsIcon}
-            isSelected={screen === 'Settings'}
-            onClick={() => void navigateTo('Settings')}
-          />
-          <SideNavItem
             label="Feedback"
             icon={MessageIcon}
             onClick={onFeedback}
@@ -110,10 +110,19 @@ export function SidebarNav({ screen, parameter, isDark, appInfo, onToggleTheme, 
               onClick={() => void navigateTo('Recording')}
             />
           )}
-          <Text size="sm">{sidebar?.versionLabel ?? (appInfo ? `v${appInfo.version}` : '')}</Text>
+          <SideNavItem
+            label="Configurações"
+            icon={SettingsIcon}
+            isSelected={screen === 'Settings'}
+            onClick={() => void navigateTo('Settings')}
+          />
+          <Text size="sm" color="secondary" style={{ display: 'block', textAlign: 'right' }}>
+            {sidebar?.versionLabel ?? (appInfo ? `v${appInfo.version}` : '')}
+          </Text>
         </>
       }
-      collapsible={{ defaultIsCollapsed: false }}
+      collapsible={{ isCollapsed, onCollapsedChange: setIsCollapsed, hasButton: false }}
+      footerIcons={isCollapsed ? <SideNavCollapseButton /> : null}
     >
       {FOLDERS_ENABLED && (
       <SideNavSection
