@@ -172,7 +172,7 @@ Builds **self-contained** / **single-file**. O pacote contém o app, o `Verso.Up
 
 **Atualização automática:** se o pacote tiver `verso-channel.json` (releases), o app baixa sozinho a latest GitHub Release da mesma variante e troca só os binários. `data/` e arquivos extras na pasta **não são apagados**. Uma transcrição em andamento não é cortada; o update aplica na próxima abertura. Status em **Configurações → Sobre**.
 
-> **Aviso de segurança do Windows:** por padrão os executáveis não são assinados digitalmente. Ao abrir pela primeira vez, o Windows pode mostrar o alerta do SmartScreen ("O Windows protegeu seu computador"). Clique em **Mais informações → Executar mesmo assim**. Para eliminar o alerta permanentemente, configure a assinatura via Azure Trusted Signing (opcional, veja o README).
+> **Segurança no Windows:** confira a assinatura digital e o nome do publicador nas propriedades do instalador. Os pacotes publicados com o novo fluxo exigem assinatura válida da empresa. O SmartScreen ainda pode avisar sobre arquivos com pouca reputação. Veja a seção de assinatura no README.
 
 ---
 
