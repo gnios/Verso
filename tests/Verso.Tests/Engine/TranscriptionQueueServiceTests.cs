@@ -275,11 +275,8 @@ public class TranscriptionQueueServiceTests
         Assert.Contains(received, e => e.Stage == "loading");
         Assert.Contains(received, e => e.Stage == "transcribing" && e.PartIndex == 1 && e.TotalParts == 3);
         Assert.Contains(received, e => e.Percent == 67);
-        Assert.Contains(received, e => e.Stage == "diarizing");
+        Assert.DoesNotContain(received, e => e.Stage == "diarizing");
         Assert.Contains(received, e => e.Stage == "saving");
-        var diarizingAt = received.FindIndex(e => e.Stage == "diarizing");
-        var savingAt = received.FindIndex(e => e.Stage == "saving");
-        Assert.True(savingAt > diarizingAt, "diarizing deve anteceder saving");
         Assert.All(received, e => Assert.Equal(transcriptionId, e.TranscriptionId));
     }
 

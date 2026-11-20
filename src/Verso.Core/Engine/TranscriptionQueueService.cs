@@ -164,9 +164,9 @@ public sealed class TranscriptionQueueService : BackgroundService, IUpdateIdleSi
                 "Transcrição {TranscriptionId} concluída em {Seconds:F1}s — persistindo resultados…",
                 request.TranscriptionId,
                 stopwatch.Elapsed.TotalSeconds);
-            var speakerMode = await GetSpeakerModeAsync(request.TranscriptionId, linkedCts.Token)
-                .ConfigureAwait(false);
-            if (speakerMode == SpeakerMode.Automatic)
+            if (_diarizer is not null
+                && await GetSpeakerModeAsync(request.TranscriptionId, linkedCts.Token).ConfigureAwait(false)
+                    == SpeakerMode.Automatic)
             {
                 RaiseProgressChanged(request.TranscriptionId, "diarizing", null, null);
                 result = new TranscriptionResult(
@@ -422,18 +422,21 @@ public static class EngineServiceCollectionExtensions
         return services;
     }
 
-    public static IServiceCollection AddVersoEngine(this IServiceCollection services)
+    public static IServiceCollection AddVersoEngine(this IServiceCollection services, bool enableDiarization = true)
     {
         services.AddWhisperEngine();
         services.AddParakeetEngine();
         services.AddSingleton<IWorkerExecutableLocator, WorkerExecutableLocator>();
         services.AddSingleton<IWorkerProcessFactory, WorkerProcessFactory>();
         services.AddSingleton<ITranscriptionEngine, WorkerProcessTranscriptionEngine>();
-        services.AddSingleton(sp => new EcapaSpeakerModelManager(
-            sp.GetService<ILogger<EcapaSpeakerModelManager>>(),
-            sp.GetService<IModelDownloadNotifier>()));
-        services.AddSingleton<ISpeakerEmbedder, EcapaSpeakerEmbedder>();
-        services.AddSingleton<ILocalDiarizer, LocalDiarizer>();
+        if (enableDiarization)
+        {
+            services.AddSingleton(sp => new EcapaSpeakerModelManager(
+                sp.GetService<ILogger<EcapaSpeakerModelManager>>(),
+                sp.GetService<IModelDownloadNotifier>()));
+            services.AddSingleton<ISpeakerEmbedder, EcapaSpeakerEmbedder>();
+            services.AddSingleton<ILocalDiarizer, LocalDiarizer>();
+        }
         services.AddSingleton<FfmpegLocator>();
         services.AddSingleton<AudioLoader>();
         services.AddSingleton<TranscriptionQueueService>();

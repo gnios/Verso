@@ -288,12 +288,17 @@ public class LibraryServiceTests
             }
 
             var service = new LibraryService(factory);
-            await service.UpdateTranscriptionTagsAsync(transcriptionId, ["nova", "reutilizada", "  descartada  "]);
+            await service.UpdateTranscriptionTagsAsync(
+                transcriptionId,
+                ["nova", "reutilizada", "  descartada  "],
+                new Dictionary<string, string> { ["nova"] = "purple", ["descartada"] = "red" });
 
             var detail = await service.GetTranscriptionDetailAsync(transcriptionId);
             Assert.NotNull(detail);
             var tagNames = detail!.Tags.Select(t => t.Name).Order().ToList();
             Assert.Equal(["descartada", "nova", "reutilizada"], tagNames);
+            Assert.Equal("purple", detail.Tags.Single(tag => tag.Name == "nova").ColorName);
+            Assert.Equal("green", detail.Tags.Single(tag => tag.Name == "descartada").ColorName);
 
             // A tag "antiga" foi removida desta transcrição, mas a linha global de Tag
             // permanece (Tags são globais/únicas por nome — apenas a associação é trocada).

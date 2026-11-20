@@ -47,12 +47,6 @@ public partial class UploadViewModel : ViewModelBase
 
     public IReadOnlyList<ParakeetModelOptionViewModel> ParakeetModelOptions { get; } = ModelCatalog.ParakeetModels;
 
-    public IReadOnlyList<SpeakerModeOptionViewModel> SpeakerModeOptions { get; } =
-    [
-        new(SpeakerMode.Automatic, "Automático"),
-        new(SpeakerMode.Off, "Desativado"),
-    ];
-
     [ObservableProperty]
     private string? _selectedFilePath;
 
@@ -95,11 +89,7 @@ public partial class UploadViewModel : ViewModelBase
     [ObservableProperty]
     private ParakeetModelOptionViewModel? _selectedParakeetModelOption;
 
-    [ObservableProperty]
-    private SpeakerMode _speakerMode = SpeakerMode.Automatic;
-
-    [ObservableProperty]
-    private SpeakerModeOptionViewModel? _selectedSpeakerModeOption;
+    public SpeakerMode SpeakerMode => SpeakerMode.Off;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SelectedFolderId))]
@@ -270,14 +260,6 @@ public partial class UploadViewModel : ViewModelBase
         SelectedLanguageOption = LanguageOptions.First(option => option.Code == "pt");
     }
 
-    partial void OnSelectedSpeakerModeOptionChanged(SpeakerModeOptionViewModel? value)
-    {
-        if (value is not null)
-        {
-            SpeakerMode = value.Value;
-        }
-    }
-
     [RelayCommand(CanExecute = nameof(CanStart))]
     private async Task StartTranscriptionAsync()
     {
@@ -347,7 +329,6 @@ public partial class UploadViewModel : ViewModelBase
 
         var settings = await settingsService.GetAsync();
         Language = settings.DefaultLanguage;
-        SpeakerMode = settings.IdentifySpeakersDefault ? SpeakerMode.Automatic : SpeakerMode.Off;
         SelectedLanguageOption = LanguageOptions.First(option => option.Code == Language);
         Quality = settings.DefaultQuality;
         SelectedModelOption = ModelCatalog.Find(Quality);
@@ -356,7 +337,6 @@ public partial class UploadViewModel : ViewModelBase
         ParakeetModel = settings.DefaultParakeetModel;
         SelectedParakeetModelOption = ModelCatalog.FindParakeet(ParakeetModel);
         // Find dispara OnSelectedModelOptionChanged e normaliza Quality para o perfil de UI.
-        SelectedSpeakerModeOption = SpeakerModeOptions.First(option => option.Value == SpeakerMode);
         LockPortugueseIfNeeded();
 
         FolderOptions.Clear();
@@ -403,11 +383,6 @@ public partial class UploadViewModel : ViewModelBase
 }
 
 public sealed record LanguageOptionViewModel(string Code, string Label)
-{
-    public override string ToString() => Label;
-}
-
-public sealed record SpeakerModeOptionViewModel(SpeakerMode Value, string Label)
 {
     public override string ToString() => Label;
 }
