@@ -22,7 +22,7 @@
 
 ## 1. O que é o Verso
 
-**Verso** é um aplicativo desktop para transcrição de áudio e vídeo usando o modelo [Whisper](https://github.com/openai/whisper) da OpenAI, via a biblioteca [whisper.net](https://github.com/sandrohanea/whisper.net). É desenvolvido em .NET 10 com interface Photino.Blazor e tem suporte nativo ao português brasileiro.
+**Verso** é um aplicativo desktop para transcrição de áudio e vídeo usando o modelo [Whisper](https://github.com/openai/whisper) da OpenAI, via a biblioteca [whisper.net](https://github.com/sandrohanea/whisper.net). Usa .NET 10, Photino.NET e uma interface React com Astryx. Tem suporte nativo ao português brasileiro.
 
 O aplicativo permite transcrever arquivos de áudio e vídeo, organizar transcrições em **pesquisas** e **tags**, editar segmentos com atribuição de **locutores**, gravar áudio direto do microfone e exportar nos formatos **TXT**, **SRT** e **VTT**.
 
@@ -92,13 +92,17 @@ O Verso suporta quatro modos de execução:
 - **Windows 10/11**, **Linux x64** ou **macOS Apple Silicon**
 - Runtime de WebView: WebView2 (Windows), WebKitGTK (Linux), WKWebView (macOS)
 - **FFmpeg** no `PATH` (no Windows o app pode oferecer instalação via winget)
-- Para build: **[.NET 10 SDK](https://dotnet.microsoft.com/download)** (apenas para desenvolvimento)
+- Para build: **[.NET 10 SDK](https://dotnet.microsoft.com/download)** e **Node.js com npm** (apenas para desenvolvimento)
 
 ### 4.2 Build e execução em desenvolvimento
 
 ```bash
 # Restaurar dependências
 dotnet restore
+npm ci --prefix ui
+
+# Gerar a interface em src/Verso.App/wwwroot
+npm run build --prefix ui
 
 # Executar em desenvolvimento
 dotnet run --project src/Verso.App
@@ -118,12 +122,14 @@ O banco SQLite, as migrations e a pasta de dados (`data/`) são criados automati
 
 ```
 Verso.sln                    — Solução principal
+├── ui/                      — Interface React + Astryx
+│   ├── src/                 — Páginas, componentes e integração com o app
+│   └── public/              — Arquivos estáticos de origem, incluindo a marca
 ├── src/
-│   ├── Verso.App/           — UI (Photino.Blazor + WebView2)
-│   │   ├── Pages/           — Páginas Razor (Dashboard, Editor, Upload, etc.)
+│   ├── Verso.App/           — Aplicativo desktop (Photino.NET)
 │   │   ├── ViewModels/      — ViewModels (Settings, Upload, Editor, etc.)
 │   │   ├── Services/        — Serviços de UI
-│   │   ├── wwwroot/         — Assets estáticos (CSS, JS, fontes)
+│   │   ├── wwwroot/         — Build da interface, recriado pelo Vite
 │   │   └── Program.cs       — Entry point
 │   ├── Verso.Worker/        — Processo isolado de transcrição (spawn automático)
 │   └── Verso.Core/          — Motor e dados
@@ -133,8 +139,28 @@ Verso.sln                    — Solução principal
 │       ├── Media/            — Playback de áudio (NAudio)
 │       └── Logging/          — File logger
 ├── tests/Verso.Tests/       — Testes xUnit
+├── scripts/experiments/    — Ferramentas de transcrição para uso manual
+├── docs/prototypes/        — Protótipos de interface
 └── models/                  — Modelos baixados (criado pelo app)
 ```
+
+Os scripts em [scripts/experiments/transcription](scripts/experiments/transcription) são executados separadamente do Verso. Em PowerShell, partindo da raiz do repositório:
+
+```powershell
+# Whisper.net (.NET 10)
+dotnet run --file scripts/experiments/transcription/transcrever.cs
+
+# faster-whisper (execute dentro de um ambiente virtual Python)
+python -m pip install -r scripts/experiments/transcription/requirements.txt
+python scripts/experiments/transcription/transcrever.py
+
+# WhisperX com CUDA (instala e cria o ambiente dedicado no Windows)
+Set-Location scripts/experiments/transcription
+.\setup-whisperx.ps1
+.\.venv-whisperx\Scripts\python.exe transcrever_x.py
+```
+
+O [protótipo HTML da biblioteca](docs/prototypes/transcriba-v2-icons-transcriptions.html) registra a origem dos catálogos de ícones e cores.
 
 ---
 

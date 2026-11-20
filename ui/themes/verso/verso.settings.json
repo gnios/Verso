@@ -1,0 +1,14 @@
+{
+  "name": "verso",
+  "like": "neutral",
+  "mode": "both",
+  "settings": [
+    {
+      "thing": "accent",
+      "value": "#168b83",
+      "source": "dial"
+    }
+  ],
+  "lifted": [],
+  "palette": "7fc9c9e1250242710580712af35bc7a50ed6c3d0f89f96846f327fcf50a2fa42"
+}

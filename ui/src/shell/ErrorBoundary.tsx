@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react';
+import * as Sentry from '@sentry/react';
 import { Button } from '@astryxdesign/core/Button';
 import { Heading } from '@astryxdesign/core/Heading';
 import { Text } from '@astryxdesign/core/Text';
@@ -25,6 +26,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, info: { componentStack?: string | null }): void {
+    Sentry.captureException(error, { contexts: { react: { componentStack: info.componentStack ?? undefined } } });
     console.error('[Verso] Erro de renderização:', error, info.componentStack);
   }
 

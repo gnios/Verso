@@ -97,14 +97,16 @@ function WaveformCanvas({
   loadPeaks,
   duration,
   expectedDuration,
-  currentTime,
+  segments,
+  speakers,
   onSeek,
 }: {
   mediaUrl: string;
   loadPeaks: boolean;
   duration: number;
   expectedDuration: number;
-  currentTime: number;
+  segments: EditorSegment[];
+  speakers: EditorSpeaker[];
   onSeek: (seconds: number) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -167,38 +169,57 @@ function WaveformCanvas({
         return;
       }
 
-      const styles = getComputedStyle(document.documentElement);
-      const accent = styles.getPropertyValue('--color-accent').trim() || '#2eaadc';
-      const border = styles.getPropertyValue('--color-border').trim() || '#ccc';
-      // --color-border é quase transparente no escuro (#ffffff1A) — o fantasma
-      // usa a borda enfatizada para não sumir no fundo do player.
-      const ghostColor = styles.getPropertyValue('--color-border-emphasized').trim() || border;
+      const styles = getComputedStyle(canvas);
+      // Read resolved colors so the canvas receives RGB rather than light-dark().
+      const green = styles.color;
+      const speakerColors = new Map(speakers.map((speaker) => [speaker.id, speaker.colorHex]));
+      const timelineDuration = duration || expectedDuration || Math.max(1, segments.at(-1)?.end ?? 0);
       context.clearRect(0, 0, canvas.width, canvas.height);
-
-      const progress = duration > 0 ? currentTime / duration : 0;
 
       // Sem picos reais ainda (antes do play ou fetch em andamento): desenha
       // o fantasma com alpha menor — preenche a área sem fingir ser dado real.
-      const bars = peaks ?? GHOST_PEAKS;
-      const barWidth = canvas.width / bars.length;
-      context.globalAlpha = peaks ? 1 : 0.6;
-      for (let i = 0; i < bars.length; i++) {
-        const height = Math.max(2 * dpr, bars[i] * canvas.height * 0.9);
-        context.fillStyle = i / bars.length <= progress ? accent : peaks ? border : ghostColor;
-        context.fillRect(i * barWidth, (canvas.height - height) / 2, Math.max(1, barWidth * 0.7), height);
+      const sourceBars = peaks ?? GHOST_PEAKS;
+      // Mantém a waveform esparsa e colorida como a prévia do site, mesmo que
+      // o endpoint entregue centenas de picos para permitir buscas precisas.
+      const intervals = segments.length ? segments : [{ start: 0, end: timelineDuration, speakerId: null }];
+      context.globalAlpha = peaks ? 1 : 0.75;
+      for (const segment of intervals) {
+        const start = Math.max(0, segment.start) / timelineDuration;
+        const end = Math.min(timelineDuration, segment.end) / timelineDuration;
+        if (end <= start) continue;
+
+        const segmentWidth = (end - start) * canvas.width;
+        const barCount = Math.max(1, Math.round(segmentWidth / (5 * dpr)));
+        const barWidth = segmentWidth / barCount;
+        const strokeWidth = Math.min(2 * dpr, barWidth * 0.75);
+        context.fillStyle = (segment.speakerId && speakerColors.get(segment.speakerId)) || green;
+
+        for (let i = 0; i < barCount; i++) {
+          const barStart = start + (end - start) * i / barCount;
+          const barEnd = start + (end - start) * (i + 1) / barCount;
+          const firstPeak = Math.floor(barStart * sourceBars.length);
+          const lastPeak = Math.max(firstPeak + 1, Math.ceil(barEnd * sourceBars.length));
+          const peak = Math.max(0, ...sourceBars.slice(firstPeak, lastPeak));
+          const height = Math.max(2 * dpr, peak * canvas.height * 0.9);
+          const x = barStart * canvas.width + (barWidth - strokeWidth) / 2;
+          context.fillRect(x, (canvas.height - height) / 2, strokeWidth, height);
+        }
       }
       context.globalAlpha = 1;
     };
 
     const observer = new ResizeObserver(() => draw());
+    const themeObserver = new MutationObserver(draw);
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     if (canvasRef.current) {
       observer.observe(canvasRef.current);
     }
     draw();
     return () => {
       observer.disconnect();
+      themeObserver.disconnect();
     };
-  }, [duration, currentTime, peaks]);
+  }, [duration, expectedDuration, peaks, segments, speakers]);
 
   const seek = (event: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -216,7 +237,7 @@ function WaveformCanvas({
       ref={canvasRef}
       className="verso-waveform"
       onClick={seek}
-      style={{ width: '100%', height: 64, display: 'block', cursor: 'pointer' }}
+      style={{ width: '100%', height: 32, display: 'block', cursor: 'pointer' }}
     />
   );
 }
@@ -235,6 +256,7 @@ export function EditorPage({ parameter }: EditorPageProps) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1);
   const [mediaActivated, setMediaActivated] = useState(false);
   const [focusedSegmentId, setFocusedSegmentId] = useState<string | null>(null);
   const [activeSpeakerFor, setActiveSpeakerFor] = useState<string | null>(null);
@@ -262,6 +284,7 @@ export function EditorPage({ parameter }: EditorPageProps) {
       setFolderId(detail.folder.id);
       setCurrentTime(0);
       setDuration(detail.meta.durationSeconds);
+      setPlaybackRate(1);
       void invoke<SidebarData>('sidebar.load')
         .then((side) => setAllTags(side.tags.map((tag) => ({ name: tag.name, colorName: tag.colorName }))))
         .catch(() => undefined);
@@ -296,6 +319,12 @@ export function EditorPage({ parameter }: EditorPageProps) {
       pendingFocus.current = null;
     }
   }, [segments]);
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.playbackRate = playbackRate;
+    }
+  }, [playbackRate, data?.mediaUrl]);
 
   // Último segmento com start <= posição (mesmo critério de SegmentEditingService.GetActiveSegment).
   const activeSegmentId = useMemo(() => {
@@ -690,30 +719,30 @@ export function EditorPage({ parameter }: EditorPageProps) {
         </div>
       </HStack>
 
-      {/* Player — superfície própria (estilo barra do Spotify): fundo, borda
-          e raio separam o controle de áudio do conteúdo da página. */}
+      {/* Player compacto: botão, tempo e waveform seguem a prévia da landing page. */}
       <div className="verso-player-wrap">
-        <HStack className="verso-player" gap={3} align="center" width="100%">
+        <div className="verso-player">
           <IconButton
             icon={<Icon icon={isPlaying ? PauseIcon : PlayIcon} />}
             label={isPlaying ? 'Pausar' : 'Reproduzir'}
             variant="primary"
-            size="lg"
+            size="md"
             data-testid="player-play"
             onClick={togglePlay}
             isDisabled={!data.mediaUrl}
           />
-          <Text size="sm" color="secondary" style={{ minWidth: 48, textAlign: 'center' }}>
+          <span className="verso-player-time" aria-label="Tempo atual">
             {formatTime(currentTime)}
-          </Text>
-          <VStack gap={1} align="start" width="100%" style={{ flex: 1 }}>
+          </span>
+          <div className="verso-player-timeline">
             {data.mediaUrl ? (
               <WaveformCanvas
                 mediaUrl={data.mediaUrl}
                 loadPeaks={mediaActivated}
                 duration={duration}
                 expectedDuration={data.meta.durationSeconds}
-                currentTime={currentTime}
+                segments={segments}
+                speakers={speakers}
                 onSeek={seek}
               />
             ) : null}
@@ -724,14 +753,27 @@ export function EditorPage({ parameter }: EditorPageProps) {
               max={duration || 0}
               step={0.1}
               value={currentTime}
+              aria-label="Posição do áudio"
+              disabled={!data.mediaUrl || duration <= 0}
               onChange={(event) => seek(Number(event.target.value))}
-              style={{ width: '100%' }}
             />
-          </VStack>
-          <Text size="sm" color="secondary" style={{ minWidth: 48, textAlign: 'center' }}>
+          </div>
+          <span className="verso-player-time verso-player-duration" aria-label="Duração do áudio">
             {formatTime(duration)}
-          </Text>
-        </HStack>
+          </span>
+          <select
+            className="verso-speed"
+            aria-label="Velocidade de reprodução"
+            value={playbackRate}
+            disabled={!data.mediaUrl}
+            onChange={(event) => setPlaybackRate(Number(event.target.value))}
+          >
+            <option value={1}>1×</option>
+            <option value={1.25}>1,25×</option>
+            <option value={1.5}>1,5×</option>
+            <option value={2}>2×</option>
+          </select>
+        </div>
       </div>
 
       {/* Conteúdo rolável: meta, tags e segmentos */}
