@@ -367,6 +367,10 @@ export function EditorPage({ parameter }: EditorPageProps) {
     setTagPickerOpen(false);
   };
 
+  const removeTag = (name: string) => {
+    commitTags(tags.filter((tag) => tag.name.toLowerCase() !== name.toLowerCase()));
+  };
+
   const tagSuggestions = allTags.filter(
     (tag) =>
       !tags.some((applied) => applied.name.toLowerCase() === tag.name.toLowerCase()) &&
@@ -746,7 +750,17 @@ export function EditorPage({ parameter }: EditorPageProps) {
           {data.isInProgress ? <Badge variant="info" label="Em andamento" /> : null}
           {data.isError ? <Badge variant="error" label={data.errorMessage ?? 'Erro'} /> : null}
           {tags.map((tag) => (
-            <Badge key={tag.name} variant={tagVariant(tag.name)} label={tag.name} />
+            <span key={tag.name} className="verso-tag-chip">
+              <Badge variant={tagVariant(tag.name)} label={tag.name} />
+              <button
+                type="button"
+                className="verso-tag-chip-remove"
+                aria-label={`Remover tag ${tag.name}`}
+                onClick={() => removeTag(tag.name)}
+              >
+                ×
+              </button>
+            </span>
           ))}
           <Popover
             label="Adicionar tag"

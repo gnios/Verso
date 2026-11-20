@@ -43,6 +43,39 @@ body,
   cursor: pointer;
 }
 
+/* Tags removíveis no editor: o × flutua no canto do Badge e aparece no
+   hover/focus — mesmo padrão dos chips removíveis do Material/Notion. */
+.verso-tag-chip {
+  position: relative;
+  display: inline-flex;
+}
+
+.verso-tag-chip-remove {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--color-border-emphasized);
+  color: var(--color-text-primary);
+  font-size: 10px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.verso-tag-chip:hover .verso-tag-chip-remove,
+.verso-tag-chip-remove:focus-visible {
+  opacity: 1;
+}
+
 .verso-row-icon {
   font-size: 18px;
   flex-shrink: 0;
