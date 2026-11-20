@@ -483,7 +483,7 @@ public sealed class VersoBridge : IDisposable
                 tags = detail.Tags.Select(t => new
                 {
                     name = t.Name,
-                    colorName = TagColorCatalog.GetColor(t.Name),
+                    colorName = t.ColorName,
                 }),
                 folder = detail.Folder is { } folder
                     ? new { id = (int?)folder.Id, title = folder.Title }
@@ -656,6 +656,7 @@ public sealed class VersoBridge : IDisposable
                 }
 
                 await library.UpdateTranscriptionTagsAsync(transcriptionId, tags, colors);
+                _bridge.SendEvent("sidebar.tagsChanged", await library.GetTagsAsync());
             }
 
             if (args?.TryGetProperty("folderId", out var folderElement) == true)
@@ -666,7 +667,11 @@ public sealed class VersoBridge : IDisposable
                 await folderService.AssignTranscriptionToFolderAsync(transcriptionId, folderId);
             }
 
-            await _services.GetRequiredService<SidebarViewModel>().LoadAsync();
+            if (args is { } metadata && (metadata.TryGetProperty("title", out _)
+                || metadata.TryGetProperty("icon", out _) || metadata.TryGetProperty("folderId", out _)))
+            {
+                await _sidebar.LoadAsync();
+            }
             return null;
         });
 

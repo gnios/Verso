@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge } from '@astryxdesign/core/Badge';
 import { Button } from '@astryxdesign/core/Button';
 import { IconButton } from '@astryxdesign/core/IconButton';
@@ -9,7 +9,8 @@ import { VStack } from '@astryxdesign/core/VStack';
 import { invoke, onEvent } from '../lib/bridge';
 import { FOLDERS_ENABLED, RECORDING_ENABLED } from '../lib/features';
 import { navigateTo, type ScreenKey, type NavigationParam } from '../lib/screens';
-import type { AppInfo, SidebarData } from '../types';
+import { tagVariant } from '../lib/tagColors';
+import type { AppInfo, SidebarData, SidebarTag } from '../types';
 import {
   AlertCircleIcon,
   CheckCircleIcon,
@@ -42,12 +43,18 @@ function countBadge(count: number | undefined): React.ReactNode {
 
 export function SidebarNav({ screen, parameter, isDark, appInfo, onToggleTheme, onNewFolder, onFeedback }: SidebarNavProps) {
   const [sidebar, setSidebar] = useState<SidebarData | null>(null);
+  const [tags, setTags] = useState<SidebarTag[]>([]);
+  const tagRevision = useRef(0);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
+    const revision = tagRevision.current;
     void invoke<SidebarData>('sidebar.load')
-      .then(setSidebar)
+      .then((data) => {
+        setSidebar(data);
+        if (revision === tagRevision.current) setTags(data.tags);
+      })
       .catch(() => undefined);
   }, []);
 
@@ -56,10 +63,15 @@ export function SidebarNav({ screen, parameter, isDark, appInfo, onToggleTheme, 
     const offNavigation = onEvent('navigation.changed', refresh);
     const offDashboard = onEvent('dashboard.changed', refresh);
     const offUpdate = onEvent('sidebar.updateChanged', refresh);
+    const offTags = onEvent<SidebarTag[]>('sidebar.tagsChanged', (nextTags) => {
+      tagRevision.current++;
+      setTags(nextTags);
+    });
     return () => {
       offNavigation();
       offDashboard();
       offUpdate();
+      offTags();
     };
   }, [refresh]);
 
@@ -244,10 +256,13 @@ export function SidebarNav({ screen, parameter, isDark, appInfo, onToggleTheme, 
       </SideNavSection>
 
       <SideNavSection title="Tags">
-        {sidebar?.tags.map((tag) => (
+        {tags.map((tag) => (
           <SideNavItem
             key={tag.id}
             label={tag.name}
+            icon={<span className="sidebar-tag-dot"
+              style={{ backgroundColor: `var(--color-text-${tagVariant(tag.colorName)})` }}
+              aria-hidden="true" />}
             endContent={<Text size="sm">{tag.count}</Text>}
             isSelected={screen === 'Dashboard' && parameter.tagId === tag.id}
             onClick={() => void onDashboard({ tagId: tag.id })}

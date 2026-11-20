@@ -14,6 +14,7 @@ import { TextInput } from '@astryxdesign/core/TextInput';
 import { VStack } from '@astryxdesign/core/VStack';
 import { invoke, onEvent } from '../lib/bridge';
 import { FOLDERS_ENABLED } from '../lib/features';
+import { TAG_COLORS, tagVariant } from '../lib/tagColors';
 import type { NavigationParam } from '../lib/screens';
 import type {
   CardTag,
@@ -42,15 +43,6 @@ interface EditorPageProps {
 }
 
 const TranscriptionEmojiPicker = lazy(() => import('../components/TranscriptionEmojiPicker'));
-
-const TAG_COLORS = {
-  blue: 'Azul', cyan: 'Ciano', green: 'Verde', orange: 'Laranja', pink: 'Rosa',
-  purple: 'Roxo', teal: 'Verde-azulado', yellow: 'Amarelo', red: 'Vermelho',
-} as const;
-
-function tagVariant(color: string): keyof typeof TAG_COLORS {
-  return Object.hasOwn(TAG_COLORS, color) ? color as keyof typeof TAG_COLORS : 'blue';
-}
 
 function PickerOption({ label, color, selected, onClick }: {
   label: string;

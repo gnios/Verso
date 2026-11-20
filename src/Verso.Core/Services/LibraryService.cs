@@ -52,7 +52,8 @@ public class LibraryService(IDbContextFactory<VersoDbContext> dbContextFactory)
             .Select(t => new TagSummary(
                 t.Id,
                 t.Name,
-                context.Transcriptions.Count(tr => tr.Tags.Any(tag => tag.Id == t.Id))))
+                context.Transcriptions.Count(tr => tr.Tags.Any(tag => tag.Id == t.Id)),
+                t.ColorName))
             .ToListAsync();
     }
 
@@ -320,13 +321,18 @@ public class LibraryService(IDbContextFactory<VersoDbContext> dbContextFactory)
             return;
         }
 
-        foreach (var tagName in tagNames
-                     .Select(t => t.Trim())
-                     .Where(t => !string.IsNullOrEmpty(t))
-                     .Distinct(StringComparer.OrdinalIgnoreCase))
+        var names = tagNames.Select(t => t.Trim())
+            .Where(t => t.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (names.Length == 0)
+            return;
+
+        var existingTags = await context.Tags.Where(t => names.Contains(t.Name))
+            .ToDictionaryAsync(t => t.Name, StringComparer.Ordinal);
+        foreach (var tagName in names)
         {
-            var tag = await context.Tags.FirstOrDefaultAsync(t => t.Name == tagName);
-            if (tag is null)
+            if (!existingTags.TryGetValue(tagName, out var tag))
             {
                 tag = new Tag
                 {
