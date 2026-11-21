@@ -7,6 +7,7 @@
 <p align="center">
   <a href="https://github.com/gnios/Verso/releases/latest"><strong>Baixar o Verso</strong></a> ·
   <a href="#primeira-transcrição">Primeira transcrição</a> ·
+  <a href="#demonstrações">Demonstrações</a> ·
   <a href="#como-apoiar-o-verso">Como apoiar</a>
 </p>
 
@@ -26,22 +27,86 @@ A variante **CPU** funciona sem aceleração gráfica. A variante **GPU** oferec
 
 <img align="right" src="docs/brand/verso-mascote.png" width="160" alt="Capivara pesquisadora com fones, caderno e caneta">
 
-1. Abra **Nova transcrição**, clique em **Selecionar arquivo** e escolha uma gravação. Confira o título preenchido e clique em **Transcrever**. Você também pode gravar pelo microfone.
+1. Abra **Nova transcrição**, clique em **Selecionar arquivo** e escolha uma gravação. Confira o título preenchido e clique em **Transcrever**.
 2. Aguarde o download do modelo no primeiro uso. Acompanhe a transcrição na fila.
 3. Abra o resultado no editor e use o player e a forma de onda para conferir trechos. Use a detecção automática de locutores, ajuste as atribuições por segmento e renomeie quem está falando.
 4. Organize a biblioteca com tags. No menu **Baixar** do editor, escolha **Documento acadêmico (RTF)**, **Texto (TXT)** ou legendas em **SRT** e **VTT**.
 
 <br clear="all">
 
-<details>
-<summary>Ver como importar um áudio no Verso (GIF)</summary>
+> [!TIP]
+> Os pacotes do Verso já incluem o FFmpeg para transcrever MP3, MP4 e outros formatos. No primeiro uso, o aplicativo baixa o modelo de transcrição.
 
-![No Verso, abra Nova transcrição, selecione o arquivo de áudio, confira o título e clique em Transcrever.](site/assets/importar-audio.gif)
+## Demonstrações
+
+![Editor do Verso com dois locutores identificados e a forma de onda da gravação.](site/assets/demonstracoes/03-editor.png)
+
+[Ver biblioteca](site/assets/demonstracoes/01-biblioteca.png) · [Ver tela de importação](site/assets/demonstracoes/02-importacao.png) · [Ver menu de exportação](site/assets/demonstracoes/04-exportacao.png)
+
+Abra um tópico para ver o GIF com o passo a passo.
+
+<details>
+<summary>Importar um áudio ou vídeo</summary>
+
+Abra Nova transcrição, selecione o arquivo e confira o título antes de clicar em Transcrever.
+
+![Abra Nova transcrição, selecione o arquivo e confira o título antes de clicar em Transcrever.](site/assets/importar-audio.gif)
 
 </details>
 
-> [!TIP]
-> Os pacotes do Verso já incluem o FFmpeg para transcrever MP3, MP4 e outros formatos. No primeiro uso, o aplicativo baixa o modelo de transcrição.
+<details>
+<summary>Escolher o motor de transcrição</summary>
+
+Em Configurações, abra Modelos e desempenho. Escolha Parakeet ou Whisper e ajuste o modelo ou o perfil.
+
+![Em Configurações, abra Modelos e desempenho. Escolha Parakeet ou Whisper e ajuste o modelo ou o perfil.](site/assets/demonstracoes/motores.gif)
+
+</details>
+
+<details>
+<summary>Acompanhar e buscar na biblioteca</summary>
+
+Acompanhe a fila em Em andamento, busque por título e alterne entre tabela e cartões.
+
+![Acompanhe a fila em Em andamento, busque por título e alterne entre tabela e cartões.](site/assets/demonstracoes/biblioteca.gif)
+
+</details>
+
+<details>
+<summary>Organizar com tags</summary>
+
+No editor, abra Tags para adicionar uma etiqueta existente ou criar uma com nome e cor.
+
+![No editor, abra Tags para adicionar uma etiqueta existente ou criar uma com nome e cor.](site/assets/demonstracoes/tags.gif)
+
+</details>
+
+<details>
+<summary>Revisar ouvindo a gravação</summary>
+
+Use o player e a forma de onda. Clique no tempo de uma fala para ir direto a ela e corrigir o texto.
+
+![Use o player e a forma de onda. Clique no tempo de uma fala para ir direto a ela e corrigir o texto.](site/assets/demonstracoes/revisar.gif)
+
+</details>
+
+<details>
+<summary>Ajustar os locutores</summary>
+
+Clique no nome acima de uma fala para atribuir ou renomear o locutor.
+
+![Clique no nome acima de uma fala para atribuir ou renomear o locutor.](site/assets/demonstracoes/locutores.gif)
+
+</details>
+
+<details>
+<summary>Exportar o resultado</summary>
+
+No menu Baixar, escolha Documento acadêmico (RTF), Texto (TXT) ou legendas (SRT e VTT).
+
+![No menu Baixar, escolha Documento acadêmico (RTF), Texto (TXT) ou legendas (SRT e VTT).](site/assets/demonstracoes/exportar.gif)
+
+</details>
 
 ### Exportação acadêmica em RTF
 
