@@ -41,7 +41,7 @@ A variante **CPU** funciona sem aceleração gráfica. A variante **GPU** oferec
 </details>
 
 > [!TIP]
-> Para começar, use um arquivo WAV PCM. Para MP3, MP4 e outros formatos, instale o FFmpeg e deixe-o disponível no PATH.
+> Os pacotes do Verso já incluem o FFmpeg para transcrever MP3, MP4 e outros formatos. No primeiro uso, o aplicativo baixa o modelo de transcrição.
 
 ### Exportação acadêmica em RTF
 

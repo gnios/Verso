@@ -60,9 +60,14 @@ public sealed class FfmpegLocator
 
     public string? FindFfmpeg()
     {
+        var executable = _isWindows ? "ffmpeg.exe" : "ffmpeg";
+        var bundled = Path.Combine(VersoPaths.PayloadDirectory, "ffmpeg", executable);
+        if (_fileExists(bundled))
+            return bundled;
+
         foreach (var dir in _getPathDirectories())
         {
-            var candidate = Path.Combine(dir, _isWindows ? "ffmpeg.exe" : "ffmpeg");
+            var candidate = Path.Combine(dir, executable);
             if (_fileExists(candidate))
                 return candidate;
         }
