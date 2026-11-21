@@ -122,14 +122,11 @@ public class Program
             wwwroot);
         appServer.Start();
 
-        // Limites da janela: abaixo de 1024x640 a tabela de transcrições +
-        // sidebar ficam ilegíveis; acima de 1600x1000 a janela fica "esticada"
-        // demais em monitores largos/HiDPI.
+        // O sistema define o tamanho maximizado na área útil do monitor.
         var window = new PhotinoWindow()
             .SetTitle("Verso")
             .SetSize(1280, 800)
-            .SetMinSize(1024, 640)
-            .SetMaxSize(1600, 1000)
+            .SetMinSize(800, 540)
             .Center();
 
         // Ícone da janela (barra de título + taskbar): SetIconFile exige o HWND

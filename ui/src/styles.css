@@ -26,6 +26,50 @@ body,
   cursor: pointer;
 }
 
+.library-page {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 16px clamp(16px, 1.5vw, 48px);
+  container-type: inline-size;
+}
+
+.library-toolbar,
+.library-page > .verso-table-wrap {
+  max-width: 2400px;
+}
+
+.library-toolbar > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.library-controls {
+  width: min(100%, 400px);
+}
+
+.library-search {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.library-card-grid {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 16px;
+}
+
+@container (max-width: 640px) {
+  .library-toolbar {
+    align-items: start;
+  }
+
+  .library-controls {
+    width: 100%;
+  }
+}
+
 .settings-scroll {
   width: 100%;
   height: 100%;
@@ -161,6 +205,8 @@ body,
    então a célula do título é um botão que ocupa a célula inteira. */
 .verso-table-wrap {
   width: 100%;
+  min-width: 0;
+  overflow-x: auto;
 }
 
 .verso-row-open {
