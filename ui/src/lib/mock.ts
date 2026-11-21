@@ -119,7 +119,7 @@ const sidebar: SidebarData = {
   ],
   counts: { total: 12, inProgress: 2, done: 9, error: 1, unassigned: 3 },
   versionLabel: '1.0.0',
-  update: { canUpdateNow: false, isReady: false, title: '', label: '' },
+  update: { canUpdateNow: false, isReady: false, hasUpdate: false, title: '', label: '' },
 };
 
 const models = [
@@ -284,6 +284,14 @@ export function mockInvoke(method: string, args?: unknown): Promise<unknown> {
     case 'theme.toggle':
       themeDark = !themeDark;
       return Promise.resolve({ isDark: themeDark });
+    case 'updates.load':
+      return Promise.resolve({
+        version: '0.1.0-dev (mock)',
+        latestVersion: null,
+        hasChannel: false,
+        status: 'Atualização automática disponível na versão instalada ou no pacote portátil.',
+        action: { canUpdateNow: false, isReady: false, hasUpdate: false, title: '', label: 'Verificar atualizações' },
+      });
     case 'sidebar.load':
       return Promise.resolve(sidebar);
     case 'navigation.navigate':

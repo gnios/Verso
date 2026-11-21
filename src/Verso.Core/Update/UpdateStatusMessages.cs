@@ -16,8 +16,8 @@ public static class UpdateStatusMessages
                 ? "Baixando atualização…"
                 : $"Baixando {target}…",
             UpdateStatus.Ready => target is null
-                ? "Atualização pronta — clique em Atualizar na barra lateral."
-                : $"Atualização {target} pronta — clique em Atualizar na barra lateral.",
+                ? "Atualização pronta para instalar."
+                : $"Atualização {target} pronta para instalar.",
             UpdateStatus.Applying => "Aplicando atualização…",
             UpdateStatus.UpToDate => "Verso está atualizado.",
             UpdateStatus.Failed => "Não foi possível atualizar agora. Tentaremos de novo na próxima abertura.",

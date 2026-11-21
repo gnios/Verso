@@ -141,7 +141,7 @@ export function SidebarNav({ screen, parameter, isDark, appInfo, onToggleTheme, 
       }
       footer={
         <>
-          {appInfo?.hasUpdateChannel && update && (
+          {appInfo?.hasUpdateChannel && update?.hasUpdate && (
             isCollapsed ? (
               <IconButton label={update.label} icon={<Icon icon={DownloadIcon} />}
                 variant={update.isReady ? 'primary' : 'ghost'} isDisabled={!update.canUpdateNow}

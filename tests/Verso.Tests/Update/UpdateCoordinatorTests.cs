@@ -46,6 +46,7 @@ public class UpdateCoordinatorTests
             var result = await coordinator.CheckAndPrepareAsync();
 
             Assert.Equal(UpdateStatus.UpToDate, result.Status);
+            Assert.Equal("1.0.0", coordinator.LatestPublishedVersion);
             Assert.Equal("1.0.0", coordinator.AvailableVersion);
             Assert.False(downloader.Called);
         }
@@ -73,6 +74,7 @@ public class UpdateCoordinatorTests
             Assert.True(result.ApplyImmediately);
             Assert.True(coordinator.HasPendingApply());
             Assert.Equal("1.1.0", coordinator.AvailableVersion);
+            Assert.Equal("1.1.0", coordinator.LatestPublishedVersion);
             Assert.True(File.Exists(Path.Combine(coordinator.PayloadDirectory, "Verso.App.exe")));
             Assert.False(Directory.Exists(Path.Combine(coordinator.PayloadDirectory, "data")));
             Assert.False(File.Exists(Path.Combine(coordinator.StagingDirectory, UpdateCoordinator.PackageFileName)));

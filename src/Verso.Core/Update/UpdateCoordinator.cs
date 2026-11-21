@@ -44,6 +44,7 @@ public sealed class UpdateCoordinator
     public string? StatusDetail { get; private set; }
 
     public string? AvailableVersion { get; private set; }
+    public string? LatestPublishedVersion { get; private set; }
 
     public event EventHandler? StatusChanged;
 
@@ -125,6 +126,7 @@ public sealed class UpdateCoordinator
                 return new UpdateCheckResult(UpdateStatus.Failed, false, StatusDetail);
             }
 
+            LatestPublishedVersion = AppVersion.Display(latest.TagName);
             if (!AppVersion.IsNewer(latest.TagName, _localVersion()))
             {
                 TryDeleteStaging();
@@ -141,6 +143,7 @@ public sealed class UpdateCoordinator
             var asset = _releases.FindChannelAsset(latest, channel);
             if (asset is null)
             {
+                RememberAvailable(null);
                 _logger.LogWarning(
                     "Release {Tag} sem asset do canal {Variant}-{Rid}.",
                     latest.TagName,
