@@ -32,6 +32,7 @@ public sealed class NativeBridge
     };
 
     private long _lastMessageAtTicks = DateTime.UtcNow.Ticks;
+    private bool _hasWebViewConnection;
 
     public NativeBridge(PhotinoWindow window, ILogger<NativeBridge> logger)
     {
@@ -70,6 +71,8 @@ public sealed class NativeBridge
                 return;
             }
 
+            Volatile.Write(ref _hasWebViewConnection, true);
+
             // Keep-alive do watchdog: responde na hora, sem lookup de handler.
             if (method == "app.ping")
             {
@@ -104,8 +107,13 @@ public sealed class NativeBridge
     }
 
     /// <summary>Push de evento assíncrono para o JS (sem id de request).</summary>
-    public void SendEvent(string eventName, object? payload) =>
-        Send(new { @event = eventName, payload });
+    public void SendEvent(string eventName, object? payload)
+    {
+        // Startup notifications have no receiver yet. The WebView reads the
+        // current state when it mounts.
+        if (Volatile.Read(ref _hasWebViewConnection))
+            Send(new { @event = eventName, payload });
+    }
 
     private void Respond(long? id, bool ok, object? result, string? error) =>
         Send(new { id, ok, result, error });

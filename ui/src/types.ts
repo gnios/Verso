@@ -41,8 +41,17 @@ export interface SidebarCounts {
 export interface UpdateStatus {
   canUpdateNow: boolean;
   isReady: boolean;
+  hasUpdate: boolean;
   title: string;
   label: string;
+}
+
+export interface UpdateDetails {
+  version: string;
+  latestVersion: string | null;
+  hasChannel: boolean;
+  status: string;
+  action: UpdateStatus;
 }
 
 export interface SidebarData {

@@ -105,6 +105,27 @@ public sealed class VersoBridge : IDisposable
         });
 
         _bridge.Register("sidebar.load", async _ => await SnapshotSidebarAsync());
+        _bridge.Register("updates.load", _ =>
+        {
+            var coordinator = _services.GetService<UpdateCoordinator>();
+            var hasChannel = UpdateChannel.TryLoad(VersoPaths.AppDirectory) is not null;
+            return Task.FromResult<object?>(new
+            {
+                version = _sidebar.AppVersionLabel,
+                latestVersion = coordinator?.LatestPublishedVersion,
+                hasChannel,
+                status = UpdateStatusMessages.For(
+                    coordinator?.Status ?? UpdateStatus.Idle, hasChannel, coordinator?.AvailableVersion),
+                action = SnapshotUpdateAction(_sidebar),
+            });
+        });
+        _bridge.Register("updates.check", async _ =>
+        {
+            if (_sidebar.CanUpdateNow && _services.GetService<UpdateSession>() is { } session)
+                await session.CheckInBackgroundAsync();
+
+            return null;
+        });
         _bridge.Register("sidebar.updateNow", async _ =>
         {
             if (_sidebar.UpdateNowCommand.CanExecute(null))
@@ -1240,15 +1261,19 @@ public sealed class VersoBridge : IDisposable
                 unassigned = viewModel.UnassignedCount,
             },
             versionLabel = viewModel.AppVersionLabel,
-            update = new
-            {
-                canUpdateNow = viewModel.CanUpdateNow,
-                isReady = viewModel.UpdateIsReady,
-                title = viewModel.UpdateButtonTitle,
-                label = viewModel.UpdateButtonLabel,
-            },
+            update = SnapshotUpdateAction(viewModel),
         };
     }
+
+    private object SnapshotUpdateAction(SidebarViewModel viewModel) => new
+    {
+        canUpdateNow = viewModel.CanUpdateNow,
+        isReady = viewModel.UpdateIsReady,
+        hasUpdate = _services.GetService<UpdateCoordinator>()?.AvailableVersion is { } available
+            && AppVersion.IsNewer(available, viewModel.AppVersionLabel),
+        title = viewModel.UpdateButtonTitle,
+        label = viewModel.UpdateButtonLabel,
+    };
 
     private static object SnapshotDashboard(DashboardViewModel viewModel) => new
     {

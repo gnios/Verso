@@ -114,6 +114,19 @@ body,
   font-weight: var(--font-weight-medium);
 }
 
+.settings-update-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-update-summary {
+  display: grid;
+  gap: 4px;
+}
+
 .settings-details {
   border-bottom: 1px solid var(--color-border);
 }

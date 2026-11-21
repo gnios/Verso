@@ -6,6 +6,7 @@ import { Switch } from '@astryxdesign/core/Switch';
 import { Text } from '@astryxdesign/core/Text';
 import { invoke } from '../lib/bridge';
 import type { SettingsData } from '../types';
+import { UpdateSettings } from '../components/UpdateSettings';
 
 type SettingsChanges = Partial<Pick<SettingsData,
   'defaultLanguage' | 'liveTranscriptionEnabled' | 'identifySpeakersDefault'
@@ -89,6 +90,8 @@ export function SettingsPage() {
             : <Text color="secondary" role="status">Carregando…</Text>
         ) : (
           <>
+            <UpdateSettings />
+
             <section className="settings-section" aria-labelledby="settings-transcription">
               <Heading level={2} id="settings-transcription">Transcrição</Heading>
               <div className="settings-row settings-select-row">
