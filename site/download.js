@@ -1,16 +1,7 @@
 const packages = {
-  win: {
-    suffix: '-cpu-win-x64-setup.exe',
-    label: 'Windows x64',
-  },
-  mac: {
-    suffix: '-cpu-osx-arm64.zip',
-    label: 'macOS Apple Silicon',
-  },
-  linux: {
-    suffix: '-cpu-linux-x64.zip',
-    label: 'Linux x64',
-  },
+  win: '-cpu-win-x64-setup.exe',
+  mac: '-cpu-osx-arm64.zip',
+  linux: '-cpu-linux-x64.zip',
 };
 
 async function detectPackage() {
@@ -38,40 +29,53 @@ async function detectPackage() {
   return null;
 }
 
-async function updateDownloadLinks() {
-  const platform = detectPackage();
-  const response = await fetch('https://api.github.com/repos/gnios/Verso/releases/latest', { cache: 'no-cache' });
-  if (!response.ok) return;
-  const release = await response.json();
-  if (release.draft || release.prerelease || !Array.isArray(release.assets)) return;
+const downloadStatus = document.querySelector('[data-download-status]');
 
-  const visitorPackage = await platform;
+async function updateDownloadLinks() {
+  downloadStatus.textContent = 'Carregando os arquivos da versão estável…';
+  const [visitorPackage, response] = await Promise.all([
+    detectPackage(),
+    fetch('https://api.github.com/repos/gnios/Verso/releases/latest', {
+      cache: 'no-cache',
+      signal: AbortSignal.timeout(8000),
+    }),
+  ]);
+  if (!response.ok) throw new Error('Release request failed');
+  const release = await response.json();
+  if (release.draft || release.prerelease || !Array.isArray(release.assets)) {
+    throw new Error('Stable release unavailable');
+  }
+
+  let available = 0;
   for (const button of document.querySelectorAll('.os-button')) {
     const os = button.dataset.os;
-    const { suffix, label } = packages[os];
     const asset = release.assets.find((item) =>
-      item.name?.endsWith(suffix) &&
+      item.name?.endsWith(packages[os]) &&
       item.browser_download_url?.startsWith('https://github.com/gnios/Verso/releases/download/')
     );
-    if (!asset) continue;
-
-    button.href = asset.browser_download_url;
-    const size = Number.isFinite(asset.size) && asset.size > 0
-      ? Math.round(asset.size / 1048576) + ' MB'
-      : '';
-    button.querySelector('[data-size]').textContent = size ? ' · ' + size : '';
-    if (os !== visitorPackage) continue;
-
-    button.classList.add('os-recommended');
-    for (const link of document.querySelectorAll('[data-recommended-download]')) {
-      link.href = asset.browser_download_url;
-      link.textContent = 'Baixar para ' + label;
+    const details = button.querySelector('[data-size]');
+    if (!asset) {
+      details.textContent = ' · Indisponível';
+      continue;
     }
-    document.querySelector('[data-recommended-version]').textContent =
-      [release.tag_name, 'CPU', size].filter(Boolean).join(' · ');
+
+    available++;
+    button.href = asset.browser_download_url;
+    button.removeAttribute('aria-disabled');
+    if (Number.isFinite(asset.size) && asset.size > 0) {
+      details.textContent = ' · ' + Math.round(asset.size / 1048576) + ' MB';
+    }
+    if (os === visitorPackage) {
+      button.classList.add('os-recommended');
+      button.parentElement.prepend(button);
+    }
   }
+
+  downloadStatus.textContent = available
+    ? 'Versão estável ' + release.tag_name + ' · CPU'
+    : 'Esta versão estável não tem pacotes disponíveis.';
 }
 
 updateDownloadLinks().catch(() => {
-  // Keep the release-page links available if GitHub cannot be reached.
+  downloadStatus.textContent = 'Os downloads estão indisponíveis no momento. Recarregue a página para tentar de novo.';
 });

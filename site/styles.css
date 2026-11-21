@@ -206,18 +206,17 @@ h2 { margin-bottom: 16px; font-size: clamp(32px, 4vw, 44px); line-height: 1.1; f
 .download-copy { width: 68%; position: relative; z-index: 2; }
 .download-copy h2 { margin-bottom: 15px; font-size: 39px; }
 .download-copy > p { max-width: 520px; margin-bottom: 25px; color: var(--muted); font-size: 14px; }
-.download-recommendation { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 22px; }
-.download-recommendation span { color: var(--muted); font-size: 13px; }
-.download-recommendation span:empty { display: none; }
+.download-copy > .download-status { margin-bottom: 16px; }
+.download-status:empty { margin: 0; }
 .os-buttons { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
 .os-button { position: relative; display: flex; flex-direction: column; gap: 2px; min-width: 168px; padding: 13px 18px; border: 1px solid #e2deec; border-radius: 13px; background: #fff; text-decoration: none; transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease; }
-.os-button:hover { border-color: var(--purple-2); box-shadow: 0 10px 24px rgb(55 38 110 / 12%); transform: translateY(-2px); }
+.os-button[href]:hover { border-color: var(--purple-2); box-shadow: 0 10px 24px rgb(55 38 110 / 12%); transform: translateY(-2px); }
 .os-button b { color: var(--purple); font-size: 16px; font-weight: 800; }
 .os-button small { color: #5f5a72; font-size: 12px; }
 .os-flag { display: none; position: absolute; top: -9px; right: 10px; padding: 2px 8px; border-radius: 99px; color: #fff; background: var(--teal); font-size: 9px; font-weight: 800; letter-spacing: .4px; }
-.os-recommended { border-color: var(--teal); }
+.os-button[aria-disabled] { opacity: .6; }
+.os-recommended { border-color: var(--teal); background: #f2fbf9; }
 .os-recommended .os-flag { display: block; }
-.download-all { display: inline-block; }
 .download-note { max-width: 560px; margin-top: 20px; color: #5f5a72; font-size: 12px; line-height: 1.6; }
 .download-mascot { width: 215px; position: absolute; right: 40px; bottom: 0; opacity: .9; filter: drop-shadow(0 15px 13px rgb(55 38 110 / 10%)); }
 .download-card { max-width: 560px; display: flex; align-items: flex-start; gap: 12px; margin-top: 22px; padding: 14px 16px; border: 1px solid #ebe8f0; border-radius: 13px; background: #f7f6f9; }
