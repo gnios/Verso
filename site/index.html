@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#f6f3ff" />
     <meta
       name="description"
-      content="Verso transcreve entrevistas de graça e sem sair do seu computador: ouça junto com o texto, corrija trechos e exporte para a pesquisa."
+      content="Verso transcreve entrevistas e sem sair do seu computador: ouça junto com o texto, corrija trechos e exporte para a pesquisa."
     />
     <title>Verso &mdash; transcri&ccedil;&atilde;o de entrevistas no seu computador</title>
     <link rel="icon" type="image/png" href="assets/verso-logo.png" />
@@ -19,8 +19,8 @@
         <span>verso</span>
       </a>
       <nav class="desktop-nav" aria-label="Navega&ccedil;&atilde;o principal"><a href="#origem">Sobre</a><a href="#motores">Motores</a><a href="#como-funciona">Primeiros passos</a><a href="#recursos">Recursos</a><a href="#perguntas">Ajuda</a></nav>
-      <a class="button button-small button-dark header-download" href="#baixar" data-recommended-download>
-        Baixar gr&aacute;tis
+      <a class="button button-small button-dark header-download" href="#baixar">
+        Baixar
       </a>
       <details class="mobile-nav">
         <summary aria-label="Abrir navegação"><span></span><span></span></summary>
@@ -32,9 +32,9 @@
       <section class="hero section-wrap">
         <div class="hero-copy">
           <h1>Transcreva e revise<br /><em>entrevistas no seu computador.</em></h1>
-          <p class="hero-lede">O Verso transcreve entrevistas de graça no seu computador. Ouça o áudio enquanto revisa o texto e exporte a transcrição em RTF acadêmico, com formatação compatível com a ABNT NBR 14724.</p>
+          <p class="hero-lede">O Verso transcreve entrevistas no seu computador. Ouça o áudio enquanto revisa o texto e exporte a transcrição em RTF acadêmico, com formatação compatível com a ABNT NBR 14724.</p>
           <div class="hero-actions">
-            <a class="button button-primary" href="#baixar" data-recommended-download>Baixar gr&aacute;tis</a>
+            <a class="button button-primary" href="#baixar">Baixar</a>
             <a class="text-link" href="#como-funciona">Ver como funciona</a>
           </div>
           <div class="hero-proof" aria-label="Sistemas compat&iacute;veis">
@@ -201,17 +201,14 @@
       <section class="download section-wrap" id="baixar">
         <div class="download-copy">
           <h2>Baixe o Verso<br /><em>para o seu sistema.</em></h2>
-          <p>Os pacotes abaixo usam CPU. Para baixar a variante com aceleração gráfica, veja os arquivos da versão no GitHub.</p>
-          <div class="download-recommendation">
-            <a class="button button-primary" data-recommended-download href="https://github.com/gnios/Verso/releases/latest">Ver versão estável no GitHub</a>
-            <span data-recommended-version aria-live="polite"></span>
-          </div>
+          <p>Escolha o pacote para o seu sistema operacional.</p>
+          <p class="download-status" data-download-status role="status"></p>
+          <noscript><p>Ative o JavaScript para carregar os arquivos da versão estável.</p></noscript>
           <div class="os-buttons">
-            <a class="os-button" data-os="win" href="https://github.com/gnios/Verso/releases/latest"><b>Windows</b><small>Instalador &middot; Windows 10/11 x64<span data-size></span></small><span class="os-flag">Recomendado</span></a>
-            <a class="os-button" data-os="mac" href="https://github.com/gnios/Verso/releases/latest"><b>macOS</b><small>ZIP &middot; Apple Silicon<span data-size></span></small><span class="os-flag">Recomendado</span></a>
-            <a class="os-button" data-os="linux" href="https://github.com/gnios/Verso/releases/latest"><b>Linux</b><small>ZIP &middot; x64<span data-size></span></small><span class="os-flag">Recomendado</span></a>
+            <a class="os-button" data-os="win" aria-disabled="true"><b>Windows</b><small>Instalador &middot; Windows 10/11 x64<span data-size></span></small><span class="os-flag">Recomendado</span></a>
+            <a class="os-button" data-os="mac" aria-disabled="true"><b>macOS</b><small>ZIP &middot; Apple Silicon<span data-size></span></small><span class="os-flag">Recomendado</span></a>
+            <a class="os-button" data-os="linux" aria-disabled="true"><b>Linux</b><small>ZIP &middot; x64<span data-size></span></small><span class="os-flag">Recomendado</span></a>
           </div>
-          <a class="text-link download-all" href="https://github.com/gnios/Verso/releases/latest">Todos os arquivos da versão estável, incluindo GPU &#8599;</a>
           <p class="download-note">No Windows, o componente WebView2 j&aacute; vem instalado ou &eacute; adicionado pelo pr&oacute;prio instalador. No Linux, verifique se o WebKitGTK est&aacute; instalado — na maioria das distribui&ccedil;&otilde;es ele j&aacute; vem pronto.</p>
           <div class="download-card"><span class="download-card-icon">i</span><p><b>MP3, MP4 e outros formatos</b><br />Exigem o FFmpeg, um conversor gratuito — o <a href="https://github.com/gnios/Verso#readme">guia do reposit&oacute;rio</a> mostra como instalar.</p></div>
         </div>
@@ -230,12 +227,12 @@
       </section>
     </main>
 
-    <a class="mobile-cta" href="#baixar" data-recommended-download>Baixar gr&aacute;tis</a>
+    <a class="mobile-cta" href="#baixar">Baixar</a>
 
     <footer class="site-footer">
       <a class="brand footer-brand" href="#inicio"><img src="assets/verso-logo.png" alt="" width="36" height="36" /><span>verso</span></a>
       <p>Feito para ouvir com atenção.</p>
-      <div class="footer-links"><a href="https://github.com/gnios/Verso">GitHub</a><a href="https://github.com/gnios/Verso/releases/latest">Downloads</a><a href="https://github.com/gnios/Verso/issues">Ajuda e sugestões</a></div>
+      <div class="footer-links"><a href="https://github.com/gnios/Verso">Código-fonte no GitHub</a><a href="#baixar">Baixar</a><a href="https://github.com/gnios/Verso/issues">Ajuda e sugestões</a></div>
       <span class="copyright">© 2026 Verso</span>
     </footer>
     <script>
