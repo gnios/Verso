@@ -5,6 +5,21 @@ namespace Verso.Tests.Engine;
 public class FfmpegLocatorTests
 {
     [Fact]
+    public void EnsureFfmpeg_PrefersBundledExecutableOverPath()
+    {
+        var bundled = Path.Combine(Verso.Core.VersoPaths.PayloadDirectory, "ffmpeg", "ffmpeg.exe");
+        var locator = new FfmpegLocator(
+            () => throw new InvalidOperationException("PATH should not be consulted."),
+            path => path == bundled,
+            _ => false,
+            _ => [],
+            () => false,
+            isWindows: true);
+
+        Assert.Equal(bundled, locator.EnsureFfmpeg());
+    }
+
+    [Fact]
     public void EnsureFfmpeg_WhenPathContainsFfmpeg_ReturnsPath()
     {
         var ffmpegDir = @"C:\tools\ffmpeg\bin";

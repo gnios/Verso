@@ -285,6 +285,23 @@ jobs:
 
           echo "Validação OK"
 
+      - name: Preparar compilador do FFmpeg no Windows
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: mingw-w64-x86_64-gcc make curl tar xz
+
+      - name: Compilar e incluir FFmpeg no Windows
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: bash scripts/bundle-ffmpeg.sh "publish/${{ matrix.variant }}-${{ matrix.rid }}" "${{ matrix.rid }}"
+
+      - name: Compilar e incluir FFmpeg no Linux e macOS
+        if: runner.os != 'Windows'
+        shell: bash
+        run: bash scripts/bundle-ffmpeg.sh "publish/${{ matrix.variant }}-${{ matrix.rid }}" "${{ matrix.rid }}"
+
       - name: Empacotar zip
         shell: pwsh
         run: |
@@ -351,6 +368,10 @@ jobs:
           if ($installed.ExitCode -ne 0 -or -not (Test-Path (Join-Path $installDir 'Verso.App.exe') -PathType Leaf)) {
             throw "Instalação silenciosa falhou (código $($installed.ExitCode))."
           }
+          & (Join-Path $installDir 'engine/ffmpeg/ffmpeg.exe') -version
+          if ($LASTEXITCODE -ne 0) { throw 'FFmpeg instalado falhou.' }
+          & (Join-Path $installDir 'engine/ffmpeg/ffprobe.exe') -version
+          if ($LASTEXITCODE -ne 0) { throw 'FFprobe instalado falhou.' }
           $uninstaller = Join-Path $installDir 'unins000.exe'
           $removed = Start-Process $uninstaller -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' `
             -WindowStyle Hidden -Wait -PassThru

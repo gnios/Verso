@@ -91,7 +91,7 @@ O Verso suporta quatro modos de execução:
 
 - **Windows 10/11**, **Linux x64** ou **macOS Apple Silicon**
 - Runtime de WebView: WebView2 (Windows), WebKitGTK (Linux), WKWebView (macOS)
-- **FFmpeg** no `PATH` (no Windows o app pode oferecer instalação via winget)
+- Para transcrever MP3, MP4 e outros formatos em desenvolvimento, disponibilize o **FFmpeg** no `PATH`. Os pacotes de distribuição já incluem o FFmpeg.
 - Para build: **[.NET 10 SDK](https://dotnet.microsoft.com/download)** e **Node.js com npm** (apenas para desenvolvimento)
 
 ### 4.2 Build e execução em desenvolvimento
@@ -112,11 +112,16 @@ dotnet publish src/Verso.App -c Release -r win-x64 --self-contained true `
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=false `
   -o ./publish
 
+# Incluir FFmpeg e FFprobe na publicação manual
+bash scripts/bundle-ffmpeg.sh ./publish win-x64
+
 # Executar testes
 dotnet test
 ```
 
 O banco SQLite, as migrations e a pasta de dados (`data/`) são criados automaticamente no primeiro boot.
+
+O script de empacotamento compila o [FFmpeg](https://ffmpeg.org/) sob a LGPL a partir de uma versão fixa do código-fonte. No Windows, use o ambiente MSYS2 MINGW64 com os pacotes `mingw-w64-x86_64-gcc make curl tar xz`. No Linux e no macOS, use o compilador e o GNU Make nativos do sistema. Os binários, a licença, o código-fonte correspondente e o script de compilação ficam em `engine/ffmpeg/`.
 
 ### 4.3 Estrutura do projeto
 
@@ -250,7 +255,7 @@ Para gerar o MSIX x64 (CPU) para envio ao Partner Center, use o `MakeAppx.exe` x
 
 Envie o `.msix` de `artifacts/store/` na seção **Pacotes**. A Store assina o pacote após a certificação e distribui as atualizações. Para novas submissões, aumente a versão e mantenha o quarto componente em zero.
 
-Informe no início da descrição da Store que MP3, MP4 e outros formatos além de WAV requerem FFmpeg instalado separadamente. Para a certificação, indique que um WAV PCM permite testar a transcrição sem FFmpeg e que o primeiro uso requer internet para baixar o modelo. O Partner Center também exige a URL pública da política de privacidade.
+O pacote inclui o FFmpeg para transcrever MP3, MP4 e outros formatos. Para a certificação, informe que o primeiro uso requer internet para baixar o modelo. O Partner Center também exige a URL pública da política de privacidade.
 
 ---
 

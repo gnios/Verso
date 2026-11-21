@@ -17,13 +17,28 @@ $output = Join-Path $repo 'artifacts/store'
 $stage = Join-Path $output ('stage-' + [guid]::NewGuid())
 $package = Join-Path $output "Verso-Transcricao-$Version-x64.msix"
 
+$bash = Get-Command bash.exe -CommandType Application -All |
+    Where-Object { $_.Source -notlike "$env:WINDIR\*" } |
+    Select-Object -First 1
+if (-not $bash) { throw 'Execute o empacotamento com o Bash do MSYS2 MINGW64 no PATH.' }
+
 dotnet publish (Join-Path $repo 'src/Verso.App/Verso.App.csproj') `
     -c Release -r win-x64 --self-contained true `
     -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=false `
     -p:VersoIncludeGpuRuntimes=false -p:VersoStorePackage=true "-p:Version=$Version" -o $stage
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish falhou ($LASTEXITCODE)." }
 
-foreach ($required in @('Verso.App.exe', 'engine/Verso.Worker.exe', 'engine/wwwroot/index.html')) {
+# Windows PowerShell can surface native stderr as errors when the build log is redirected.
+try {
+    $ErrorActionPreference = 'Continue'
+    & $bash.Source ((Join-Path $PSScriptRoot 'bundle-ffmpeg.sh') -replace '\\', '/') ($stage -replace '\\', '/') win-x64
+} finally {
+    $ErrorActionPreference = 'Stop'
+}
+if ($LASTEXITCODE -ne 0) { throw "Build do FFmpeg falhou ($LASTEXITCODE)." }
+
+foreach ($required in @('Verso.App.exe', 'engine/Verso.Worker.exe', 'engine/wwwroot/index.html',
+                        'engine/ffmpeg/ffmpeg.exe', 'engine/ffmpeg/ffprobe.exe')) {
     if (-not (Test-Path -LiteralPath (Join-Path $stage $required) -PathType Leaf)) {
         throw "Arquivo ausente no pacote: $required"
     }
