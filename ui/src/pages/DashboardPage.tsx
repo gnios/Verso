@@ -1,5 +1,4 @@
 import { EmptyState } from '@astryxdesign/core/EmptyState';
-import { Grid } from '@astryxdesign/core/Grid';
 import { Heading } from '@astryxdesign/core/Heading';
 import { HStack } from '@astryxdesign/core/HStack';
 import { Icon } from '@astryxdesign/core/Icon';
@@ -104,25 +103,27 @@ export function DashboardPage({ parameter }: DashboardPageProps) {
   const isProgressEmpty = activeFilter === 'Progress' && !search.trim();
 
   return (
-    <VStack gap={4} padding={4} align="start">
-      <HStack justify="between" align="end" gap={4} width="100%">
+    <VStack className="library-page" gap={4} align="start">
+      <HStack className="library-toolbar" justify="between" align="end" gap={4} width="100%" wrap="wrap">
         <VStack gap={1} align="start">
           <Heading level={1}>{title}</Heading>
           <Text color="secondary">
             {loading ? 'Carregando…' : `${data?.cards.length ?? 0} transcrições`}
           </Text>
         </VStack>
-        <HStack gap={3} align="end">
-          <TextInput
-            type="search"
-            label="Buscar transcrições"
-            isLabelHidden
-            placeholder="Buscar por título…"
-            value={search}
-            onChange={onSearchChange}
-            startIcon={SearchIcon}
-            width={280}
-          />
+        <HStack className="library-controls" gap={3} align="end" wrap="wrap">
+          <div className="library-search">
+            <TextInput
+              type="search"
+              label="Buscar transcrições"
+              isLabelHidden
+              placeholder="Buscar por título…"
+              value={search}
+              onChange={onSearchChange}
+              startIcon={SearchIcon}
+              width="100%"
+            />
+          </div>
           <LibraryViewToggle value={viewMode} onChange={setViewMode} />
         </HStack>
       </HStack>
@@ -169,11 +170,11 @@ export function DashboardPage({ parameter }: DashboardPageProps) {
           <TranscriptionTableView cards={data.cards} />
         ) : null
       ) : (
-        <Grid columns={{ minWidth: 340, max: 3 }} gap={4} width="100%">
+        <div className="library-card-grid">
           {data?.cards.map((card) => (
             <TranscriptionCardView key={card.id} card={card} />
           ))}
-        </Grid>
+        </div>
       )}
     </VStack>
   );

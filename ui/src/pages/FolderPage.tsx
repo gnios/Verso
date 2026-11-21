@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { Badge } from '@astryxdesign/core/Badge';
 import { Button } from '@astryxdesign/core/Button';
 import { EmptyState } from '@astryxdesign/core/EmptyState';
-import { Grid } from '@astryxdesign/core/Grid';
 import { HStack } from '@astryxdesign/core/HStack';
 import { Heading } from '@astryxdesign/core/Heading';
 import { Icon } from '@astryxdesign/core/Icon';
@@ -75,17 +74,17 @@ export function FolderPage({ parameter }: FolderPageProps) {
   }
 
   return (
-    <VStack gap={4} padding={4} align="start" isScrollable>
-      <HStack justify="between" align="end" width="100%">
+    <VStack className="library-page" gap={4} align="start" isScrollable>
+      <HStack className="library-toolbar" justify="between" align="end" gap={4} width="100%" wrap="wrap">
         <VStack gap={1} align="start">
-          <HStack gap={2} align="center">
+          <HStack gap={2} align="center" wrap="wrap">
             <Text size="lg">{data.icon}</Text>
             <Heading level={1}>{data.title}</Heading>
             <Badge label={`${data.cards.length} transcrições`} />
           </HStack>
           {data.description ? <Text color="secondary">{data.description}</Text> : null}
         </VStack>
-        <HStack gap={2} align="center">
+        <HStack gap={2} align="center" wrap="wrap">
           <LibraryViewToggle value={viewMode} onChange={setViewMode} />
           <Button
             variant="primary"
@@ -125,7 +124,7 @@ export function FolderPage({ parameter }: FolderPageProps) {
           onAfterAction={() => void load()}
         />
       ) : (
-        <Grid columns={{ minWidth: 340, max: 3 }} gap={4} width="100%">
+        <div className="library-card-grid">
           {data.cards.map((card) => (
             <TranscriptionCardView
               key={card.id}
@@ -134,7 +133,7 @@ export function FolderPage({ parameter }: FolderPageProps) {
               onAfterAction={() => void load()}
             />
           ))}
-        </Grid>
+        </div>
       )}
     </VStack>
   );
