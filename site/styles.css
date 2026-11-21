@@ -206,6 +206,9 @@ h2 { margin-bottom: 16px; font-size: clamp(32px, 4vw, 44px); line-height: 1.1; f
 .download-copy { width: 68%; position: relative; z-index: 2; }
 .download-copy h2 { margin-bottom: 15px; font-size: 39px; }
 .download-copy > p { max-width: 520px; margin-bottom: 25px; color: var(--muted); font-size: 14px; }
+.download-recommendation { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 22px; }
+.download-recommendation span { color: var(--muted); font-size: 13px; }
+.download-recommendation span:empty { display: none; }
 .os-buttons { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
 .os-button { position: relative; display: flex; flex-direction: column; gap: 2px; min-width: 168px; padding: 13px 18px; border: 1px solid #e2deec; border-radius: 13px; background: #fff; text-decoration: none; transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease; }
 .os-button:hover { border-color: var(--purple-2); box-shadow: 0 10px 24px rgb(55 38 110 / 12%); transform: translateY(-2px); }
