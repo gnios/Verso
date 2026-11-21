@@ -32,7 +32,7 @@ async function detectPackage() {
 const downloadStatus = document.querySelector('[data-download-status]');
 
 async function updateDownloadLinks() {
-  downloadStatus.textContent = 'Carregando os arquivos da versão estável…';
+  downloadStatus.textContent = 'Carregando os pacotes do GitHub…';
   const [visitorPackage, response] = await Promise.all([
     detectPackage(),
     fetch('https://api.github.com/repos/gnios/Verso/releases/latest', {
@@ -47,7 +47,7 @@ async function updateDownloadLinks() {
   }
 
   let available = 0;
-  for (const button of document.querySelectorAll('.os-button')) {
+  for (const button of document.querySelectorAll('[data-os]')) {
     const os = button.dataset.os;
     const asset = release.assets.find((item) =>
       item.name?.endsWith(packages[os]) &&
@@ -55,7 +55,7 @@ async function updateDownloadLinks() {
     );
     const details = button.querySelector('[data-size]');
     if (!asset) {
-      details.textContent = ' · Indisponível';
+      if (os !== 'win') details.textContent = ' · Indisponível';
       continue;
     }
 
@@ -65,17 +65,17 @@ async function updateDownloadLinks() {
     if (Number.isFinite(asset.size) && asset.size > 0) {
       details.textContent = ' · ' + Math.round(asset.size / 1048576) + ' MB';
     }
-    if (os === visitorPackage) {
+    if (os !== 'win' && os === visitorPackage) {
       button.classList.add('os-recommended');
       button.parentElement.prepend(button);
     }
   }
 
   downloadStatus.textContent = available
-    ? 'Versão estável ' + release.tag_name + ' · CPU'
-    : 'Esta versão estável não tem pacotes disponíveis.';
+    ? 'Pacotes do GitHub ' + release.tag_name + ' · CPU'
+    : 'Esta versão estável não tem pacotes disponíveis no GitHub.';
 }
 
 updateDownloadLinks().catch(() => {
-  downloadStatus.textContent = 'Os downloads estão indisponíveis no momento. Recarregue a página para tentar de novo.';
+  downloadStatus.textContent = 'Não foi possível carregar os pacotes do GitHub. Recarregue a página para tentar de novo.';
 });
